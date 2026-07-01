@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "judets",
+  "info": {
+    "singularName": "judet",
+    "pluralName": "judets",
+    "displayName": "Judet"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "nume": {
+      "type": "string"
+    },
+    "abreviere": {
+      "type": "string"
+    },
+    "ongs": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::ong.ong",
+      "mappedBy": "judet"
+    },
+    "localitati": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::localitate.localitate",
+      "mappedBy": "judet"
+    }
+  }
+}

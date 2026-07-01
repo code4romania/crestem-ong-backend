@@ -1,0 +1,16 @@
+{
+  "error": {
+    "name": "ValidationError",
+    "message": "contentType.attributes.cui.required must be a `boolean` type, but the final value was: `\"true\"`.",
+    "details": {
+      "errors": [
+        {
+          "path": ["contentType", "attributes", "cui", "required"],
+          "message": "contentType.attributes.cui.required must be a `boolean` type, but the final value was: `\"true\"`.",
+          "name": "ValidationError",
+          "value": "true"
+        }
+      ]
+    }
+  }
+}

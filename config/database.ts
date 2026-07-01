@@ -1,7 +1,6 @@
 import path from 'path';
-import type { Core } from '@strapi/strapi';
 
-const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Database => {
+export default ({ env }) => {
   const client = env('DATABASE_CLIENT', 'sqlite');
 
   const connections = {
@@ -59,5 +58,3 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Database 
     },
   };
 };
-
-export default config;

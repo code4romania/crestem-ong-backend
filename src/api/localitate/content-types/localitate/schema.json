@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "localitates",
+  "info": {
+    "singularName": "localitate",
+    "pluralName": "localitates",
+    "displayName": "Localitate"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "nume": {
+      "type": "string"
+    },
+    "judet": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::judet.judet",
+      "inversedBy": "localitati"
+    },
+    "ongs": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::ong.ong",
+      "mappedBy": "localitate"
+    }
+  }
+}

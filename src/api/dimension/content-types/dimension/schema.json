@@ -1,0 +1,34 @@
+{
+  "kind": "collectionType",
+  "collectionName": "dimensions",
+  "info": {
+    "singularName": "dimension",
+    "pluralName": "dimensions",
+    "displayName": "Dimension",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "link": {
+      "type": "string"
+    },
+    "quiz": {
+      "type": "component",
+      "component": "matrix.question",
+      "repeatable": true
+    },
+    "activities": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::activity.activity",
+      "mappedBy": "dimension"
+    }
+  }
+}

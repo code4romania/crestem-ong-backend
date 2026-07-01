@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "reports",
+  "info": {
+    "singularName": "report",
+    "pluralName": "reports",
+    "displayName": "Report",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "evaluations": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::evaluation.evaluation",
+      "mappedBy": "report"
+    },
+    "deadline": {
+      "type": "date",
+      "required": true
+    },
+    "finished": {
+      "type": "boolean",
+      "required": true,
+      "default": false
+    }
+  }
+}

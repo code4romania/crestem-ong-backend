@@ -1,0 +1,105 @@
+/**
+ * Validation schemas for the `auth` API.
+ *
+ * Fields are derived from:
+ *  - users-permissions user content-type (account: nume, email, password, telefon)
+ *  - ong content-type (organization: name, cui, website, judet, localitate, acordTermeniSiConditii)
+ */
+
+import { z } from "zod";
+
+export const registerNgoSchema = z.object({
+  // --- Account (users-permissions user) ---
+  nume: z
+    .string({ message: "Numele persoanei este obligatoriu" })
+    .trim()
+    .min(3, "Numele trebuie să aibă minim 3 caractere"),
+  email: z
+    .email("Adresă de email invalidă")
+    .lowercase()
+    .min(6, "Adresa de email este prea scurtă")
+    .refine(
+      async (email) =>
+        !(await strapi.db
+          .query("plugin::users-permissions.user")
+          .findOne({ where: { email } })),
+      "Există deja un cont cu acest email",
+    ),
+  password: z
+    .string({ message: "Parola este obligatorie" })
+    .min(8, "Parola trebuie să aibă minim 8 caractere")
+    .regex(/[A-Z]/, "Parola trebuie să conțină cel puțin o literă mare")
+    .regex(/[0-9]/, "Parola trebuie să conțină cel puțin o cifră")
+    .regex(
+      /[^A-Za-z0-9]/,
+      "Parola trebuie să conțină cel puțin un caracter special",
+    ),
+  telefon: z
+    .string()
+    .trim()
+    .min(8, "Numărul de telefon este invalid")
+    .optional(),
+
+  // --- Organization (ong) ---
+  numeOng: z
+    .string({ message: "Numele organizației este obligatoriu" })
+    .trim()
+    .min(1, "Numele organizației este obligatoriu"),
+  cui: z
+    .string({ error: "C.U.I.-ul este obligatoriu" })
+    .trim()
+    .min(1, "C.U.I. invalid")
+    .refine(
+      async (cui) =>
+        !(await strapi.db.query("api::ong.ong").findOne({ where: { cui } })),
+      "Există deja o organizație cu acest C.U.I.",
+    ),
+  website: z.url("Adresa website-ului este invalidă").optional(),
+  judet: z
+    .string({ message: "Județul este obligatoriu" })
+    .trim()
+    .length(24, "Județul selectat este invalid"),
+  localitate: z
+    .string({ message: "Localitatea este obligatorie" })
+    .trim()
+    .length(24, "Localitatea selectată este invalidă"),
+  acordTermeniSiConditii: z.literal(true, {
+    message: "Trebuie să accepți termenii și condițiile",
+  }),
+});
+
+export const registerIndividualSchema = z.object({
+  // --- Account (users-permissions user) ---
+  nume: z
+    .string({ message: "Numele persoanei este obligatoriu" })
+    .trim()
+    .min(3, "Numele trebuie să aibă minim 3 caractere"),
+  email: z
+    .email("Adresă de email invalidă")
+    .lowercase()
+    .min(6, "Adresa de email este prea scurtă")
+    .refine(
+      async (email) =>
+        !(await strapi.db
+          .query("plugin::users-permissions.user")
+          .findOne({ where: { email } })),
+      "Există deja un cont cu acest email",
+    ),
+  password: z
+    .string({ message: "Parola este obligatorie" })
+    .min(8, "Parola trebuie să aibă minim 8 caractere")
+    .regex(/[A-Z]/, "Parola trebuie să conțină cel puțin o literă mare")
+    .regex(/[0-9]/, "Parola trebuie să conțină cel puțin o cifră")
+    .regex(
+      /[^A-Za-z0-9]/,
+      "Parola trebuie să conțină cel puțin un caracter special",
+    ),
+  telefon: z
+    .string()
+    .trim()
+    .min(8, "Numărul de telefon este invalid")
+    .optional(),
+  acordTermeniSiConditii: z.literal(true, {
+    message: "Trebuie să accepți termenii și condițiile",
+  }),
+});

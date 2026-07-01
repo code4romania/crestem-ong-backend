@@ -1,0 +1,66 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ongs",
+  "info": {
+    "singularName": "ong",
+    "pluralName": "ongs",
+    "displayName": "ONG",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "judet": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::judet.judet",
+      "inversedBy": "ongs"
+    },
+    "localitate": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::localitate.localitate",
+      "inversedBy": "ongs"
+    },
+    "website": {
+      "type": "string"
+    },
+    "acordTermeniSiConditii": {
+      "type": "boolean",
+      "required": true
+    },
+    "logo": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "cui": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "adresa": {
+      "type": "string"
+    },
+    "dataInfiintare": {
+      "type": "date"
+    },
+    "domeniuActivitate": {
+      "type": "string"
+    },
+    "users": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "ong"
+    }
+  }
+}
