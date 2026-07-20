@@ -34,6 +34,13 @@ const APP_ROLES = [
   },
 ];
 
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  "super-admin": [
+    "api::auth.auth.registerMentor",
+    "api::auth.auth.resendMentorInvite",
+  ],
+};
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -47,6 +54,7 @@ export default {
    */
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await ensureAppRoles(strapi);
+    await ensureRolePermissions(strapi);
   },
 };
 
@@ -68,5 +76,36 @@ async function ensureAppRoles(strapi: Core.Strapi) {
     strapi.log.info(
       `[bootstrap] Created users-permissions role "${role.type}".`,
     );
+  }
+}
+
+async function ensureRolePermissions(strapi: Core.Strapi) {
+  for (const [roleType, actions] of Object.entries(ROLE_PERMISSIONS)) {
+    const role = await strapi.db
+      .query("plugin::users-permissions.role")
+      .findOne({ where: { type: roleType } });
+
+    if (!role) {
+      strapi.log.warn(
+        `[bootstrap] Role "${roleType}" not found; skipping permission grants.`,
+      );
+      continue;
+    }
+
+    for (const action of actions) {
+      const existing = await strapi.db
+        .query("plugin::users-permissions.permission")
+        .findOne({ where: { action, role: role.id } });
+
+      if (existing) continue;
+
+      await strapi.db
+        .query("plugin::users-permissions.permission")
+        .create({ data: { action, role: role.id } });
+
+      strapi.log.info(
+        `[bootstrap] Granted "${action}" to role "${roleType}".`,
+      );
+    }
   }
 }

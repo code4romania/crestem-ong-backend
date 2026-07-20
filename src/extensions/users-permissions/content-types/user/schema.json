@@ -26,6 +26,12 @@
       "required": true,
       "unique": true
     },
+    "username": {
+      "type": "string",
+      "minLength": 6,
+      "configurable": false,
+      "unique": true
+    },
     "provider": {
       "type": "string",
       "configurable": false
@@ -65,6 +71,12 @@
     },
     "telefon": {
       "type": "string"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "active", "deleted"],
+      "default": "active",
+      "required": true
     },
     "ong": {
       "type": "relation",

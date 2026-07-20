@@ -1,6 +1,19 @@
 const REPORT_UID = 'api::report.report' as const;
 
 export default {
+  cleanupRefreshTokens: {
+    task: async ({ strapi }: { strapi: any }) => {
+      const removed = await strapi
+        .service('api::refresh-token.refresh-token')
+        .cleanup();
+      if (removed) {
+        strapi.log.info(`[cron] Removed ${removed} stale refresh tokens.`);
+      }
+    },
+    options: {
+      rule: '0 3 * * *',
+    },
+  },
   /**
    * Mark reports as finished once their deadline has passed.
    * Runs every day at midnight.

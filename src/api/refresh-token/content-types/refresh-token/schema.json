@@ -1,0 +1,42 @@
+{
+  "kind": "collectionType",
+  "collectionName": "refresh_tokens",
+  "info": {
+    "singularName": "refresh-token",
+    "pluralName": "refresh-tokens",
+    "displayName": "Refresh Token",
+    "description": "Stored refresh tokens for API authentication."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "tokenHash": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "private": true
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "familyId": {
+      "type": "string",
+      "required": true,
+      "private": true
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "revokedAt": {
+      "type": "datetime"
+    },
+    "userAgent": {
+      "type": "string"
+    }
+  }
+}
