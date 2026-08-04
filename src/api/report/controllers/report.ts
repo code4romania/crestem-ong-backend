@@ -2,8 +2,14 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
 import { computeProgress } from "../../evaluation/utils/progress";
+import { hasResponses, isProgramReport } from "../utils/lifecycle";
 import { assignMembersSchema } from "../validation/assign-members";
-import { updateReportSchema } from "../validation/report";
+import {
+  findActivePhaseForOng,
+  findOpenReport,
+  findPhaseReport,
+} from "../utils/association";
+import { todayInBucharest } from "../../../utils/date";
 
 const reportView = (report: any) => ({
   documentId: report.documentId,
@@ -15,7 +21,17 @@ const reportView = (report: any) => ({
   })),
 });
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayInBucharest();
+
+const phaseView = (phase: any) => ({
+  documentId: phase.documentId,
+  title: phase.title,
+  startDate: phase.startDate,
+  endDate: phase.endDate,
+  program: phase.program
+    ? { documentId: phase.program.documentId, name: phase.program.name }
+    : null,
+});
 
 export default factories.createCoreController(
   "api::report.report",
@@ -48,11 +64,11 @@ export default factories.createCoreController(
         const reports = await strapi.documents("api::report.report").findMany({
           filters: {
             ong: { documentId: user.ong.documentId },
-            program: { documentId: program.documentId },
+            phases: { program: { documentId: program.documentId } },
           },
           populate: {
             evaluations: { populate: { dimensions: true } },
-            phase: true,
+            phases: true,
           },
         });
         const programEntry: any = {
@@ -66,11 +82,12 @@ export default factories.createCoreController(
         const phases = [...((program.phases ?? []) as any[])].sort((a, b) =>
           `${a.startDate}`.localeCompare(`${b.startDate}`),
         );
-        const reportByPhase = new Map(
-          reports
-            .filter((report: any) => report.phase)
-            .map((report: any) => [report.phase.documentId, report]),
-        );
+        const reportByPhase = new Map<string, any>();
+        for (const report of reports as any[]) {
+          for (const phase of (report.phases ?? []) as any[]) {
+            reportByPhase.set(phase.documentId, report);
+          }
+        }
         programEntry.phases = phases.map((phase) => ({
           documentId: phase.documentId,
           title: phase.title,
@@ -88,12 +105,12 @@ export default factories.createCoreController(
         filters: { ong: { documentId: user.ong.documentId }, finished: false },
         sort: { createdAt: "desc" },
         populate: {
-          program: true,
+          phases: true,
           evaluations: { populate: { dimensions: true } },
         },
       });
       const standaloneReports = unfinished
-        .filter((report) => !report.program)
+        .filter((report) => ((report.phases ?? []) as any[]).length === 0)
         .map(reportView);
       return { data: { programRounds, standaloneReports } };
     },
@@ -146,21 +163,28 @@ export default factories.createCoreController(
         if (!activePhase.hasEvaluation) {
           return ctx.badRequest("Faza activă nu are evaluare");
         }
-        const existing = await strapi.documents("api::report.report").findMany({
-          filters: {
-            ong: { documentId: user.ong.documentId },
-            phase: { documentId: activePhase.documentId },
-          },
-          limit: 1,
-        });
+        const existing = await findPhaseReport(
+          strapi,
+          activePhase.documentId,
+          user.ong.documentId,
+        );
+        if (!existing) {
+          const open = await findOpenReport(
+            strapi,
+            user.ong.documentId,
+            activePhase.documentId,
+          );
+          if (open) {
+            return ctx.badRequest("Ai deja o evaluare în desfășurare");
+          }
+        }
         report =
-          existing[0] ??
+          existing ??
           (await strapi.documents("api::report.report").create({
             data: {
               finished: false,
               ong: user.ong.documentId,
-              program: program.documentId,
-              phase: activePhase.documentId,
+              phases: [activePhase.documentId],
             },
           }));
       } else {
@@ -236,16 +260,38 @@ export default factories.createCoreController(
       if (!user?.ong) {
         return ctx.badRequest("Utilizatorul nu aparține unei organizații");
       }
+      const open = await findOpenReport(strapi, user.ong.documentId);
+      if (open) {
+        return ctx.badRequest("Ai deja o evaluare în desfășurare");
+      }
+      const active = await findActivePhaseForOng(
+        strapi,
+        user.ong.documentId,
+        todayIso(),
+      );
+      if (active) {
+        const taken = await findPhaseReport(
+          strapi,
+          active.phase.documentId,
+          user.ong.documentId,
+        );
+        if (taken) {
+          return ctx.badRequest(`Faza ${active.phase.title} are deja o evaluare`);
+        }
+      }
       const created = await strapi.documents("api::report.report").create({
         data: {
           finished: false,
           ong: user.ong.documentId,
+          phases: active ? [active.phase.documentId] : [],
         },
+        populate: { phases: { populate: { program: true } } },
       });
       return {
         data: {
           documentId: created.documentId,
           finished: created.finished,
+          phases: ((created.phases ?? []) as any[]).map(phaseView),
         },
       };
     },
@@ -266,8 +312,7 @@ export default factories.createCoreController(
         documentId: ctx.params.documentId,
         populate: {
           ong: true,
-          program: true,
-          phase: true,
+          phases: { populate: { program: true } },
           evaluations: {
             populate: { dimensions: { populate: { quiz: true } } },
           },
@@ -280,20 +325,10 @@ export default factories.createCoreController(
         data: {
           documentId: report.documentId,
           finished: report.finished,
-          program: report.program
-            ? {
-                documentId: report.program.documentId,
-                name: report.program.name,
-              }
-            : null,
-          phase: report.phase
-            ? {
-                documentId: (report.phase as any).documentId,
-                title: (report.phase as any).title,
-                startDate: (report.phase as any).startDate,
-                endDate: (report.phase as any).endDate,
-              }
-            : null,
+          finishedAt: report.finishedAt,
+          closedBy: report.closedBy,
+          canDelete: !hasResponses(report as any),
+          phases: ((report.phases ?? []) as any[]).map(phaseView),
           evaluations: (report.evaluations ?? []).map((evaluation: any) => ({
             documentId: evaluation.documentId,
             email: evaluation.email,
@@ -303,13 +338,9 @@ export default factories.createCoreController(
         },
       };
     },
-    async updateOne(ctx: Context) {
+    async finishOne(ctx: Context) {
       if (!ctx.state.user) {
         return ctx.unauthorized();
-      }
-      const parsed = updateReportSchema.safeParse(ctx.request.body);
-      if (!parsed.success) {
-        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
       const user = await strapi
         .documents("plugin::users-permissions.user")
@@ -322,21 +353,70 @@ export default factories.createCoreController(
       }
       const report = await strapi.documents("api::report.report").findOne({
         documentId: ctx.params.documentId,
-        populate: { ong: true },
+        populate: { ong: true, phases: true },
       });
       if (!report || report.ong?.documentId !== user.ong.documentId) {
-        return ctx.badRequest("Raportul nu există");
+        return ctx.badRequest("Evaluarea nu există");
+      }
+      if (isProgramReport(report as any)) {
+        return ctx.badRequest(
+          "Evaluările de program se finalizează automat la încheierea fazei",
+        );
+      }
+      if (report.finished) {
+        return ctx.badRequest("Evaluarea este deja finalizată");
       }
       const updated = await strapi.documents("api::report.report").update({
         documentId: report.documentId,
-        data: parsed.data,
+        data: {
+          finished: true,
+          finishedAt: new Date().toISOString(),
+          closedBy: "manual",
+        },
       });
       return {
         data: {
           documentId: updated.documentId,
           finished: updated.finished,
+          finishedAt: updated.finishedAt,
+          closedBy: updated.closedBy,
         },
       };
+    },
+    async deleteOne(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const user = await strapi
+        .documents("plugin::users-permissions.user")
+        .findOne({
+          documentId: ctx.state.user.documentId,
+          populate: { ong: true },
+        });
+      if (!user?.ong) {
+        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
+      }
+      const report = await strapi.documents("api::report.report").findOne({
+        documentId: ctx.params.documentId,
+        populate: { ong: true, evaluations: { populate: { dimensions: true } } },
+      });
+      if (!report || report.ong?.documentId !== user.ong.documentId) {
+        return ctx.badRequest("Evaluarea nu există");
+      }
+      if (hasResponses(report as any)) {
+        return ctx.badRequest(
+          "Evaluarea are răspunsuri și nu poate fi ștearsă",
+        );
+      }
+      for (const evaluation of (report.evaluations ?? []) as any[]) {
+        await strapi
+          .documents("api::evaluation.evaluation")
+          .delete({ documentId: evaluation.documentId });
+      }
+      await strapi
+        .documents("api::report.report")
+        .delete({ documentId: report.documentId });
+      return { data: { documentId: report.documentId } };
     },
   }),
 );

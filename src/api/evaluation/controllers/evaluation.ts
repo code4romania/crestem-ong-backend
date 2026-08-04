@@ -2,6 +2,17 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { evaluationDimensionsSchema } from "../validation/evaluation";
 import { computeProgress } from "../utils/progress";
+import { toDateString, todayInBucharest } from "../../../utils/date";
+
+const reportPhaseView = (phase: any) => ({
+  documentId: phase.documentId,
+  title: phase.title,
+  startDate: phase.startDate,
+  endDate: phase.endDate,
+  program: phase.program
+    ? { documentId: phase.program.documentId, name: phase.program.name }
+    : null,
+});
 
 const evaluationView = (evaluation: any) => ({
   documentId: evaluation.documentId,
@@ -18,25 +29,12 @@ const evaluationView = (evaluation: any) => ({
     ? {
         documentId: evaluation.report.documentId,
         finished: evaluation.report.finished,
-        program: evaluation.report.program
-          ? {
-              documentId: evaluation.report.program.documentId,
-              name: evaluation.report.program.name,
-            }
-          : null,
-        phase: evaluation.report.phase
-          ? {
-              documentId: evaluation.report.phase.documentId,
-              title: evaluation.report.phase.title,
-              startDate: evaluation.report.phase.startDate,
-              endDate: evaluation.report.phase.endDate,
-            }
-          : null,
+        phases: (evaluation.report.phases ?? []).map(reportPhaseView),
       }
     : null,
 });
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayInBucharest();
 
 export default factories.createCoreController(
   "api::evaluation.evaluation",
@@ -67,7 +65,7 @@ export default factories.createCoreController(
           sort: { createdAt: "desc" },
           populate: {
             dimensions: true,
-            report: { populate: { program: true, phase: true } },
+            report: { populate: { phases: { populate: { program: true } } } },
           },
         });
       return {
@@ -76,20 +74,9 @@ export default factories.createCoreController(
           email: evaluation.email,
           report: {
             documentId: evaluation.report?.documentId,
-            program: evaluation.report?.program
-              ? {
-                  documentId: evaluation.report.program.documentId,
-                  name: evaluation.report.program.name,
-                }
-              : null,
-            phase: (evaluation.report as any)?.phase
-              ? {
-                  documentId: (evaluation.report as any).phase.documentId,
-                  title: (evaluation.report as any).phase.title,
-                  startDate: (evaluation.report as any).phase.startDate,
-                  endDate: (evaluation.report as any).phase.endDate,
-                }
-              : null,
+            phases: ((evaluation.report?.phases ?? []) as any[]).map(
+              reportPhaseView,
+            ),
           },
           progress: computeProgress(evaluation.dimensions),
         })),
@@ -105,7 +92,7 @@ export default factories.createCoreController(
           documentId: ctx.params.documentId,
           populate: {
             dimensions: { populate: { quiz: true } },
-            report: { populate: { program: true, phase: true } },
+            report: { populate: { phases: { populate: { program: true } } } },
           },
         });
       if (!evaluation) {
@@ -134,7 +121,7 @@ export default factories.createCoreController(
           documentId: ctx.params.documentId,
           populate: {
             dimensions: { populate: { quiz: true } },
-            report: { populate: { program: true, phase: true } },
+            report: { populate: { phases: { populate: { program: true } } } },
           },
         });
       if (!existing) {
@@ -148,9 +135,12 @@ export default factories.createCoreController(
       if (existing.report?.finished) {
         return ctx.badRequest("Runda de evaluare este închisă");
       }
+      const reportPhases = ((existing.report as any)?.phases ?? []) as any[];
       if (
-        (existing.report as any)?.phase &&
-        `${(existing.report as any).phase.endDate}` < todayIso()
+        reportPhases.length > 0 &&
+        reportPhases.every(
+          (phase) => toDateString(phase.endDate) < todayIso(),
+        )
       ) {
         return ctx.badRequest("Termenul fazei de evaluare a expirat");
       }
@@ -177,7 +167,7 @@ export default factories.createCoreController(
           data: { dimensions: [...saved, ...parsed.data] },
           populate: {
             dimensions: { populate: { quiz: true } },
-            report: { populate: { program: true, phase: true } },
+            report: { populate: { phases: { populate: { program: true } } } },
           },
         });
       return { data: evaluationView(updated) };

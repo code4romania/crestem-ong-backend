@@ -4,6 +4,8 @@
 
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
+import { computeProgress } from "../../evaluation/utils/progress";
+import { computeReportScores } from "../../report/utils/scores";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -79,6 +81,98 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         email: member.email,
         accountStatus: member.accountStatus,
       })),
+    };
+  },
+  async evaluations(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi.documents("api::report.report").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      sort: { createdAt: "desc" },
+      populate: {
+        phases: { populate: { program: true } },
+        evaluations: { populate: { dimensions: true } },
+      },
+    });
+    return {
+      data: reports.map((report: any) => ({
+        documentId: report.documentId,
+        createdAt: report.createdAt,
+        finished: report.finished,
+        finishedAt: report.finishedAt,
+        respondents: (report.evaluations ?? []).length,
+        completedRespondents: (report.evaluations ?? []).filter(
+          (evaluation: any) =>
+            computeProgress(evaluation.dimensions).complete,
+        ).length,
+        phases: ((report.phases ?? []) as any[]).map((phase) => ({
+          documentId: phase.documentId,
+          title: phase.title,
+          program: phase.program
+            ? { documentId: phase.program.documentId, name: phase.program.name }
+            : null,
+        })),
+      })),
+    };
+  },
+  async evaluationDetail(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const report = await strapi.documents("api::report.report").findOne({
+      documentId: ctx.params.reportDocumentId,
+      populate: {
+        ong: true,
+        phases: { populate: { program: true } },
+        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+      },
+    });
+    if (!report || report.ong?.documentId !== ctx.params.documentId) {
+      return ctx.badRequest("Evaluarea nu există");
+    }
+    const responses = (report.evaluations ?? []) as any[];
+    return {
+      data: {
+        documentId: report.documentId,
+        createdAt: report.createdAt,
+        finished: report.finished,
+        finishedAt: report.finishedAt,
+        closedBy: report.closedBy,
+        ong: { documentId: report.ong.documentId, name: report.ong.name },
+        phases: ((report.phases ?? []) as any[]).map((phase) => ({
+          documentId: phase.documentId,
+          title: phase.title,
+          startDate: phase.startDate,
+          endDate: phase.endDate,
+          program: phase.program
+            ? { documentId: phase.program.documentId, name: phase.program.name }
+            : null,
+        })),
+        respondents: responses.length,
+        completedRespondents: responses.filter(
+          (evaluation) => computeProgress(evaluation.dimensions).complete,
+        ).length,
+        scores: computeReportScores(responses),
+        evaluations: responses.map((evaluation) => ({
+          documentId: evaluation.documentId,
+          email: evaluation.email,
+          progress: computeProgress(evaluation.dimensions),
+          dimensions: (evaluation.dimensions ?? []).map((block: any) => ({
+            dimensionKey: block.dimensionKey,
+            comment: block.comment,
+            quiz: (block.quiz ?? []).map((question: any) => ({
+              answer: question.answer,
+            })),
+          })),
+        })),
+      },
     };
   },
 }));

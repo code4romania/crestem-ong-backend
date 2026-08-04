@@ -37,9 +37,9 @@
     },
     "reports": {
       "type": "relation",
-      "relation": "oneToMany",
+      "relation": "manyToMany",
       "target": "api::report.report",
-      "mappedBy": "phase"
+      "mappedBy": "phases"
     }
   }
 }

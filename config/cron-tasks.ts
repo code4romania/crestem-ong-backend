@@ -1,8 +1,5 @@
-import {
-  computeProgramStatus,
-  toDateString,
-  todayInBucharest,
-} from '../src/api/program/utils/status';
+import { computeProgramStatus } from '../src/api/program/utils/status';
+import { toDateString, todayInBucharest } from '../src/utils/date';
 
 const REPORT_UID = 'api::report.report' as const;
 const PROGRAM_UID = 'api::program.program' as const;
@@ -22,32 +19,43 @@ export default {
     },
   },
   /**
-   * Mark reports as finished once their phase (or program) end date has passed.
-   * Standalone reports are only closed manually.
-   * Runs every day at midnight.
+   * Mark program reports as finished once every phase they serve has ended.
+   * A report shared by two programs stays open until the later phase closes.
+   * Independent reports are only closed manually.
+   * Runs every day at midnight, Romanian time.
    */
-  updateExpiredReports: {
+  finishExpiredProgramReports: {
     task: async ({ strapi }: { strapi: any }) => {
       const reports: any[] = await strapi.documents(REPORT_UID).findMany({
         filters: { finished: false },
-        populate: { phase: true, program: true },
+        populate: { phases: true },
       });
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayInBucharest();
+      let closed = 0;
       for (const report of reports) {
-        const endDate = report.phase?.endDate ?? report.program?.endDate;
-        if (!endDate) {
+        const phases: any[] = report.phases ?? [];
+        if (phases.length === 0) {
           continue;
         }
-        if (`${endDate}` < today) {
+        if (phases.every((phase) => toDateString(phase.endDate) < today)) {
           await strapi.documents(REPORT_UID).update({
             documentId: report.documentId,
-            data: { finished: true },
+            data: {
+              finished: true,
+              finishedAt: new Date().toISOString(),
+              closedBy: 'auto',
+            },
           });
+          closed += 1;
         }
+      }
+      if (closed) {
+        strapi.log.info(`[cron] Finished ${closed} expired program reports.`);
       }
     },
     options: {
       rule: '0 0 * * *',
+      tz: 'Europe/Bucharest',
     },
   },
   updateProgramStatuses: {

@@ -25,9 +25,15 @@ export default {
       config: { policies: ["global::is-ngo-admin"] },
     },
     {
-      method: "PUT",
+      method: "POST",
+      path: "/reports/:documentId/finish",
+      handler: "report.finishOne",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
+      method: "DELETE",
       path: "/reports/:documentId",
-      handler: "report.updateOne",
+      handler: "report.deleteOne",
       config: { policies: ["global::is-ngo-admin"] },
     },
   ],

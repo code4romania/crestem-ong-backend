@@ -18,5 +18,17 @@ export default {
       handler: "program.removeOngs",
       config: { policies: ["global::is-super-admin"] },
     },
+    {
+      method: "POST",
+      path: "/programs/withdraw-ongs",
+      handler: "program.withdrawOngs",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
+      method: "POST",
+      path: "/programs/:documentId/phases/:phaseDocumentId/evaluation",
+      handler: "program.assignPhaseEvaluation",
+      config: { policies: ["global::is-super-admin"] },
+    },
   ],
 };

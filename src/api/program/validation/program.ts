@@ -38,17 +38,20 @@ const phasesChecks = (
     }
     titles.add(title);
   }
+};
+
+export const overlappingPhases = (
+  phases: { title: string; startDate: string; endDate: string }[],
+) => {
   const sorted = [...phases].sort((a, b) =>
     a.startDate.localeCompare(b.startDate),
   );
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].startDate <= sorted[i - 1].endDate) {
-      ctx.addIssue({
-        code: "custom",
-        message: `Fazele ${sorted[i - 1].title} și ${sorted[i].title} se suprapun`,
-      });
+      return { earlier: sorted[i - 1], later: sorted[i] };
     }
   }
+  return null;
 };
 
 const createPhaseSchema = z

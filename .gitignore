@@ -131,3 +131,4 @@ build
 .strapi-cloud.json
 .claude
 docs
+.superpowers/*

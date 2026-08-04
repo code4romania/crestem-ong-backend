@@ -641,7 +641,7 @@ export interface ApiPhasePhase extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
-    reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
+    reports: Schema.Attribute.Relation<'manyToMany', 'api::report.report'>;
     startDate: Schema.Attribute.Date & Schema.Attribute.Required;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
@@ -686,7 +686,6 @@ export interface ApiProgramProgram extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.DefaultTo<'Upcoming'>;
     publishedAt: Schema.Attribute.DateTime;
-    reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
     startDate: Schema.Attribute.Date & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -749,6 +748,7 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    closedBy: Schema.Attribute.Enumeration<['manual', 'auto']>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -759,6 +759,7 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
     finished: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<false>;
+    finishedAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -766,8 +767,7 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
-    phase: Schema.Attribute.Relation<'manyToOne', 'api::phase.phase'>;
-    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    phases: Schema.Attribute.Relation<'manyToMany', 'api::phase.phase'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

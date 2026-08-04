@@ -40,12 +40,6 @@
       "target": "api::ong.ong",
       "inversedBy": "programs"
     },
-    "reports": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::report.report",
-      "mappedBy": "program"
-    },
     "phases": {
       "type": "relation",
       "relation": "oneToMany",

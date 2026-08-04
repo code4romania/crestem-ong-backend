@@ -23,21 +23,27 @@
       "required": true,
       "default": false
     },
+    "finishedAt": {
+      "type": "datetime",
+      "required": false
+    },
+    "closedBy": {
+      "type": "enumeration",
+      "enum": [
+        "manual",
+        "auto"
+      ],
+      "required": false
+    },
     "ong": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::ong.ong",
       "inversedBy": "reports"
     },
-    "program": {
+    "phases": {
       "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::program.program",
-      "inversedBy": "reports"
-    },
-    "phase": {
-      "type": "relation",
-      "relation": "manyToOne",
+      "relation": "manyToMany",
       "target": "api::phase.phase",
       "inversedBy": "reports"
     }
