@@ -1,3 +1,7 @@
-import { factories } from '@strapi/strapi';
+import { DIMENSIONS } from "../../../constants/dimensions";
 
-export default factories.createCoreController('api::dimension.dimension');
+export default {
+  async find() {
+    return DIMENSIONS;
+  },
+};

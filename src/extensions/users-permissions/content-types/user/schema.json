@@ -72,9 +72,17 @@
     "telefon": {
       "type": "string"
     },
-    "status": {
+    "acordTermeniSiConditii": {
+      "type": "boolean",
+      "default": false
+    },
+    "accountStatus": {
       "type": "enumeration",
-      "enum": ["pending", "active", "deleted"],
+      "enum": [
+        "pending",
+        "active",
+        "deleted"
+      ],
       "default": "active",
       "required": true
     },

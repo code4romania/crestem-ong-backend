@@ -413,9 +413,19 @@ export interface ApiActivityActivity extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    dimension: Schema.Attribute.Relation<
-      'manyToOne',
-      'api::dimension.dimension'
+    dimension: Schema.Attribute.Enumeration<
+      [
+        'guvernanta',
+        'aspecte_financiare',
+        'managementul_informatiei',
+        'monitorizare_si_evaluare',
+        'structura_organizationala',
+        'leadership',
+        'managementul_resurselor_umane',
+        'implicarea_persoanelor_beneficiare',
+        'advocacy_si_networking',
+        'comunicare_externa',
+      ]
     >;
     duration: Schema.Attribute.Float;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -431,41 +441,6 @@ export interface ApiActivityActivity extends Struct.CollectionTypeSchema {
       'oneToOne',
       'api::activity-type.activity-type'
     >;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
-export interface ApiDimensionDimension extends Struct.CollectionTypeSchema {
-  collectionName: 'dimensions';
-  info: {
-    description: '';
-    displayName: 'Dimension';
-    pluralName: 'dimensions';
-    singularName: 'dimension';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    activities: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::activity.activity'
-    >;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    link: Schema.Attribute.String;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::dimension.dimension'
-    > &
-      Schema.Attribute.Private;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
-    publishedAt: Schema.Attribute.DateTime;
-    quiz: Schema.Attribute.Component<'matrix.question', true>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -594,38 +569,6 @@ export interface ApiLocalitateLocalitate extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiMatrixMatrix extends Struct.SingleTypeSchema {
-  collectionName: 'matrices';
-  info: {
-    description: '';
-    displayName: 'Matrix';
-    pluralName: 'matrices';
-    singularName: 'matrix';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    dimensions: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::dimension.dimension'
-    >;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::matrix.matrix'
-    > &
-      Schema.Attribute.Private;
-    publishedAt: Schema.Attribute.DateTime;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
 export interface ApiOngOng extends Struct.CollectionTypeSchema {
   collectionName: 'ongs';
   info: {
@@ -638,8 +581,6 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    acordTermeniSiConditii: Schema.Attribute.Boolean &
-      Schema.Attribute.Required;
     adresa: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -659,7 +600,12 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     logo: Schema.Attribute.Media<'images'>;
     name: Schema.Attribute.String;
+    ngoStatus: Schema.Attribute.Enumeration<['active', 'blocked', 'deleted']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'active'>;
+    programs: Schema.Attribute.Relation<'manyToMany', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
+    reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -668,6 +614,39 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
       'plugin::users-permissions.user'
     >;
     website: Schema.Attribute.String;
+  };
+}
+
+export interface ApiPhasePhase extends Struct.CollectionTypeSchema {
+  collectionName: 'phases';
+  info: {
+    description: '';
+    displayName: 'Phase';
+    pluralName: 'phases';
+    singularName: 'phase';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    endDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    hasEvaluation: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::phase.phase'> &
+      Schema.Attribute.Private;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
+    startDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -693,9 +672,21 @@ export interface ApiProgramProgram extends Struct.CollectionTypeSchema {
       'api::program.program'
     > &
       Schema.Attribute.Private;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
+    mentors: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    >;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    ongs: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
+    phases: Schema.Attribute.Relation<'oneToMany', 'api::phase.phase'>;
+    programStatus: Schema.Attribute.Enumeration<
+      ['Upcoming', 'Active', 'Finished']
+    > &
+      Schema.Attribute.DefaultTo<'Upcoming'>;
     publishedAt: Schema.Attribute.DateTime;
-    sponsorName: Schema.Attribute.String;
+    reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
     startDate: Schema.Attribute.Date & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -761,7 +752,6 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    deadline: Schema.Attribute.Date & Schema.Attribute.Required;
     evaluations: Schema.Attribute.Relation<
       'oneToMany',
       'api::evaluation.evaluation'
@@ -775,6 +765,9 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
       'api::report.report'
     > &
       Schema.Attribute.Private;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    phase: Schema.Attribute.Relation<'manyToOne', 'api::phase.phase'>;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1239,6 +1232,13 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    accountStatus: Schema.Attribute.Enumeration<
+      ['pending', 'active', 'deleted']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'active'>;
+    acordTermeniSiConditii: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -1275,9 +1275,6 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
-    status: Schema.Attribute.Enumeration<['pending', 'active', 'deleted']> &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'active'>;
     telefon: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1302,13 +1299,12 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::activity-type.activity-type': ApiActivityTypeActivityType;
       'api::activity.activity': ApiActivityActivity;
-      'api::dimension.dimension': ApiDimensionDimension;
       'api::domain.domain': ApiDomainDomain;
       'api::evaluation.evaluation': ApiEvaluationEvaluation;
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
-      'api::matrix.matrix': ApiMatrixMatrix;
       'api::ong.ong': ApiOngOng;
+      'api::phase.phase': ApiPhasePhase;
       'api::program.program': ApiProgramProgram;
       'api::refresh-token.refresh-token': ApiRefreshTokenRefreshToken;
       'api::report.report': ApiReportReport;

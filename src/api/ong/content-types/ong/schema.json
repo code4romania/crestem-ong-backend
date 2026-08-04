@@ -30,10 +30,6 @@
     "website": {
       "type": "string"
     },
-    "acordTermeniSiConditii": {
-      "type": "boolean",
-      "required": true
-    },
     "logo": {
       "type": "media",
       "multiple": false,
@@ -61,6 +57,28 @@
       "relation": "oneToMany",
       "target": "plugin::users-permissions.user",
       "mappedBy": "ong"
+    },
+    "reports": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::report.report",
+      "mappedBy": "ong"
+    },
+    "programs": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::program.program",
+      "mappedBy": "ongs"
+    },
+    "ngoStatus": {
+      "type": "enumeration",
+      "enum": [
+        "active",
+        "blocked",
+        "deleted"
+      ],
+      "required": true,
+      "default": "active"
     }
   }
 }

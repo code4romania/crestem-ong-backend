@@ -14,7 +14,8 @@
   "attributes": {
     "name": {
       "type": "string",
-      "required": true
+      "required": true,
+      "unique": true
     },
     "startDate": {
       "type": "date",
@@ -24,8 +25,37 @@
       "type": "date",
       "required": true
     },
-    "sponsorName": {
-      "type": "string"
+    "programStatus": {
+      "type": "enumeration",
+      "enum": [
+        "Upcoming",
+        "Active",
+        "Finished"
+      ],
+      "default": "Upcoming"
+    },
+    "ongs": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::ong.ong",
+      "inversedBy": "programs"
+    },
+    "reports": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::report.report",
+      "mappedBy": "program"
+    },
+    "phases": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::phase.phase",
+      "mappedBy": "program"
+    },
+    "mentors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
     }
   }
 }

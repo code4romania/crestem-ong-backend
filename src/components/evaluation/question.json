@@ -8,8 +8,8 @@
   "attributes": {
     "answer": {
       "type": "integer",
-      "max": 4,
-      "min": 0,
+      "max": 5,
+      "min": 1,
       "required": true
     }
   }

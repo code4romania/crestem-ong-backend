@@ -38,7 +38,41 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   "super-admin": [
     "api::auth.auth.registerMentor",
     "api::auth.auth.resendMentorInvite",
+    "api::auth.auth.changePassword",
+    "api::program.program.list",
+    "api::program.program.detail",
+    "api::program.program.createOne",
+    "api::program.program.updateOne",
+    "api::program.program.deleteOne",
+    "api::program.program.assignMentors",
+    "api::program.program.removeMentors",
+    "api::program.program.mentors",
+    "api::program.program.ongs",
+    "api::program.program.assignOngs",
+    "api::program.program.removeOngs",
+    "api::ong.ong.list",
+    "api::ong.ong.listActive",
+    "api::mentor.mentor.listActive",
   ],
+  "ngo-admin": [
+    "api::auth.auth.changePassword",
+    "api::auth.auth.registerMember",
+    "api::auth.auth.resendMemberInvite",
+    "api::ong.ong.members",
+    "api::report.report.current",
+    "api::report.report.assignMembers",
+    "api::report.report.createOne",
+    "api::report.report.detail",
+    "api::report.report.updateOne",
+  ],
+  "ngo-member": [
+    "api::auth.auth.changePassword",
+    "api::evaluation.evaluation.current",
+    "api::evaluation.evaluation.detail",
+    "api::evaluation.evaluation.updateOne",
+  ],
+  mentor: ["api::auth.auth.changePassword"],
+  individual: ["api::auth.auth.changePassword"],
 };
 
 export default {
@@ -80,17 +114,12 @@ async function ensureAppRoles(strapi: Core.Strapi) {
 }
 
 async function ensureRolePermissions(strapi: Core.Strapi) {
-  for (const [roleType, actions] of Object.entries(ROLE_PERMISSIONS)) {
-    const role = await strapi.db
-      .query("plugin::users-permissions.role")
-      .findOne({ where: { type: roleType } });
+  const roles = await strapi.db
+    .query("plugin::users-permissions.role")
+    .findMany();
 
-    if (!role) {
-      strapi.log.warn(
-        `[bootstrap] Role "${roleType}" not found; skipping permission grants.`,
-      );
-      continue;
-    }
+  for (const role of roles) {
+    const actions = ROLE_PERMISSIONS[role.type] ?? [];
 
     for (const action of actions) {
       const existing = await strapi.db
@@ -104,7 +133,35 @@ async function ensureRolePermissions(strapi: Core.Strapi) {
         .create({ data: { action, role: role.id } });
 
       strapi.log.info(
-        `[bootstrap] Granted "${action}" to role "${roleType}".`,
+        `[bootstrap] Granted "${action}" to role "${role.type}".`,
+      );
+    }
+
+    const stale = await strapi.db
+      .query("plugin::users-permissions.permission")
+      .findMany({
+        where: {
+          role: role.id,
+          action: { $startsWith: "api::" },
+          $not: { action: { $in: actions } },
+        },
+      });
+
+    for (const permission of stale) {
+      await strapi.db
+        .query("plugin::users-permissions.permission")
+        .delete({ where: { id: permission.id } });
+
+      strapi.log.info(
+        `[bootstrap] Revoked "${permission.action}" from role "${role.type}" (not in code matrix).`,
+      );
+    }
+  }
+
+  for (const roleType of Object.keys(ROLE_PERMISSIONS)) {
+    if (!roles.some((role) => role.type === roleType)) {
+      strapi.log.warn(
+        `[bootstrap] Role "${roleType}" not found; skipping permission grants.`,
       );
     }
   }

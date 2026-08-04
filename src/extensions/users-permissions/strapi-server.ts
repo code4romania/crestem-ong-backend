@@ -20,9 +20,9 @@ export default (plugin: any) => {
 
       const user = await strapi.db
         .query("plugin::users-permissions.user")
-        .findOne({ where: { id: userId }, select: ["status"] });
+        .findOne({ where: { id: userId }, select: ["accountStatus"] });
 
-      if (user && BLOCKED_STATUSES.includes(user.status)) {
+      if (user && BLOCKED_STATUSES.includes(user.accountStatus)) {
         ctx.body = null;
         throw new ApplicationError(
           "Contul tău nu este activat. Verifică emailul primit.",

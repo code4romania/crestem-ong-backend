@@ -18,10 +18,19 @@
       "target": "api::activity-type.activity-type"
     },
     "dimension": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::dimension.dimension",
-      "inversedBy": "activities"
+      "type": "enumeration",
+      "enum": [
+        "guvernanta",
+        "aspecte_financiare",
+        "managementul_informatiei",
+        "monitorizare_si_evaluare",
+        "structura_organizationala",
+        "leadership",
+        "managementul_resurselor_umane",
+        "implicarea_persoanelor_beneficiare",
+        "advocacy_si_networking",
+        "comunicare_externa"
+      ]
     },
     "startDate": {
       "type": "date",

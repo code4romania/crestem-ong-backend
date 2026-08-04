@@ -6,8 +6,12 @@ import {
   registerNgoSchema,
   registerIndividualSchema,
   registerMentorSchema,
-  activateMentorSchema,
+  registerMemberSchema,
+  activateAccountSchema,
   refreshTokenSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
 } from "../validation/auth";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
@@ -88,7 +92,6 @@ export default {
           ? "Contul de mentor a fost creat. Invitația a fost trimisă pe email."
           : "Contul de mentor a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
-        status: result.status,
         emailSent: result.emailSent,
       };
     } catch (error) {
@@ -98,16 +101,51 @@ export default {
       );
     }
   },
-  async activateMentor(ctx: Context) {
+  async registerMember(ctx: Context) {
     try {
-      const data = ctx.request.body;
-
-      const parsed = await activateMentorSchema.safeParseAsync(data);
+      const parsed = await registerMemberSchema.safeParseAsync(
+        ctx.request.body,
+      );
       if (!parsed.success) {
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
 
-      await (strapi.service("api::auth.auth") as AuthService).activateMentor(
+      const admin = await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { id: ctx.state.user.id }, populate: ["ong"] });
+
+      if (!admin?.ong) {
+        return ctx.badRequest("Contul tău nu este asociat unei organizații");
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).createMember(parsed.data, { id: admin.ong.id, name: admin.ong.name });
+
+      return {
+        message: result.emailSent
+          ? "Contul de membru a fost creat. Invitația a fost trimisă pe email."
+          : "Contul de membru a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
+        id: result.id,
+        emailSent: result.emailSent,
+      };
+    } catch (error) {
+      console.error("registerMember failed", error);
+      return ctx.badRequest(
+        "A apărut o eroare neașteptată în timpul înregistrării. Te rugăm să încerci din nou mai târziu.",
+      );
+    }
+  },
+  async activate(ctx: Context) {
+    try {
+      const data = ctx.request.body;
+
+      const parsed = await activateAccountSchema.safeParseAsync(data);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      await (strapi.service("api::auth.auth") as AuthService).activateAccount(
         parsed.data,
       );
 
@@ -115,7 +153,7 @@ export default {
         message: "Contul a fost activat cu succes. Te poți autentifica acum.",
       };
     } catch (error) {
-      console.error("activateMentor failed", error);
+      console.error("activate failed", error);
       return ctx.badRequest(error.message);
     }
   },
@@ -136,6 +174,34 @@ export default {
       };
     } catch (error) {
       console.error("resendMentorInvite failed", error);
+      return ctx.badRequest(error.message);
+    }
+  },
+  async resendMemberInvite(ctx: Context) {
+    try {
+      const userId = Number(ctx.params.id);
+
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return ctx.badRequest("Identificator invalid");
+      }
+
+      const admin = await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { id: ctx.state.user.id }, populate: ["ong"] });
+
+      if (!admin?.ong) {
+        return ctx.badRequest("Contul tău nu este asociat unei organizații");
+      }
+
+      await (
+        strapi.service("api::auth.auth") as AuthService
+      ).resendMemberInvite(userId, admin.ong.id);
+
+      return {
+        message: "Invitația a fost retrimisă.",
+      };
+    } catch (error) {
+      console.error("resendMemberInvite failed", error);
       return ctx.badRequest(error.message);
     }
   },
@@ -176,5 +242,63 @@ export default {
     }
 
     return { message: "Delogare reușită" };
+  },
+  async forgotPassword(ctx: Context) {
+    const parsed = await forgotPasswordSchema.safeParseAsync(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+
+    try {
+      await (strapi.service("api::auth.auth") as AuthService).forgotPassword(
+        parsed.data.email,
+      );
+    } catch (error) {
+      console.error("forgotPassword failed", error);
+    }
+
+    return {
+      message: "Dacă există un cont cu acest email, vei primi un link de resetare",
+    };
+  },
+  async resetPassword(ctx: Context) {
+    try {
+      const parsed = await resetPasswordSchema.safeParseAsync(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      await (strapi.service("api::auth.auth") as AuthService).resetPassword(
+        parsed.data,
+      );
+
+      return {
+        message: "Parola a fost resetată cu succes. Te poți autentifica acum.",
+      };
+    } catch (error) {
+      console.error("resetPassword failed", error);
+      return ctx.badRequest(error.message);
+    }
+  },
+  async changePassword(ctx: Context) {
+    try {
+      const parsed = await changePasswordSchema.safeParseAsync(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).changePassword(
+        ctx.state.user.id,
+        parsed.data,
+        ctx.request.header["user-agent"],
+      );
+
+      return { ...result, message: "Parola a fost schimbată cu succes" };
+    } catch (error) {
+      console.error("changePassword failed", error);
+      return ctx.badRequest(error.message);
+    }
   },
 };

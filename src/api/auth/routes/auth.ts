@@ -26,8 +26,20 @@ export default {
     },
     {
       method: "POST",
-      path: "/auth/mentor/activate",
-      handler: "auth.activateMentor",
+      path: "/auth/register/member",
+      handler: "auth.registerMember",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
+      method: "POST",
+      path: "/auth/register/member/:id/resend",
+      handler: "auth.resendMemberInvite",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
+      method: "POST",
+      path: "/auth/activate",
+      handler: "auth.activate",
       config: { auth: false },
     },
     {
@@ -41,6 +53,24 @@ export default {
       path: "/auth/logout",
       handler: "auth.logout",
       config: { auth: false },
+    },
+    {
+      method: "POST",
+      path: "/auth/forgot-password",
+      handler: "auth.forgotPassword",
+      config: { auth: false, middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
+    {
+      method: "POST",
+      path: "/auth/reset-password",
+      handler: "auth.resetPassword",
+      config: { auth: false, middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
+    {
+      method: "POST",
+      path: "/auth/change-password",
+      handler: "auth.changePassword",
+      config: { middlewares: ["plugin::users-permissions.rateLimit"] },
     },
   ],
 };

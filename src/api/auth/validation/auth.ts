@@ -56,7 +56,12 @@ export const registerNgoSchema = z.object({
           .findOne({ where: { cui: { $eqi: cui } } })),
       "Există deja o organizație cu acest C.U.I.",
     ),
-  website: z.url("Adresa website-ului este invalidă").optional(),
+  website: z
+    .string()
+    .trim()
+    .transform((v) => (/^https?:\/\//i.test(v) ? v : `https://${v}`))
+    .pipe(z.url({ protocol: /^https?$/, error: "Adresa website-ului este invalidă" }))
+    .optional(),
   judet: z
     .string({ message: "Județul este obligatoriu" })
     .trim()
@@ -79,6 +84,10 @@ const passwordSchema = z
     /[^A-Za-z0-9]/,
     "Parola trebuie să conțină cel puțin un caracter special",
   );
+
+const confirmedPasswordSchema = z.string({
+  message: "Confirmarea parolei este obligatorie",
+});
 
 export const registerIndividualSchema = z.object({
   // --- Account (users-permissions user) ---
@@ -108,7 +117,7 @@ export const registerIndividualSchema = z.object({
   }),
 });
 
-export const registerMentorSchema = z.object({
+const inviteSchema = z.object({
   nume: z
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
@@ -131,13 +140,22 @@ export const registerMentorSchema = z.object({
     .optional(),
 });
 
-export const activateMentorSchema = z.object({
-  token: z
-    .string({ message: "Tokenul este obligatoriu" })
-    .trim()
-    .min(1, "Tokenul este obligatoriu"),
-  password: passwordSchema,
-});
+export const registerMentorSchema = inviteSchema;
+export const registerMemberSchema = inviteSchema;
+
+export const activateAccountSchema = z
+  .object({
+    token: z
+      .string({ message: "Tokenul este obligatoriu" })
+      .trim()
+      .min(1, "Tokenul este obligatoriu"),
+    password: passwordSchema,
+    confirmedPassword: confirmedPasswordSchema,
+  })
+  .refine((data) => data.password === data.confirmedPassword, {
+    message: "Parolele nu coincid",
+    path: ["confirmedPassword"],
+  });
 
 export const refreshTokenSchema = z.object({
   refreshToken: z
@@ -145,3 +163,37 @@ export const refreshTokenSchema = z.object({
     .trim()
     .min(1, "Refresh tokenul este obligatoriu"),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .email("Adresă de email invalidă")
+    .lowercase()
+    .min(6, "Adresa de email este prea scurtă"),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z
+      .string({ message: "Tokenul este obligatoriu" })
+      .trim()
+      .min(1, "Tokenul este obligatoriu"),
+    password: passwordSchema,
+    confirmedPassword: confirmedPasswordSchema,
+  })
+  .refine((data) => data.password === data.confirmedPassword, {
+    message: "Parolele nu coincid",
+    path: ["confirmedPassword"],
+  });
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string({ message: "Parola actuală este obligatorie" })
+      .min(1, "Parola actuală este obligatorie"),
+    password: passwordSchema,
+    confirmedPassword: confirmedPasswordSchema,
+  })
+  .refine((data) => data.password === data.confirmedPassword, {
+    message: "Parolele nu coincid",
+    path: ["confirmedPassword"],
+  });

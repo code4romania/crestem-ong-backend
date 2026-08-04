@@ -18,14 +18,28 @@
       "target": "api::evaluation.evaluation",
       "mappedBy": "report"
     },
-    "deadline": {
-      "type": "date",
-      "required": true
-    },
     "finished": {
       "type": "boolean",
       "required": true,
       "default": false
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong",
+      "inversedBy": "reports"
+    },
+    "program": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::program.program",
+      "inversedBy": "reports"
+    },
+    "phase": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::phase.phase",
+      "inversedBy": "reports"
     }
   }
 }

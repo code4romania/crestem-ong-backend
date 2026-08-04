@@ -1,3 +1,10 @@
-import { factories } from '@strapi/strapi';
-
-export default factories.createCoreRouter('api::dimension.dimension');
+export default {
+  routes: [
+    {
+      method: "GET",
+      path: "/dimensions",
+      handler: "dimension.find",
+      config: { auth: false },
+    },
+  ],
+};
