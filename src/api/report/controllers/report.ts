@@ -2,24 +2,42 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
 import { computeProgress } from "../../evaluation/utils/progress";
-import { hasResponses, isProgramReport } from "../utils/lifecycle";
-import { assignMembersSchema } from "../validation/assign-members";
+import { hasResponses, isClosed, isProgramReport } from "../utils/lifecycle";
+import { startEvaluationSchema } from "../validation/start-evaluation";
+import { addMembersSchema } from "../validation/add-members";
+import type { CreatedEvaluation } from "../utils/members";
 import {
+  createEvaluations,
+  memberView,
+  resolveMembers,
+  sendInvites,
+} from "../utils/members";
+import {
+  activePhase,
   findActivePhaseForOng,
   findOpenReport,
   findPhaseReport,
 } from "../utils/association";
-import { todayInBucharest } from "../../../utils/date";
+import {
+  toDateString,
+  toDisplayDate,
+  todayInBucharest,
+} from "../../../utils/date";
+import { requireOng } from "../../../utils/ong-scope";
 
-const reportView = (report: any) => ({
-  documentId: report.documentId,
-  finished: report.finished,
-  evaluations: (report.evaluations ?? []).map((evaluation: any) => ({
-    documentId: evaluation.documentId,
-    email: evaluation.email,
-    progress: computeProgress(evaluation.dimensions),
-  })),
-});
+const reportView = (report: any, today: string) => {
+  const evaluations = (report.evaluations ?? []) as any[];
+  const closed = isClosed(report, today);
+  return {
+    documentId: report.documentId,
+    name: report.name,
+    finished: closed,
+    invitedCount: evaluations.length,
+    completedCount: evaluations.filter(
+      (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
+    ).length,
+  };
+};
 
 const todayIso = () => todayInBucharest();
 
@@ -40,19 +58,15 @@ export default factories.createCoreController(
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return { data: { programRounds: [], standaloneReports: [] } };
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
+      const ong = scope.ong;
       const today = todayIso();
       const programs = await strapi.documents("api::program.program").findMany({
         filters: {
-          ongs: { documentId: user.ong.documentId },
+          ongs: { documentId: ong.documentId },
           startDate: { $lte: today },
           endDate: { $gte: today },
         },
@@ -63,7 +77,7 @@ export default factories.createCoreController(
       for (const program of programs) {
         const reports = await strapi.documents("api::report.report").findMany({
           filters: {
-            ong: { documentId: user.ong.documentId },
+            ong: { documentId: ong.documentId },
             phases: { program: { documentId: program.documentId } },
           },
           populate: {
@@ -96,13 +110,13 @@ export default factories.createCoreController(
           hasEvaluation: phase.hasEvaluation,
           active: `${phase.startDate}` <= today && `${phase.endDate}` >= today,
           report: reportByPhase.has(phase.documentId)
-            ? reportView(reportByPhase.get(phase.documentId))
+            ? reportView(reportByPhase.get(phase.documentId), today)
             : null,
         }));
         programRounds.push(programEntry);
       }
       const unfinished = await strapi.documents("api::report.report").findMany({
-        filters: { ong: { documentId: user.ong.documentId }, finished: false },
+        filters: { ong: { documentId: ong.documentId }, finished: false },
         sort: { createdAt: "desc" },
         populate: {
           phases: true,
@@ -111,187 +125,288 @@ export default factories.createCoreController(
       });
       const standaloneReports = unfinished
         .filter((report) => ((report.phases ?? []) as any[]).length === 0)
-        .map(reportView);
+        .map((report) => reportView(report, today));
       return { data: { programRounds, standaloneReports } };
     },
-    async assignMembers(ctx: Context) {
+    async start(ctx: Context) {
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
-      const parsed = assignMembersSchema.safeParse(ctx.request.body);
+      const parsed = startEvaluationSchema.safeParse(ctx.request.body);
       if (!parsed.success) {
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
-      let report;
+      const ong = scope.ong;
+      const today = todayIso();
+      let phase: any = null;
       if (parsed.data.program) {
-        const program = await strapi
-          .documents("api::program.program")
-          .findOne({
-            documentId: parsed.data.program,
-            populate: { ongs: true, phases: true },
-          });
+        const program = await strapi.documents("api::program.program").findOne({
+          documentId: parsed.data.program,
+          populate: { ongs: true, phases: true },
+        });
         if (!program) {
           return ctx.badRequest("Programul nu există");
         }
         const participates = (program.ongs ?? []).some(
-          (ong) => ong.documentId === user.ong.documentId,
+          (entry: any) => entry.documentId === ong.documentId,
         );
         if (!participates) {
           return ctx.badRequest("Organizația nu participă la acest program");
         }
-        const today = todayIso();
-        if (program.startDate > today || program.endDate < today) {
+        if (
+          toDateString(program.startDate) > today ||
+          toDateString(program.endDate) < today
+        ) {
           return ctx.badRequest("Programul nu este activ");
         }
-        const programPhases = (program.phases ?? []) as any[];
-        const activePhase = programPhases.find(
-          (phase) =>
-            `${phase.startDate}` <= today && `${phase.endDate}` >= today,
-        );
-        if (!activePhase) {
-          return ctx.badRequest("Nu există o fază activă");
+        phase = activePhase(program, today);
+        if (!phase) {
+          return ctx.badRequest("Nu există o fază de evaluare activă");
         }
-        if (!activePhase.hasEvaluation) {
-          return ctx.badRequest("Faza activă nu are evaluare");
-        }
-        const existing = await findPhaseReport(
+        const taken = await findPhaseReport(
           strapi,
-          activePhase.documentId,
-          user.ong.documentId,
+          phase.documentId,
+          ong.documentId,
         );
-        if (!existing) {
-          const open = await findOpenReport(
-            strapi,
-            user.ong.documentId,
-            activePhase.documentId,
+        if (taken) {
+          return ctx.badRequest(
+            `Faza ${phase.title} are deja o evaluare pornită`,
           );
-          if (open) {
-            return ctx.badRequest("Ai deja o evaluare în desfășurare");
-          }
         }
-        report =
-          existing ??
-          (await strapi.documents("api::report.report").create({
-            data: {
-              finished: false,
-              ong: user.ong.documentId,
-              phases: [activePhase.documentId],
-            },
-          }));
       } else {
-        const found = await strapi.documents("api::report.report").findOne({
-          documentId: parsed.data.report,
-          populate: { ong: true },
-        });
-        if (!found || found.ong?.documentId !== user.ong.documentId) {
-          return ctx.badRequest("Raportul nu există");
-        }
-        report = found;
-      }
-      if (report.finished) {
-        return ctx.badRequest("Runda de evaluare este închisă");
-      }
-      const memberUsers = await strapi
-        .documents("plugin::users-permissions.user")
-        .findMany({
-          filters: { documentId: { $in: parsed.data.members } },
-          populate: { ong: true, role: true },
-        });
-      if (memberUsers.length !== parsed.data.members.length) {
-        return ctx.badRequest("Unii utilizatori selectați nu există");
-      }
-      const invalid = memberUsers.find(
-        (member) =>
-          member.ong?.documentId !== user.ong.documentId ||
-          member.role?.type !== "ngo-member",
-      );
-      if (invalid) {
-        return ctx.badRequest(
-          `Utilizatorul ${invalid.email} nu este membru al organizației`,
+        const running = await findActivePhaseForOng(
+          strapi,
+          ong.documentId,
+          today,
         );
-      }
-      const existingEvaluations = await strapi
-        .documents("api::evaluation.evaluation")
-        .findMany({
-          filters: { report: { documentId: report.documentId } },
-        });
-      const existingEmails = new Set(
-        existingEvaluations.map((evaluation) => evaluation.email.toLowerCase()),
-      );
-      const created = [];
-      const skipped = [];
-      for (const member of memberUsers) {
-        if (existingEmails.has(member.email.toLowerCase())) {
-          skipped.push(member.email);
-          continue;
+        if (running) {
+          return ctx.badRequest(
+            `Ai o fază de evaluare activă în programul ${running.program.name}. Pornește evaluarea din program.`,
+          );
         }
-        await strapi.documents("api::evaluation.evaluation").create({
-          data: { email: member.email, report: report.documentId },
-        });
-        created.push(member.email);
       }
-      return {
-        data: {
-          report: { documentId: report.documentId },
-          created,
-          skipped,
-        },
-      };
-    },
-    async createOne(ctx: Context) {
-      if (!ctx.state.user) {
-        return ctx.unauthorized();
-      }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
-      }
-      const open = await findOpenReport(strapi, user.ong.documentId);
+      const open = await findOpenReport(strapi, ong.documentId);
       if (open) {
         return ctx.badRequest("Ai deja o evaluare în desfășurare");
       }
-      const active = await findActivePhaseForOng(
+      const resolved = await resolveMembers(
         strapi,
-        user.ong.documentId,
-        todayIso(),
+        ong.documentId,
+        parsed.data.members,
       );
-      if (active) {
-        const taken = await findPhaseReport(
-          strapi,
-          active.phase.documentId,
-          user.ong.documentId,
-        );
-        if (taken) {
-          return ctx.badRequest(`Faza ${active.phase.title} are deja o evaluare`);
-        }
+      if ("error" in resolved) {
+        return ctx.badRequest(resolved.error);
       }
-      const created = await strapi.documents("api::report.report").create({
-        data: {
-          finished: false,
-          ong: user.ong.documentId,
-          phases: active ? [active.phase.documentId] : [],
-        },
-        populate: { phases: { populate: { program: true } } },
-      });
+      let report: any;
+      let created: CreatedEvaluation[];
+      try {
+        const started = await strapi.db.transaction(async () => {
+          const createdReport = await strapi
+            .documents("api::report.report")
+            .create({
+              data: {
+                name: `Evaluare ${toDisplayDate(today)}`,
+                finished: false,
+                ong: ong.documentId,
+                phases: phase ? [phase.documentId] : [],
+                originPhase: phase ? phase.documentId : null,
+              },
+              populate: { phases: { populate: { program: true } } },
+            });
+          const createdEvaluations = await createEvaluations(
+            strapi,
+            createdReport.documentId,
+            resolved.members,
+          );
+          return { report: createdReport, created: createdEvaluations };
+        });
+        report = started.report;
+        created = started.created;
+      } catch (error) {
+        console.error("start evaluation failed", error);
+        return ctx.badRequest("Nu s-a putut porni evaluarea. Încearcă din nou");
+      }
+      const invites = await sendInvites(
+        strapi,
+        created,
+        ong.name,
+        phase ? toDateString(phase.endDate) : undefined,
+      );
       return {
         data: {
-          documentId: created.documentId,
-          finished: created.finished,
-          phases: ((created.phases ?? []) as any[]).map(phaseView),
+          report: {
+            documentId: report.documentId,
+            name: report.name,
+            finished: isClosed(report, today),
+            phases: ((report.phases ?? []) as any[]).map(phaseView),
+          },
+          invited: created.map((entry) => memberView(entry.member)),
+          emailSent: invites.emailSent,
+          emailFailed: invites.failed,
+        },
+      };
+    },
+    async addMembers(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const parsed = addMembersSchema.safeParse(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const report = await strapi.documents("api::report.report").findOne({
+        documentId: ctx.params.documentId,
+        populate: {
+          ong: true,
+          phases: true,
+          evaluations: { populate: { user: true } },
+        },
+      });
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
+      }
+      const today = todayIso();
+      if (isClosed(report, today)) {
+        return ctx.badRequest("Runda de evaluare este închisă");
+      }
+      const resolved = await resolveMembers(
+        strapi,
+        ong.documentId,
+        parsed.data.members,
+      );
+      if ("error" in resolved) {
+        return ctx.badRequest(resolved.error);
+      }
+      const existingUserIds = new Set(
+        ((report.evaluations ?? []) as any[])
+          .map((evaluation) => evaluation.user?.documentId)
+          .filter(Boolean),
+      );
+      const fresh = resolved.members.filter(
+        (member: any) => !existingUserIds.has(member.documentId),
+      );
+      const skipped = resolved.members
+        .filter((member: any) => existingUserIds.has(member.documentId))
+        .map(memberView);
+      const deadline = ((report.phases ?? []) as any[])
+        .map((phase) => toDateString(phase.endDate))
+        .sort()
+        .pop();
+      let created: CreatedEvaluation[] = [];
+      if (fresh.length > 0) {
+        try {
+          created = await strapi.db.transaction(async () =>
+            createEvaluations(strapi, report.documentId, fresh),
+          );
+        } catch (error) {
+          console.error("add members failed", error);
+          return ctx.badRequest(
+            "Nu s-au putut adăuga membrii. Încearcă din nou",
+          );
+        }
+      }
+      const invites =
+        created.length > 0
+          ? await sendInvites(strapi, created, ong.name, deadline)
+          : null;
+      return {
+        data: {
+          added: created.map((entry) => memberView(entry.member)),
+          skipped,
+          emailSent: invites ? invites.emailSent : null,
+          emailFailed: invites ? invites.failed : [],
+        },
+      };
+    },
+    async list(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const reports = await strapi.documents("api::report.report").findMany({
+        filters: { ong: { documentId: ong.documentId } },
+        sort: { createdAt: "desc" },
+        populate: {
+          phases: { populate: { program: true } },
+          evaluations: { populate: { dimensions: true } },
+        },
+      });
+      const today = todayIso();
+      return {
+        data: reports.map((report: any) => {
+          const closed = isClosed(report, today);
+          const evaluations = (report.evaluations ?? []) as any[];
+          return {
+            documentId: report.documentId,
+            name: report.name,
+            createdAt: report.createdAt,
+            finished: closed,
+            finishedAt: report.finishedAt,
+            closedBy: report.closedBy,
+            phases: ((report.phases ?? []) as any[]).map(phaseView),
+            invitedCount: evaluations.length,
+            completedCount: evaluations.filter(
+              (evaluation) =>
+                computeProgress(evaluation.dimensions, closed).complete,
+            ).length,
+          };
+        }),
+      };
+    },
+    async members(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const report = await strapi.documents("api::report.report").findOne({
+        documentId: ctx.params.documentId,
+        populate: {
+          ong: true,
+          phases: true,
+          evaluations: { populate: { user: true, dimensions: true } },
+        },
+      });
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
+      }
+      const today = todayIso();
+      const closed = isClosed(report, today);
+      const invitedEvaluations = (report.evaluations ?? []).filter(
+        (evaluation: any) => evaluation.user,
+      ) as any[];
+      const invited = invitedEvaluations
+        .map((evaluation) => ({
+          documentId: evaluation.documentId,
+          user: memberView(evaluation.user),
+          status: computeProgress(evaluation.dimensions, closed).status,
+          completedAt: evaluation.completedAt ?? null,
+          notificationSentAt: evaluation.notificationSentAt ?? null,
+        }))
+        .sort((a, b) => a.user.nume.localeCompare(b.user.nume, "ro"));
+      return {
+        data: {
+          invited,
+          invitedCount: invited.length,
+          completedCount: invited.filter(
+            (entry) => entry.status === "completat",
+          ).length,
         },
       };
     },
@@ -299,15 +414,11 @@ export default factories.createCoreController(
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
+      const ong = scope.ong;
       const report = await strapi.documents("api::report.report").findOne({
         documentId: ctx.params.documentId,
         populate: {
@@ -318,23 +429,26 @@ export default factories.createCoreController(
           },
         },
       });
-      if (!report || report.ong?.documentId !== user.ong.documentId) {
-        return ctx.badRequest("Raportul nu există");
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
       }
+      const today = todayIso();
+      const evaluations = (report.evaluations ?? []) as any[];
+      const closed = isClosed(report, today);
       return {
         data: {
           documentId: report.documentId,
-          finished: report.finished,
+          name: report.name,
+          finished: closed,
           finishedAt: report.finishedAt,
           closedBy: report.closedBy,
           canDelete: !hasResponses(report as any),
           phases: ((report.phases ?? []) as any[]).map(phaseView),
-          evaluations: (report.evaluations ?? []).map((evaluation: any) => ({
-            documentId: evaluation.documentId,
-            email: evaluation.email,
-            progress: computeProgress(evaluation.dimensions),
-          })),
-          scores: computeReportScores(report.evaluations ?? []),
+          invitedCount: evaluations.length,
+          completedCount: evaluations.filter(
+            (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
+          ).length,
+          scores: computeReportScores(evaluations),
         },
       };
     },
@@ -342,21 +456,17 @@ export default factories.createCoreController(
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
+      const ong = scope.ong;
       const report = await strapi.documents("api::report.report").findOne({
         documentId: ctx.params.documentId,
         populate: { ong: true, phases: true },
       });
-      if (!report || report.ong?.documentId !== user.ong.documentId) {
-        return ctx.badRequest("Evaluarea nu există");
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
       }
       if (isProgramReport(report as any)) {
         return ctx.badRequest(
@@ -364,7 +474,7 @@ export default factories.createCoreController(
         );
       }
       if (report.finished) {
-        return ctx.badRequest("Evaluarea este deja finalizată");
+        return ctx.badRequest("Runda este deja finalizată");
       }
       const updated = await strapi.documents("api::report.report").update({
         documentId: report.documentId,
@@ -387,25 +497,21 @@ export default factories.createCoreController(
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
-      const user = await strapi
-        .documents("plugin::users-permissions.user")
-        .findOne({
-          documentId: ctx.state.user.documentId,
-          populate: { ong: true },
-        });
-      if (!user?.ong) {
-        return ctx.badRequest("Utilizatorul nu aparține unei organizații");
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
+      const ong = scope.ong;
       const report = await strapi.documents("api::report.report").findOne({
         documentId: ctx.params.documentId,
         populate: { ong: true, evaluations: { populate: { dimensions: true } } },
       });
-      if (!report || report.ong?.documentId !== user.ong.documentId) {
-        return ctx.badRequest("Evaluarea nu există");
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
       }
       if (hasResponses(report as any)) {
         return ctx.badRequest(
-          "Evaluarea are răspunsuri și nu poate fi ștearsă",
+          "Runda are răspunsuri și nu poate fi ștearsă",
         );
       }
       for (const evaluation of (report.evaluations ?? []) as any[]) {
@@ -416,7 +522,7 @@ export default factories.createCoreController(
       await strapi
         .documents("api::report.report")
         .delete({ documentId: report.documentId });
-      return { data: { documentId: report.documentId } };
+      return { message: "Runda a fost ștearsă cu succes" };
     },
   }),
 );

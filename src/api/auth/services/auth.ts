@@ -100,7 +100,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           confirmed: true,
           blocked: false,
           role: role.id,
-          ong: ong.id,
+          ongs: [ong.id],
         });
 
         return true;
@@ -239,7 +239,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             confirmed: true,
             blocked: false,
             role: role.id,
-            ong: ong.id,
+            ongs: [ong.id],
           });
 
         const activationToken = signActivationToken(created.id);
@@ -360,9 +360,13 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
   async resendMemberInvite(userId: number, ongId: number) {
     const user = await strapi.db
       .query("plugin::users-permissions.user")
-      .findOne({ where: { id: userId }, populate: ["role", "ong"] });
+      .findOne({ where: { id: userId }, populate: ["role", "ongs"] });
 
-    if (!user || user.role?.type !== "ngo-member" || user.ong?.id !== ongId) {
+    if (
+      !user ||
+      user.role?.type !== "ngo-member" ||
+      !(user.ongs ?? []).some((entry: any) => entry.id === ongId)
+    ) {
       throw new Error("Contul de membru nu a fost găsit");
     }
 
@@ -382,7 +386,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     ).sendMemberActivation({
       to: user.email,
       nume: user.nume,
-      ongName: user.ong.name,
+      ongName:
+        (user.ongs ?? []).find((entry: any) => entry.id === ongId)?.name ?? "",
       link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
     });
 
@@ -393,7 +398,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .query("plugin::users-permissions.user")
       .findOne({
         where: { email: { $eqi: email } },
-        populate: ["role", "ong"],
+        populate: ["role", "ongs"],
       });
 
     if (!user || user.accountStatus === "deleted") {
@@ -420,7 +425,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         return;
       }
 
-      if (user.role?.type === "ngo-member" && user.ong) {
+      if (user.role?.type === "ngo-member" && (user.ongs ?? []).length > 0) {
         const token = signActivationToken(user.id);
 
         await strapi
@@ -433,7 +438,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ).sendMemberActivation({
           to: user.email,
           nume: user.nume,
-          ongName: user.ong.name,
+          ongName: (user.ongs ?? [])[0]?.name ?? "",
           link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
         });
 

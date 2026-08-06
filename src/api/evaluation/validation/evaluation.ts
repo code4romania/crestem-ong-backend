@@ -7,12 +7,14 @@ export const evaluationDimensionsSchema = z
   .array(
     z.object({
       dimensionKey: z.enum(dimensionKeys),
+      submit: z.boolean().optional().default(false),
+      comment: z.string().trim().optional().default(""),
       quiz: z.array(
         z.object({
-          answer: z.number().int().min(1).max(5),
+          questionId: z.string().trim().min(1),
+          answer: z.number().int(),
         }),
       ),
-      comment: z.string().trim().min(1, "Comentariul este obligatoriu"),
     }),
   )
   .max(DIMENSIONS.length)
@@ -27,10 +29,54 @@ export const evaluationDimensionsSchema = z
       }
       seen.add(block.dimensionKey);
       const dimension = DIMENSIONS.find((d) => d.key === block.dimensionKey);
-      if (dimension && block.quiz.length !== dimension.quiz.length) {
+      if (!dimension) {
+        continue;
+      }
+      const expected = new Map(
+        dimension.quiz.map((question) => [question.id, question]),
+      );
+      const answered = new Set<string>();
+      for (const answer of block.quiz) {
+        const question = expected.get(answer.questionId);
+        if (!question) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Întrebarea ${answer.questionId} nu aparține dimensiunii ${block.dimensionKey}`,
+          });
+          continue;
+        }
+        if (answered.has(answer.questionId)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Întrebarea ${answer.questionId} apare de mai multe ori`,
+          });
+          continue;
+        }
+        if (!question.options.some((option) => option.value === answer.answer)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Răspunsul ${answer.answer} nu este valid pentru întrebarea ${answer.questionId}`,
+          });
+          continue;
+        }
+        answered.add(answer.questionId);
+      }
+      if (!block.submit) {
+        continue;
+      }
+      const missing = dimension.quiz
+        .map((question) => question.id)
+        .filter((id) => !answered.has(id));
+      if (missing.length) {
         ctx.addIssue({
           code: "custom",
-          message: `Dimensiunea ${block.dimensionKey} trebuie să aibă ${dimension.quiz.length} răspunsuri`,
+          message: `Dimensiunea ${block.dimensionKey} nu are răspuns la: ${missing.join(", ")}`,
+        });
+      }
+      if (!block.comment) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Dimensiunea ${block.dimensionKey} are nevoie de un comentariu`,
         });
       }
     }

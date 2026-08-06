@@ -1,4 +1,5 @@
 import { computeProgramStatus } from '../src/api/program/utils/status';
+import { allPhasesEnded } from '../src/api/report/utils/association';
 import { toDateString, todayInBucharest } from '../src/utils/date';
 
 const REPORT_UID = 'api::report.report' as const;
@@ -33,11 +34,7 @@ export default {
       const today = todayInBucharest();
       let closed = 0;
       for (const report of reports) {
-        const phases: any[] = report.phases ?? [];
-        if (phases.length === 0) {
-          continue;
-        }
-        if (phases.every((phase) => toDateString(phase.endDate) < today)) {
+        if (allPhasesEnded(report, today)) {
           await strapi.documents(REPORT_UID).update({
             documentId: report.documentId,
             data: {

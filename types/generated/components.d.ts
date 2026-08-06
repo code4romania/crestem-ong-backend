@@ -7,9 +7,12 @@ export interface EvaluationDimension extends Struct.ComponentSchema {
     displayName: 'Dimension';
   };
   attributes: {
-    comment: Schema.Attribute.Text & Schema.Attribute.Required;
+    comment: Schema.Attribute.Text;
     dimensionKey: Schema.Attribute.String & Schema.Attribute.Required;
     quiz: Schema.Attribute.Component<'evaluation.question', true>;
+    submitted: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
   };
 }
 
@@ -29,6 +32,7 @@ export interface EvaluationQuestion extends Struct.ComponentSchema {
         },
         number
       >;
+    questionId: Schema.Attribute.String & Schema.Attribute.Required;
   };
 }
 

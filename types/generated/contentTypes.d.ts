@@ -488,11 +488,11 @@ export interface ApiEvaluationEvaluation extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    completedAt: Schema.Attribute.DateTime;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     dimensions: Schema.Attribute.Component<'evaluation.dimension', true>;
-    email: Schema.Attribute.Email & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -505,6 +505,10 @@ export interface ApiEvaluationEvaluation extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -610,7 +614,7 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     users: Schema.Attribute.Relation<
-      'oneToMany',
+      'manyToMany',
       'plugin::users-permissions.user'
     >;
     website: Schema.Attribute.String;
@@ -766,7 +770,9 @@ export interface ApiReportReport extends Struct.CollectionTypeSchema {
       'api::report.report'
     > &
       Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
     ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    originPhase: Schema.Attribute.Relation<'oneToOne', 'api::phase.phase'>;
     phases: Schema.Attribute.Relation<'manyToMany', 'api::phase.phase'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
@@ -1239,6 +1245,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.DefaultTo<'active'>;
     acordTermeniSiConditii: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    avatar: Schema.Attribute.Media<'images'>;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -1257,12 +1264,14 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    mentorJobTitle: Schema.Attribute.String;
+    mentorOrganization: Schema.Attribute.String;
     nume: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
-    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    ongs: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{

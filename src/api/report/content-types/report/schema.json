@@ -12,6 +12,10 @@
   },
   "pluginOptions": {},
   "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
     "evaluations": {
       "type": "relation",
       "relation": "oneToMany",
@@ -46,6 +50,11 @@
       "relation": "manyToMany",
       "target": "api::phase.phase",
       "inversedBy": "reports"
+    },
+    "originPhase": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::phase.phase"
     }
   }
 }

@@ -18,9 +18,15 @@
       "repeatable": true,
       "component": "evaluation.dimension"
     },
-    "email": {
-      "type": "email",
-      "required": true
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "completedAt": {
+      "displayName": "Completed At",
+      "type": "datetime",
+      "required": false
     },
     "notificationSentAt": {
       "displayName": "Notification Sent At",

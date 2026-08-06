@@ -1,4 +1,5 @@
 import type { Core } from "@strapi/strapi";
+import { toDateString } from "../../../utils/date";
 
 export interface SendMentorActivationArgs {
   to: string;
@@ -26,11 +27,20 @@ export interface SendProgramAssignmentArgs {
   programName: string;
 }
 
+export interface SendEvaluationInviteArgs {
+  to: string;
+  nume: string;
+  ongName: string;
+  link: string;
+  deadline?: string;
+}
+
 export interface EmailService {
   sendMentorActivation(args: SendMentorActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
+  sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -111,6 +121,34 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           `Organizația ta, ${ongName}, a fost înscrisă în programul ${programName} pe platforma Creștem ONG.`,
           "Te poți autentifica în platformă pentru mai multe detalii.",
+        ].join("\n"),
+      });
+  },
+  async sendEvaluationInvite({
+    to,
+    nume,
+    ongName,
+    link,
+    deadline,
+  }: SendEvaluationInviteArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: `Ai o evaluare de completat pentru ${ongName}`,
+        text: [
+          `Bună, ${nume},`,
+          "",
+          `Organizația ${ongName} a pornit o rundă de evaluare pe platforma Creștem ONG și ai fost invitat să o completezi.`,
+          ...(deadline
+            ? [`Termenul limită pentru completare este ${toDateString(deadline)}.`]
+            : []),
+          "Accesează linkul de mai jos, autentifică-te și completează evaluarea:",
+          "",
+          link,
+          "",
+          "Poți completa evaluarea pe dimensiuni, în mai multe reprize. O dimensiune trimisă nu mai poate fi modificată.",
         ].join("\n"),
       });
   },

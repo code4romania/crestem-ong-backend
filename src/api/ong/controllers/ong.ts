@@ -6,6 +6,11 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { computeReportScores } from "../../report/utils/scores";
+import { phaseOfSameProgram } from "../../report/utils/association";
+import { isClosed } from "../../report/utils/lifecycle";
+import { todayInBucharest } from "../../../utils/date";
+import { requireOng } from "../../../utils/ong-scope";
+import { decorateBlock } from "../../evaluation/utils/catalog";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -56,20 +61,15 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
-    const user = await strapi
-      .documents("plugin::users-permissions.user")
-      .findOne({
-        documentId: ctx.state.user.documentId,
-        populate: { ong: true },
-      });
-    if (!user?.ong) {
-      return { data: [] };
+    const scope = await requireOng(strapi, ctx);
+    if ("error" in scope) {
+      return ctx.badRequest(scope.error);
     }
     const members = await strapi
       .documents("plugin::users-permissions.user")
       .findMany({
         filters: {
-          ong: { documentId: user.ong.documentId },
+          ongs: { documentId: scope.ong.documentId },
           role: { type: "ngo-member" },
         },
         sort: { nume: "asc" },
@@ -93,6 +93,19 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    const programParam = ctx.query.program;
+    if (programParam !== undefined && typeof programParam !== "string") {
+      return ctx.badRequest("Parametrul program este invalid");
+    }
+    const programDocumentId = programParam as string | undefined;
+    if (programDocumentId) {
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: programDocumentId,
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+    }
     const reports = await strapi.documents("api::report.report").findMany({
       filters: { ong: { documentId: ong.documentId } },
       sort: { createdAt: "desc" },
@@ -101,16 +114,24 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         evaluations: { populate: { dimensions: true } },
       },
     });
+    const eligible = programDocumentId
+      ? reports.filter(
+          (report: any) => !phaseOfSameProgram(report, programDocumentId),
+        )
+      : reports;
+    const today = todayInBucharest();
     return {
-      data: reports.map((report: any) => ({
+      data: eligible.map((report: any) => ({
         documentId: report.documentId,
+        name: report.name,
         createdAt: report.createdAt,
-        finished: report.finished,
+        finished: isClosed(report, today),
         finishedAt: report.finishedAt,
-        respondents: (report.evaluations ?? []).length,
-        completedRespondents: (report.evaluations ?? []).filter(
+        invitedCount: (report.evaluations ?? []).length,
+        completedCount: (report.evaluations ?? []).filter(
           (evaluation: any) =>
-            computeProgress(evaluation.dimensions).complete,
+            computeProgress(evaluation.dimensions, isClosed(report, today))
+              .complete,
         ).length,
         phases: ((report.phases ?? []) as any[]).map((phase) => ({
           documentId: phase.documentId,
@@ -131,18 +152,22 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       populate: {
         ong: true,
         phases: { populate: { program: true } },
-        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+        evaluations: {
+          populate: { dimensions: { populate: { quiz: true } }, user: true },
+        },
       },
     });
     if (!report || report.ong?.documentId !== ctx.params.documentId) {
       return ctx.badRequest("Evaluarea nu există");
     }
+    const today = todayInBucharest();
     const responses = (report.evaluations ?? []) as any[];
     return {
       data: {
         documentId: report.documentId,
+        name: report.name,
         createdAt: report.createdAt,
-        finished: report.finished,
+        finished: isClosed(report, today),
         finishedAt: report.finishedAt,
         closedBy: report.closedBy,
         ong: { documentId: report.ong.documentId, name: report.ong.name },
@@ -155,22 +180,27 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? { documentId: phase.program.documentId, name: phase.program.name }
             : null,
         })),
-        respondents: responses.length,
-        completedRespondents: responses.filter(
-          (evaluation) => computeProgress(evaluation.dimensions).complete,
+        invitedCount: responses.length,
+        completedCount: responses.filter(
+          (evaluation) =>
+            computeProgress(evaluation.dimensions, isClosed(report, today))
+              .complete,
         ).length,
         scores: computeReportScores(responses),
         evaluations: responses.map((evaluation) => ({
           documentId: evaluation.documentId,
-          email: evaluation.email,
-          progress: computeProgress(evaluation.dimensions),
-          dimensions: (evaluation.dimensions ?? []).map((block: any) => ({
-            dimensionKey: block.dimensionKey,
-            comment: block.comment,
-            quiz: (block.quiz ?? []).map((question: any) => ({
-              answer: question.answer,
-            })),
-          })),
+          user: evaluation.user
+            ? {
+                documentId: evaluation.user.documentId,
+                nume: evaluation.user.nume,
+                email: evaluation.user.email,
+              }
+            : null,
+          progress: computeProgress(
+            evaluation.dimensions,
+            isClosed(report, today),
+          ),
+          dimensions: (evaluation.dimensions ?? []).map(decorateBlock),
         })),
       },
     };

@@ -16,6 +16,11 @@ import {
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
+import {
+  loadUserWithOngs,
+  requestedOng,
+  resolveActingOng,
+} from "../../../utils/ong-scope";
 
 export default {
   async registerNgo(ctx: Context) {
@@ -110,17 +115,15 @@ export default {
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
 
-      const admin = await strapi.db
-        .query("plugin::users-permissions.user")
-        .findOne({ where: { id: ctx.state.user.id }, populate: ["ong"] });
-
-      if (!admin?.ong) {
-        return ctx.badRequest("Contul tău nu este asociat unei organizații");
+      const admin = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      const scope = resolveActingOng(admin, requestedOng(ctx));
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
 
       const result = await (
         strapi.service("api::auth.auth") as AuthService
-      ).createMember(parsed.data, { id: admin.ong.id, name: admin.ong.name });
+      ).createMember(parsed.data, { id: scope.ong.id, name: scope.ong.name });
 
       return {
         message: result.emailSent
@@ -185,17 +188,15 @@ export default {
         return ctx.badRequest("Identificator invalid");
       }
 
-      const admin = await strapi.db
-        .query("plugin::users-permissions.user")
-        .findOne({ where: { id: ctx.state.user.id }, populate: ["ong"] });
-
-      if (!admin?.ong) {
-        return ctx.badRequest("Contul tău nu este asociat unei organizații");
+      const admin = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      const scope = resolveActingOng(admin, requestedOng(ctx));
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
       }
 
       await (
         strapi.service("api::auth.auth") as AuthService
-      ).resendMemberInvite(userId, admin.ong.id);
+      ).resendMemberInvite(userId, scope.ong.id);
 
       return {
         message: "Invitația a fost retrimisă.",

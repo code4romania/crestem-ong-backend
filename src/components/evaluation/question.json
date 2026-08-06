@@ -6,6 +6,10 @@
   },
   "options": {},
   "attributes": {
+    "questionId": {
+      "type": "string",
+      "required": true
+    },
     "answer": {
       "type": "integer",
       "max": 5,

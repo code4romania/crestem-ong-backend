@@ -8,8 +8,9 @@ import {
 } from "../validation/assign-ongs";
 import {
   findPhaseReport,
-  ongsWithReportsInProgram,
+  phasesOfProgram,
   phaseOfSameProgram,
+  reportsInProgram,
   targetEntryPhase,
 } from "../../report/utils/association";
 import {
@@ -26,6 +27,15 @@ const mentorView = (mentor: any) => ({
   documentId: mentor.documentId,
   nume: mentor.nume,
   email: mentor.email,
+  mentorJobTitle: mentor.mentorJobTitle ?? null,
+  mentorOrganization: mentor.mentorOrganization ?? null,
+  avatar: mentor.avatar
+    ? {
+        documentId: mentor.avatar.documentId,
+        name: mentor.avatar.name,
+        url: mentor.avatar.url,
+      }
+    : null,
 });
 
 const ongView = (ong: any) => ({
@@ -159,12 +169,14 @@ export default factories.createCoreController(
         return ctx.badRequest("Programul nu există");
       }
       if (parsed.data.name !== undefined) {
-        const duplicate = await strapi.db.query("api::program.program").findOne({
-          where: {
-            name: { $eqi: parsed.data.name },
-            documentId: { $ne: existing.documentId },
-          },
-        });
+        const duplicate = await strapi.db
+          .query("api::program.program")
+          .findOne({
+            where: {
+              name: { $eqi: parsed.data.name },
+              documentId: { $ne: existing.documentId },
+            },
+          });
         if (duplicate) {
           return ctx.badRequest("Există deja un program cu acest nume");
         }
@@ -175,7 +187,7 @@ export default factories.createCoreController(
         return ctx.badRequest("Data de sfârșit este înaintea datei de început");
       }
       const existingPhases = (existing.phases ?? []) as any[];
-      const { phases, ...programData } = parsed.data;
+      const { phases, removePhases, ...programData } = parsed.data;
       const today = todayInBucharest();
       const started = toDateString(existing.startDate) <= today;
       if (started) {
@@ -202,6 +214,32 @@ export default factories.createCoreController(
             `Faza ${missing.title} nu există în acest program`,
           );
         }
+        const removeIds = new Set(removePhases ?? []);
+        const unknownRemoval = [...removeIds].find((id) => !byId.has(id));
+        if (unknownRemoval) {
+          return ctx.badRequest("O fază de șters nu există în acest program");
+        }
+        const keptIds = new Set(
+          phases.map((phase) => phase.documentId).filter(Boolean),
+        );
+        const contradictory = [...removeIds].find((id) => keptIds.has(id));
+        if (contradictory) {
+          return ctx.badRequest(
+            `Faza ${byId.get(contradictory).title} apare și în lista de faze păstrate, și în cea de ștergere`,
+          );
+        }
+        const unaccounted = existingPhases.filter(
+          (phase) =>
+            !keptIds.has(phase.documentId) && !removeIds.has(phase.documentId),
+        );
+        if (unaccounted.length > 0) {
+          const titles = unaccounted.map((phase) => phase.title).join(", ");
+          return ctx.badRequest(
+            unaccounted.length === 1
+              ? `Faza ${titles} lipsește din listă. Trimite-o pentru a o păstra sau adaug-o în removePhases pentru a o șterge`
+              : `Fazele ${titles} lipsesc din listă. Trimite-le pentru a le păstra sau adaugă-le în removePhases pentru a le șterge`,
+          );
+        }
         if (started) {
           const lockError = phaseLockError(existingPhases, phases, today);
           if (lockError) {
@@ -214,11 +252,8 @@ export default factories.createCoreController(
             `Fazele ${overlap.earlier.title} și ${overlap.later.title} se suprapun`,
           );
         }
-        const keptIds = new Set(
-          phases.map((phase) => phase.documentId).filter(Boolean),
-        );
-        removedPhases = existingPhases.filter(
-          (phase) => !keptIds.has(phase.documentId),
+        removedPhases = existingPhases.filter((phase) =>
+          removeIds.has(phase.documentId),
         );
         const blocked = removedPhases.find(
           (phase) => (phase.reports ?? []).length > 0,
@@ -329,7 +364,7 @@ export default factories.createCoreController(
       await strapi
         .documents("api::program.program")
         .delete({ documentId: existing.documentId });
-      return { data: { documentId: existing.documentId } };
+      return { message: "Programul a fost șters cu succes" };
     },
     async mentors(ctx: Context) {
       if (!ctx.state.user) {
@@ -337,12 +372,12 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: ctx.params.documentId,
-        populate: { mentors: true },
+        populate: { mentors: { populate: { avatar: true } } },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
-      return { data: { mentors: (program.mentors ?? []).map(mentorView) } };
+      return { data: (program.mentors ?? []).map(mentorView) };
     },
     async ongs(ctx: Context) {
       if (!ctx.state.user) {
@@ -355,24 +390,7 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
-      const active = (program.ongs ?? []) as any[];
-      const activeIds = new Set(active.map((ong) => ong.documentId));
-      const engaged = await ongsWithReportsInProgram(
-        strapi,
-        program.documentId,
-      );
-      const withdrawnIds = [...engaged].filter((id) => !activeIds.has(id));
-      const withdrawn = withdrawnIds.length
-        ? await strapi.documents("api::ong.ong").findMany({
-            filters: { documentId: { $in: withdrawnIds } },
-          })
-        : [];
-      return {
-        data: {
-          ongs: active.map(ongView),
-          withdrawn: withdrawn.map(ongView),
-        },
-      };
+      return { data: { ongs: ((program.ongs ?? []) as any[]).map(ongView) } };
     },
     async assignMentors(ctx: Context) {
       if (!ctx.state.user) {
@@ -412,7 +430,7 @@ export default factories.createCoreController(
       const updated = await strapi.documents("api::program.program").update({
         documentId: program.documentId,
         data: { mentors: { connect: mentorIds } },
-        populate: { mentors: true },
+        populate: { mentors: { populate: { avatar: true } } },
       });
       return { data: { mentors: (updated.mentors ?? []).map(mentorView) } };
     },
@@ -426,17 +444,31 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: parsed.data.program,
+        populate: { mentors: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
       const mentorIds = [...new Set(parsed.data.mentors)];
-      const updated = await strapi.documents("api::program.program").update({
+      const assigned = new Set(
+        ((program.mentors ?? []) as any[]).map((mentor) => mentor.documentId),
+      );
+      const outsiderIds = mentorIds.filter((id) => !assigned.has(id));
+      if (outsiderIds.length > 0) {
+        const outsiders = await strapi
+          .documents("plugin::users-permissions.user")
+          .findMany({ filters: { documentId: { $in: outsiderIds } } });
+        return ctx.badRequest(
+          outsiders.length > 0
+            ? `Mentorul ${outsiders[0].email} nu este asignat acestui program`
+            : "Mentorul nu există",
+        );
+      }
+      await strapi.documents("api::program.program").update({
         documentId: program.documentId,
         data: { mentors: { disconnect: mentorIds } },
-        populate: { mentors: true },
       });
-      return { data: { mentors: (updated.mentors ?? []).map(mentorView) } };
+      return { message: "Mentorii au fost eliminați din program" };
     },
     async assignOngs(ctx: Context) {
       if (!ctx.state.user) {
@@ -483,7 +515,9 @@ export default factories.createCoreController(
       const picks = entries.filter((entry) => entry.report);
       const entryPhase = targetEntryPhase(program, todayInBucharest());
       if (picks.length > 0 && !entryPhase) {
-        return ctx.badRequest("Programul nu are o fază care să accepte evaluare");
+        return ctx.badRequest(
+          "Programul nu are o fază care să accepte evaluare",
+        );
       }
       for (const pick of picks) {
         const ong = ongByDocumentId.get(pick.ong);
@@ -578,9 +612,6 @@ export default factories.createCoreController(
       if (!phase.hasEvaluation) {
         return ctx.badRequest("Faza nu necesită evaluare");
       }
-      if (toDateString(phase.endDate) < todayInBucharest()) {
-        return ctx.badRequest("Faza s-a încheiat");
-      }
       const participates = ((program.ongs ?? []) as any[]).some(
         (ong) => ong.documentId === parsed.data.ong,
       );
@@ -604,6 +635,14 @@ export default factories.createCoreController(
       if (!report || report.ong?.documentId !== parsed.data.ong) {
         return ctx.badRequest("Evaluarea nu aparține organizației");
       }
+      if (
+        toDateString(phase.endDate) < todayInBucharest() &&
+        !report.finished
+      ) {
+        return ctx.badRequest(
+          "Faza s-a încheiat; poți asocia doar evaluări finalizate",
+        );
+      }
       const clash = phaseOfSameProgram(report, program.documentId);
       if (clash) {
         return ctx.badRequest(
@@ -621,6 +660,48 @@ export default factories.createCoreController(
         },
       };
     },
+    async removePhaseEvaluation(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: ctx.params.documentId,
+        populate: { phases: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const phase = ((program.phases ?? []) as any[]).find(
+        (candidate) => candidate.documentId === ctx.params.phaseDocumentId,
+      );
+      if (!phase) {
+        return ctx.badRequest("Faza nu aparține acestui program");
+      }
+      const report = await findPhaseReport(
+        strapi,
+        phase.documentId,
+        ctx.params.ongDocumentId,
+      );
+      if (!report) {
+        return ctx.badRequest(
+          "Faza nu are o evaluare pentru această organizație",
+        );
+      }
+      const stored = await strapi.documents("api::report.report").findOne({
+        documentId: report.documentId,
+        populate: { originPhase: true },
+      });
+      const bornHere =
+        (stored?.originPhase as any)?.documentId === phase.documentId;
+      await strapi.documents("api::report.report").update({
+        documentId: report.documentId,
+        data: {
+          phases: { disconnect: [phase.documentId] },
+          ...(bornHere ? { originPhase: null } : {}),
+        },
+      });
+      return { message: "Evaluarea a fost desprinsă de fază" };
+    },
     async removeOngs(ctx: Context) {
       if (!ctx.state.user) {
         return ctx.unauthorized();
@@ -631,74 +712,50 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: parsed.data.program,
-      });
-      if (!program) {
-        return ctx.badRequest("Programul nu există");
-      }
-      const ongIds = [...new Set(parsed.data.ongs)];
-      const engaged = await ongsWithReportsInProgram(
-        strapi,
-        program.documentId,
-      );
-      const withEvaluations = await strapi.documents("api::ong.ong").findMany({
-        filters: { documentId: { $in: ongIds.filter((id) => engaged.has(id)) } },
-      });
-      if (withEvaluations.length > 0) {
-        return ctx.badRequest(
-          `Organizația ${withEvaluations[0].name} are evaluări în acest program și poate fi doar retrasă`,
-        );
-      }
-      const updated = await strapi.documents("api::program.program").update({
-        documentId: program.documentId,
-        data: { ongs: { disconnect: ongIds } },
-        populate: { ongs: true },
-      });
-      return { data: { ongs: (updated.ongs ?? []).map(ongView) } };
-    },
-    async withdrawOngs(ctx: Context) {
-      if (!ctx.state.user) {
-        return ctx.unauthorized();
-      }
-      const parsed = removeOngsSchema.safeParse(ctx.request.body);
-      if (!parsed.success) {
-        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
-      }
-      const program = await strapi.documents("api::program.program").findOne({
-        documentId: parsed.data.program,
         populate: { ongs: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
       const ongIds = [...new Set(parsed.data.ongs)];
-      const participating = new Map(
-        ((program.ongs ?? []) as any[]).map((ong) => [ong.documentId, ong]),
+      const participating = new Set(
+        ((program.ongs ?? []) as any[]).map((ong) => ong.documentId),
       );
-      const outsider = ongIds.find((id) => !participating.has(id));
-      if (outsider) {
-        return ctx.badRequest("Organizația nu participă la acest program");
-      }
-      const engaged = await ongsWithReportsInProgram(
-        strapi,
-        program.documentId,
-      );
-      const untouched = ongIds.find((id) => !engaged.has(id));
-      if (untouched) {
+      const outsiderIds = ongIds.filter((id) => !participating.has(id));
+      if (outsiderIds.length > 0) {
+        const outsiders = await strapi.documents("api::ong.ong").findMany({
+          filters: { documentId: { $in: outsiderIds } },
+        });
         return ctx.badRequest(
-          `Organizația ${participating.get(untouched).name} nu are evaluări în acest program; folosește eliminarea`,
+          outsiders.length > 0
+            ? `Organizația ${outsiders[0].name} nu participă la acest program`
+            : "Organizația nu există",
         );
       }
-      const updated = await strapi.documents("api::program.program").update({
+      const removing = new Set(ongIds);
+      const reports = (
+        await reportsInProgram(strapi, program.documentId)
+      ).filter((report) => removing.has(report.ong?.documentId));
+      for (const report of reports) {
+        const phaseIds = phasesOfProgram(report, program.documentId);
+        if (phaseIds.length === 0) {
+          continue;
+        }
+        const bornHere =
+          report.originPhase?.program?.documentId === program.documentId;
+        await strapi.documents("api::report.report").update({
+          documentId: report.documentId,
+          data: {
+            phases: { disconnect: phaseIds },
+            ...(bornHere ? { originPhase: null } : {}),
+          },
+        });
+      }
+      await strapi.documents("api::program.program").update({
         documentId: program.documentId,
         data: { ongs: { disconnect: ongIds } },
-        populate: { ongs: true },
       });
-      return {
-        data: {
-          ongs: (updated.ongs ?? []).map(ongView),
-          withdrawn: ongIds.map((id) => ongView(participating.get(id))),
-        },
-      };
+      return { message: "Organizațiile au fost eliminate din program" };
     },
   }),
 );

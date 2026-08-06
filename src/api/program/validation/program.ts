@@ -115,7 +115,22 @@ export const updateProgramSchema = z
       .min(1, "Programul trebuie să aibă cel puțin o fază")
       .superRefine(phasesChecks)
       .optional(),
+    removePhases: z
+      .array(
+        z
+          .string({ message: "Identificatorul fazei este invalid" })
+          .min(1, "Identificatorul fazei este invalid"),
+        { message: "Lista fazelor de șters este invalidă" },
+      )
+      .optional(),
   })
   .refine((data) => Object.values(data).some((value) => value !== undefined), {
     message: "Trimite cel puțin un câmp",
-  });
+  })
+  .refine(
+    (data) => !data.removePhases?.length || data.phases !== undefined,
+    {
+      message:
+        "Trimite lista completă a fazelor păstrate când ștergi faze",
+    },
+  );

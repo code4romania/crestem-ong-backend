@@ -18,7 +18,12 @@
     },
     "comment": {
       "type": "text",
-      "required": true
+      "required": false
+    },
+    "submitted": {
+      "type": "boolean",
+      "required": true,
+      "default": false
     }
   }
 }

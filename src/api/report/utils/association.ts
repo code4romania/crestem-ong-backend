@@ -1,4 +1,4 @@
-import { toDateString } from "../../../utils/date";
+import { toDateString, todayInBucharest } from "../../../utils/date";
 
 export const evaluationPhases = (program: any) =>
   [...((program.phases ?? []) as any[])]
@@ -48,23 +48,22 @@ export const findActivePhaseForOng = async (
   return null;
 };
 
-export const findOpenReport = async (
-  strapi: any,
-  ongDocumentId: string,
-  excludePhaseDocumentId?: string,
-) => {
+export const allPhasesEnded = (report: any, today: string) => {
+  const phases = (report?.phases ?? []) as any[];
+  return (
+    phases.length > 0 &&
+    phases.every((phase) => toDateString(phase.endDate) < today)
+  );
+};
+
+export const findOpenReport = async (strapi: any, ongDocumentId: string) => {
   const open = await strapi.documents("api::report.report").findMany({
     filters: { ong: { documentId: ongDocumentId }, finished: false },
     populate: { phases: true },
   });
+  const today = todayInBucharest();
   return (
-    open.find(
-      (report: any) =>
-        !excludePhaseDocumentId ||
-        !((report.phases ?? []) as any[]).some(
-          (phase) => phase.documentId === excludePhaseDocumentId,
-        ),
-    ) ?? null
+    open.find((report: any) => !allPhasesEnded(report, today)) ?? null
   );
 };
 
@@ -83,20 +82,25 @@ export const findPhaseReport = async (
   return reports[0] ?? null;
 };
 
-export const ongsWithReportsInProgram = async (
+export const reportsInProgram = async (
   strapi: any,
   programDocumentId: string,
 ) => {
   const reports = await strapi.documents("api::report.report").findMany({
     filters: { phases: { program: { documentId: programDocumentId } } },
-    populate: { ong: true },
+    populate: {
+      ong: true,
+      originPhase: { populate: { program: true } },
+      phases: { populate: { program: true } },
+    },
   });
-  return new Set(
-    (reports as any[])
-      .map((report) => report.ong?.documentId)
-      .filter(Boolean) as string[],
-  );
+  return reports as any[];
 };
+
+export const phasesOfProgram = (report: any, programDocumentId: string) =>
+  ((report.phases ?? []) as any[])
+    .filter((phase) => phase.program?.documentId === programDocumentId)
+    .map((phase) => phase.documentId);
 
 export const phaseOfSameProgram = (report: any, programDocumentId: string) =>
   ((report.phases ?? []) as any[]).find(

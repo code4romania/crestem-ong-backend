@@ -86,11 +86,24 @@
       "default": "active",
       "required": true
     },
-    "ong": {
+    "ongs": {
       "type": "relation",
-      "relation": "manyToOne",
+      "relation": "manyToMany",
       "target": "api::ong.ong",
       "inversedBy": "users"
+    },
+    "mentorJobTitle": {
+      "type": "string"
+    },
+    "mentorOrganization": {
+      "type": "string"
+    },
+    "avatar": {
+      "allowedTypes": [
+        "images"
+      ],
+      "type": "media",
+      "multiple": false
     }
   }
 }

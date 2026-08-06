@@ -54,9 +54,9 @@
     },
     "users": {
       "type": "relation",
-      "relation": "oneToMany",
+      "relation": "manyToMany",
       "target": "plugin::users-permissions.user",
-      "mappedBy": "ong"
+      "mappedBy": "ongs"
     },
     "reports": {
       "type": "relation",
