@@ -30,5 +30,11 @@ export default {
       handler: "evaluation.updateOne",
       config: { policies: ["global::is-ngo-member"] },
     },
+    {
+      method: "POST",
+      path: "/evaluations/:documentId/finish",
+      handler: "evaluation.finish",
+      config: { policies: ["global::is-ngo-member"] },
+    },
   ],
 };
