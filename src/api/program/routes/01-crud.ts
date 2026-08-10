@@ -13,6 +13,12 @@ export default {
       config: { policies: ["global::is-super-admin"] },
     },
     {
+      method: "GET",
+      path: "/programs/:documentId/stats",
+      handler: "program.stats",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
       method: "POST",
       path: "/programs",
       handler: "program.createOne",

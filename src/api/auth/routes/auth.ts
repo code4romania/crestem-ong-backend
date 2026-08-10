@@ -7,6 +7,12 @@ export default {
       config: { auth: false },
     },
     {
+      method: "GET",
+      path: "/auth/me",
+      handler: "auth.me",
+      config: {},
+    },
+    {
       method: "POST",
       path: "/auth/register/individual",
       handler: "auth.registerIndividual",

@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/programs/:documentId/mentors",
       handler: "program.mentors",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-super-admin-or-ngo-admin"] },
     },
     {
       method: "POST",

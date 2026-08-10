@@ -13,6 +13,7 @@ import {
   reportsInProgram,
   targetEntryPhase,
 } from "../../report/utils/association";
+import { isClosed } from "../../report/utils/lifecycle";
 import {
   createProgramSchema,
   updateProgramSchema,
@@ -22,6 +23,7 @@ import {
 import { phaseLockError, programDatesLockError } from "../utils/phase-locks";
 import { toDateString, todayInBucharest } from "../../../utils/date";
 import { EmailService } from "../../email/services/email";
+import { requireOng } from "../../../utils/ong-scope";
 
 const mentorView = (mentor: any) => ({
   documentId: mentor.documentId,
@@ -73,8 +75,16 @@ export default factories.createCoreController(
       }
       const programs = await strapi
         .documents("api::program.program")
-        .findMany({ sort: { startDate: "desc" } });
-      return { data: programs.map(programView) };
+        .findMany({
+          sort: { startDate: "desc" },
+          populate: { phases: true },
+        });
+      return {
+        data: programs.map((program) => ({
+          ...programView(program),
+          phases: sortedPhaseViews(program.phases as any[]),
+        })),
+      };
     },
     async detail(ctx: Context) {
       if (!ctx.state.user) {
@@ -87,10 +97,14 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const entryPhase = targetEntryPhase(program, todayInBucharest());
       return {
         data: {
           ...programView(program),
           phases: sortedPhaseViews(program.phases as any[]),
+          entryPhase: entryPhase
+            ? { documentId: entryPhase.documentId, title: entryPhase.title }
+            : null,
         },
       };
     },
@@ -366,16 +380,82 @@ export default factories.createCoreController(
         .delete({ documentId: existing.documentId });
       return { message: "Programul a fost șters cu succes" };
     },
+    async stats(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: ctx.params.documentId,
+        populate: { ongs: true, mentors: true, phases: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const today = todayInBucharest();
+      const ongIds = ((program.ongs ?? []) as any[]).map(
+        (ong) => ong.documentId,
+      );
+
+      const reports = await reportsInProgram(strapi, program.documentId);
+      const reportsByOng = new Map<string, any[]>();
+      for (const report of reports) {
+        const ongId = report.ong?.documentId;
+        if (!ongId) {
+          continue;
+        }
+        if (!reportsByOng.has(ongId)) {
+          reportsByOng.set(ongId, []);
+        }
+        reportsByOng.get(ongId).push(report);
+      }
+
+      // Per ONG: an open report means it's still being evaluated; once every
+      // report is closed, the ONG counts as "finalized".
+      let inEvaluation = 0;
+      let finalizedEvaluation = 0;
+      for (const ongId of ongIds) {
+        const ongReports = reportsByOng.get(ongId) ?? [];
+        if (ongReports.length === 0) {
+          continue;
+        }
+        if (ongReports.some((report) => !isClosed(report, today))) {
+          inEvaluation += 1;
+          continue;
+        }
+        finalizedEvaluation += 1;
+      }
+
+      return {
+        data: {
+          ongsCount: ongIds.length,
+          mentorsCount: ((program.mentors ?? []) as any[]).length,
+          inEvaluation,
+          finalizedEvaluation,
+        },
+      };
+    },
     async mentors(ctx: Context) {
       if (!ctx.state.user) {
         return ctx.unauthorized();
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: ctx.params.documentId,
-        populate: { mentors: { populate: { avatar: true } } },
+        populate: { mentors: { populate: { avatar: true } }, ongs: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
+      }
+      if (ctx.state.user.role?.type !== "super-admin") {
+        const scope = await requireOng(strapi, ctx);
+        if ("error" in scope) {
+          return ctx.badRequest(scope.error);
+        }
+        const participates = (program.ongs ?? []).some(
+          (entry: any) => entry.documentId === scope.ong.documentId,
+        );
+        if (!participates) {
+          return ctx.forbidden("Organizația ta nu participă la acest program");
+        }
       }
       return { data: (program.mentors ?? []).map(mentorView) };
     },
@@ -390,7 +470,31 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
-      return { data: { ongs: ((program.ongs ?? []) as any[]).map(ongView) } };
+      const reports = await reportsInProgram(strapi, program.documentId);
+      const latestReportByOng = new Map<string, any>();
+      for (const report of reports) {
+        const ongId = report.ong?.documentId;
+        if (!ongId) {
+          continue;
+        }
+        const current = latestReportByOng.get(ongId);
+        if (!current || `${report.createdAt}` > `${current.createdAt}`) {
+          latestReportByOng.set(ongId, report);
+        }
+      }
+      return {
+        data: {
+          ongs: ((program.ongs ?? []) as any[]).map((ong) => {
+            const report = latestReportByOng.get(ong.documentId);
+            return {
+              ...ongView(ong),
+              evaluation: report
+                ? { documentId: report.documentId, name: report.name }
+                : null,
+            };
+          }),
+        },
+      };
     },
     async assignMentors(ctx: Context) {
       if (!ctx.state.user) {
@@ -560,30 +664,35 @@ export default factories.createCoreController(
       }
       let emailSent = true;
       for (const ong of ongs) {
-        const admins = await strapi
-          .documents("plugin::users-permissions.user")
-          .findMany({
-            filters: {
-              ong: { documentId: ong.documentId },
-              role: { type: "ngo-admin" },
-              accountStatus: "active",
-              blocked: false,
-            },
-          });
-        for (const admin of admins) {
-          try {
-            await (
-              strapi.service("api::email.email") as EmailService
-            ).sendProgramAssignment({
-              to: admin.email,
-              nume: admin.nume,
-              ongName: ong.name,
-              programName: program.name,
+        try {
+          const admins = await strapi
+            .documents("plugin::users-permissions.user")
+            .findMany({
+              filters: {
+                ongs: { documentId: ong.documentId },
+                role: { type: "ngo-admin" },
+                accountStatus: "active",
+                blocked: false,
+              },
             });
-          } catch (error) {
-            console.error("assignOngs email delivery failed", error);
-            emailSent = false;
+          for (const admin of admins) {
+            try {
+              await (
+                strapi.service("api::email.email") as EmailService
+              ).sendProgramAssignment({
+                to: admin.email,
+                nume: admin.nume,
+                ongName: ong.name,
+                programName: program.name,
+              });
+            } catch (error) {
+              console.error("assignOngs email delivery failed", error);
+              emailSent = false;
+            }
           }
+        } catch (error) {
+          console.error("assignOngs admin lookup failed", error);
+          emailSent = false;
         }
       }
       return { data: { ongs: (updated.ongs ?? []).map(ongView), emailSent } };

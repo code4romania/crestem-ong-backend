@@ -55,6 +55,22 @@ export default {
       );
     }
   },
+  async me(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const user = await strapi.db
+      .query("plugin::users-permissions.user")
+      .findOne({ where: { id: ctx.state.user.id }, populate: ["role"] });
+    return {
+      data: {
+        id: user.id,
+        nume: user.nume,
+        email: user.email,
+        role: user.role ? { type: user.role.type, name: user.role.name } : null,
+      },
+    };
+  },
   async registerIndividual(ctx: Context) {
     try {
       const data = ctx.request.body;

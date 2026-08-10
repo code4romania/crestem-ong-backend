@@ -73,11 +73,5 @@ export const evaluationDimensionsSchema = z
           message: `Dimensiunea ${block.dimensionKey} nu are răspuns la: ${missing.join(", ")}`,
         });
       }
-      if (!block.comment) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Dimensiunea ${block.dimensionKey} are nevoie de un comentariu`,
-        });
-      }
     }
   });

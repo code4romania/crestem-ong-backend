@@ -67,11 +67,9 @@ export default factories.createCoreController(
       const programs = await strapi.documents("api::program.program").findMany({
         filters: {
           ongs: { documentId: ong.documentId },
-          startDate: { $lte: today },
-          endDate: { $gte: today },
         },
         sort: { startDate: "desc" },
-        populate: { phases: true },
+        populate: { phases: true, ongs: true },
       });
       const programRounds = [];
       for (const program of programs) {
@@ -91,6 +89,8 @@ export default factories.createCoreController(
             name: program.name,
             startDate: program.startDate,
             endDate: program.endDate,
+            programStatus: program.programStatus,
+            ongsCount: ((program.ongs ?? []) as any[]).length,
           },
         };
         const phases = [...((program.phases ?? []) as any[])].sort((a, b) =>

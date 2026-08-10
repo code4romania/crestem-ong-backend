@@ -36,11 +36,13 @@ const APP_ROLES = [
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   "super-admin": [
+    "api::auth.auth.me",
     "api::auth.auth.registerMentor",
     "api::auth.auth.resendMentorInvite",
     "api::auth.auth.changePassword",
     "api::program.program.list",
     "api::program.program.detail",
+    "api::program.program.stats",
     "api::program.program.createOne",
     "api::program.program.updateOne",
     "api::program.program.deleteOne",
@@ -59,11 +61,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::mentor.mentor.listActive",
   ],
   "ngo-admin": [
+    "api::auth.auth.me",
     "api::auth.auth.changePassword",
     "api::evaluation.evaluation.myOngs",
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
+    "api::program.program.mentors",
     "api::report.report.list",
     "api::report.report.current",
     "api::report.report.start",
@@ -74,15 +78,17 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::report.report.deleteOne",
   ],
   "ngo-member": [
+    "api::auth.auth.me",
     "api::auth.auth.changePassword",
     "api::evaluation.evaluation.myOngs",
     "api::evaluation.evaluation.myEvaluations",
     "api::evaluation.evaluation.current",
     "api::evaluation.evaluation.detail",
     "api::evaluation.evaluation.updateOne",
+    "api::evaluation.evaluation.finish",
   ],
-  mentor: ["api::auth.auth.changePassword"],
-  individual: ["api::auth.auth.changePassword"],
+  mentor: ["api::auth.auth.me", "api::auth.auth.changePassword"],
+  individual: ["api::auth.auth.me", "api::auth.auth.changePassword"],
 };
 
 export default {

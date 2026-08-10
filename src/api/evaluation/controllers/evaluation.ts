@@ -33,6 +33,7 @@ const evaluationView = (evaluation: any, today: string) => ({
     isClosed(evaluation.report, today),
   ),
   completedAt: evaluation.completedAt ?? null,
+  scores: computeEvaluationScores(evaluation),
   dimensions: (evaluation.dimensions ?? []).map(decorateBlock),
   report: evaluation.report
     ? {
@@ -112,6 +113,7 @@ export default factories.createCoreController(
             documentId: ong.documentId,
             name: ong.name,
             cui: ong.cui,
+            domeniuActivitate: ong.domeniuActivitate,
             programs: ((ong.programs ?? []) as any[]).map((program) => ({
               documentId: program.documentId,
               name: program.name,
@@ -220,6 +222,9 @@ export default factories.createCoreController(
       if (allPhasesEnded(existing.report, today)) {
         return ctx.badRequest("Termenul fazei de evaluare a expirat");
       }
+      if (existing.completedAt) {
+        return ctx.badRequest("Evaluarea a fost deja finalizată");
+      }
       const saved = (existing.dimensions ?? []).map((block: any) => ({
         dimensionKey: block.dimensionKey,
         comment: block.comment ?? "",
@@ -229,19 +234,6 @@ export default factories.createCoreController(
           answer: question.answer,
         })),
       }));
-      const lockedKeys = new Set(
-        saved
-          .filter((block: any) => block.submitted)
-          .map((block: any) => block.dimensionKey),
-      );
-      const resubmitted = parsed.data.find((block) =>
-        lockedKeys.has(block.dimensionKey),
-      );
-      if (resubmitted) {
-        return ctx.badRequest(
-          `Dimensiunea ${resubmitted.dimensionKey} a fost deja trimisă`,
-        );
-      }
       const incoming = parsed.data.map((block) => ({
         dimensionKey: block.dimensionKey,
         comment: block.comment,
@@ -255,15 +247,57 @@ export default factories.createCoreController(
         ...saved.filter((block: any) => !incomingKeys.has(block.dimensionKey)),
         ...incoming,
       ]);
-      const completedAt =
-        computeProgress(dimensions).complete && !existing.completedAt
-          ? new Date().toISOString()
-          : undefined;
       const updated = await strapi
         .documents("api::evaluation.evaluation")
         .update({
           documentId: existing.documentId,
-          data: completedAt ? { dimensions, completedAt } : { dimensions },
+          data: { dimensions },
+          populate: {
+            dimensions: { populate: { quiz: true } },
+            user: true,
+            report: { populate: { phases: { populate: { program: true } } } },
+          },
+        });
+      return { data: evaluationView(updated, today) };
+    },
+    async finish(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const existing = await strapi
+        .documents("api::evaluation.evaluation")
+        .findOne({
+          documentId: ctx.params.documentId,
+          populate: {
+            dimensions: { populate: { quiz: true } },
+            user: true,
+            report: { populate: { phases: { populate: { program: true } } } },
+          },
+        });
+      if (!existing) {
+        return ctx.badRequest("Evaluarea nu există");
+      }
+      if (existing.user?.documentId !== ctx.state.user.documentId) {
+        return ctx.forbidden("Nu ai acces la această evaluare");
+      }
+      if (existing.report?.finished) {
+        return ctx.badRequest("Runda de evaluare este închisă");
+      }
+      const today = todayIso();
+      if (allPhasesEnded(existing.report, today)) {
+        return ctx.badRequest("Termenul fazei de evaluare a expirat");
+      }
+      if (existing.completedAt) {
+        return ctx.badRequest("Evaluarea a fost deja finalizată");
+      }
+      if (!computeProgress(existing.dimensions).complete) {
+        return ctx.badRequest("Nu ai completat toate dimensiunile încă");
+      }
+      const updated = await strapi
+        .documents("api::evaluation.evaluation")
+        .update({
+          documentId: existing.documentId,
+          data: { completedAt: new Date().toISOString() },
           populate: {
             dimensions: { populate: { quiz: true } },
             user: true,
