@@ -60,6 +60,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.evaluationDetail",
     "api::ong.ong.list",
     "api::ong.ong.listActive",
+    "api::ong.ong.detail",
+    "api::ong.ong.deleteOne",
     "api::mentor.mentor.listActive",
   ],
   "ngo-admin": [

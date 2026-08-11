@@ -37,6 +37,7 @@ const reportView = (report: any, today: string) => {
     completedCount: evaluations.filter(
       (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
     ).length,
+    score: computeReportScores(evaluations).overall,
   };
 };
 
@@ -80,7 +81,7 @@ export default factories.createCoreController(
             phases: { program: { documentId: program.documentId } },
           },
           populate: {
-            evaluations: { populate: { dimensions: true } },
+            evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
             phases: true,
           },
         });
@@ -121,7 +122,7 @@ export default factories.createCoreController(
         sort: { createdAt: "desc" },
         populate: {
           phases: true,
-          evaluations: { populate: { dimensions: true } },
+          evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
         },
       });
       const standaloneReports = unfinished
@@ -440,6 +441,7 @@ export default factories.createCoreController(
         data: {
           documentId: report.documentId,
           name: report.name,
+          createdAt: report.createdAt,
           finished: closed,
           finishedAt: report.finishedAt,
           closedBy: report.closedBy,
