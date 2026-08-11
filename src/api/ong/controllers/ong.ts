@@ -18,11 +18,72 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       return ctx.unauthorized();
     }
     const ongs = await strapi.documents("api::ong.ong").findMany({
+      filters: { ngoStatus: { $ne: "deleted" } },
       sort: { name: "asc" },
-      populate: { judet: true, localitate: true },
+      populate: {
+        judet: true,
+        localitate: true,
+        programs: true,
+        users: { populate: { role: true } },
+      },
     });
     return {
-      data: ongs.map((ong) => ({
+      data: ongs.map((ong) => {
+        const users = (ong.users ?? []) as any[];
+        const admin = users.find((user) => user.role?.type === "ngo-admin");
+        const memberCount = users.filter(
+          (user) => user.role?.type === "ngo-member",
+        ).length;
+        return {
+          documentId: ong.documentId,
+          name: ong.name,
+          cui: ong.cui,
+          website: ong.website,
+          adresa: ong.adresa,
+          dataInfiintare: ong.dataInfiintare,
+          domeniuActivitate: ong.domeniuActivitate,
+          memberCount,
+          admin: admin ? { nume: admin.nume } : null,
+          programs: ((ong.programs ?? []) as any[]).map((program) => ({
+            documentId: program.documentId,
+            name: program.name,
+          })),
+          judet: ong.judet
+            ? { documentId: ong.judet.documentId, nume: ong.judet.nume }
+            : null,
+          localitate: ong.localitate
+            ? {
+                documentId: ong.localitate.documentId,
+                nume: ong.localitate.nume,
+              }
+            : null,
+        };
+      }),
+    };
+  },
+  async detail(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+      populate: {
+        judet: true,
+        localitate: true,
+        programs: true,
+        users: { populate: { role: true } },
+      },
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const users = (ong.users ?? []) as any[];
+    const admin = users.find((user) => user.role?.type === "ngo-admin");
+    const memberCount = users.filter(
+      (user) => user.role?.type === "ngo-member",
+    ).length;
+    return {
+      data: {
         documentId: ong.documentId,
         name: ong.name,
         cui: ong.cui,
@@ -30,6 +91,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
         domeniuActivitate: ong.domeniuActivitate,
+        memberCount,
+        admin: admin ? { nume: admin.nume } : null,
+        programs: ((ong.programs ?? []) as any[]).map((program) => ({
+          documentId: program.documentId,
+          name: program.name,
+        })),
         judet: ong.judet
           ? { documentId: ong.judet.documentId, nume: ong.judet.nume }
           : null,
@@ -39,8 +106,24 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
               nume: ong.localitate.nume,
             }
           : null,
-      })),
+      },
     };
+  },
+  async deleteOne(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const existing = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!existing) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    await strapi.documents("api::ong.ong").update({
+      documentId: ctx.params.documentId,
+      data: { ngoStatus: "deleted" },
+    });
+    return { data: { documentId: ctx.params.documentId } };
   },
   async listActive(ctx: Context) {
     if (!ctx.state.user) {
@@ -111,7 +194,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       sort: { createdAt: "desc" },
       populate: {
         phases: { populate: { program: true } },
-        evaluations: { populate: { dimensions: true } },
+        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
       },
     });
     const eligible = programDocumentId
@@ -133,9 +216,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             computeProgress(evaluation.dimensions, isClosed(report, today))
               .complete,
         ).length,
+        scores: computeReportScores(report.evaluations ?? []),
         phases: ((report.phases ?? []) as any[]).map((phase) => ({
           documentId: phase.documentId,
           title: phase.title,
+          startDate: phase.startDate,
+          endDate: phase.endDate,
           program: phase.program
             ? { documentId: phase.program.documentId, name: phase.program.name }
             : null,
