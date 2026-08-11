@@ -21,7 +21,17 @@ interface JoinTableInfo {
 
 const COUNTIES = LOCALITIES as CountySeed[];
 
-const generateDocumentId = () => crypto.randomUUID().replace(/-/g, "");
+const DOCUMENT_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+const DOCUMENT_ID_LENGTH = 24;
+
+const generateDocumentId = () => {
+  const bytes = crypto.randomBytes(DOCUMENT_ID_LENGTH);
+  let id = "";
+  for (const byte of bytes) {
+    id += DOCUMENT_ID_ALPHABET[byte % DOCUMENT_ID_ALPHABET.length];
+  }
+  return id;
+};
 
 const chunk = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
