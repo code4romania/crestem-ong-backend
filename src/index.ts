@@ -1,5 +1,7 @@
 import type { Core } from "@strapi/strapi";
 
+import { seedLocalities } from "./utils/seed-localities";
+
 /**
  * Application-level users-permissions roles, beyond the built-in
  * `public` and `authenticated`. Identified by their `type` (a stable
@@ -105,6 +107,7 @@ export default {
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
+    await seedLocalities(strapi);
   },
 };
 
