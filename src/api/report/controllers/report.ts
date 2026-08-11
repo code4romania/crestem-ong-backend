@@ -23,6 +23,7 @@ import {
   toDisplayDate,
   todayInBucharest,
 } from "../../../utils/date";
+import { docRef } from "../../../utils/relations";
 import { requireOng } from "../../../utils/ong-scope";
 
 const reportView = (report: any, today: string) => {
@@ -211,9 +212,9 @@ export default factories.createCoreController(
               data: {
                 name: `Evaluare ${toDisplayDate(today)}`,
                 finished: false,
-                ong: ong.documentId,
-                phases: phase ? [phase.documentId] : [],
-                originPhase: phase ? phase.documentId : null,
+                ong: docRef(ong.documentId),
+                phases: phase ? { connect: [docRef(phase.documentId)] } : [],
+                originPhase: phase ? docRef(phase.documentId) : null,
               },
               populate: { phases: { populate: { program: true } } },
             });

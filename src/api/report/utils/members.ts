@@ -1,5 +1,6 @@
 import type { EmailService } from "../../email/services/email";
 import { buildEvaluationLink } from "./invite-link";
+import { docRef } from "../../../utils/relations";
 
 export interface MemberView {
   documentId: string;
@@ -62,7 +63,10 @@ export const createEvaluations = async (
     const evaluation = await strapi
       .documents("api::evaluation.evaluation")
       .create({
-        data: { user: member.documentId, report: reportDocumentId },
+        data: {
+          user: docRef(member.documentId),
+          report: docRef(reportDocumentId),
+        },
       });
     created.push({ member, evaluationDocumentId: evaluation.documentId });
   }

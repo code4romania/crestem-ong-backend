@@ -14,6 +14,7 @@ import {
   ResetPasswordPayload,
   ChangePasswordPayload,
 } from "../interfaces/auth";
+import { docRef } from "../../../utils/relations";
 import { EmailService } from "../../email/services/email";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
@@ -83,8 +84,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             name: data.numeOng,
             cui: data.cui,
             website: data.website,
-            judet: data.judet,
-            localitate: data.localitate,
+            judet: docRef(data.judet),
+            localitate: docRef(data.localitate),
             ngoStatus: "active",
           },
         });

@@ -14,6 +14,7 @@ import {
   targetEntryPhase,
 } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
+import { docRef, docRefs } from "../../../utils/relations";
 import {
   createProgramSchema,
   updateProgramSchema,
@@ -144,7 +145,7 @@ export default factories.createCoreController(
         for (const phase of phases) {
           createdPhases.push(
             await strapi.documents("api::phase.phase").create({
-              data: { ...phase, program: created.documentId },
+              data: { ...phase, program: docRef(created.documentId) },
             }),
           );
         }
@@ -323,7 +324,7 @@ export default factories.createCoreController(
               });
             } else {
               await strapi.documents("api::phase.phase").create({
-                data: { ...phase, program: existing.documentId },
+                data: { ...phase, program: docRef(existing.documentId) },
               });
             }
           }
@@ -533,7 +534,7 @@ export default factories.createCoreController(
       }
       const updated = await strapi.documents("api::program.program").update({
         documentId: program.documentId,
-        data: { mentors: { connect: mentorIds } },
+        data: { mentors: { connect: docRefs(mentorIds) } },
         populate: { mentors: { populate: { avatar: true } } },
       });
       return { data: { mentors: (updated.mentors ?? []).map(mentorView) } };
@@ -570,7 +571,7 @@ export default factories.createCoreController(
       }
       await strapi.documents("api::program.program").update({
         documentId: program.documentId,
-        data: { mentors: { disconnect: mentorIds } },
+        data: { mentors: { disconnect: docRefs(mentorIds) } },
       });
       return { message: "Mentorii au fost eliminați din program" };
     },
@@ -653,13 +654,13 @@ export default factories.createCoreController(
       }
       const updated = await strapi.documents("api::program.program").update({
         documentId: program.documentId,
-        data: { ongs: { connect: ongIds } },
+        data: { ongs: { connect: docRefs(ongIds) } },
         populate: { ongs: true },
       });
       for (const pick of picks) {
         await strapi.documents("api::report.report").update({
           documentId: pick.report,
-          data: { phases: { connect: [entryPhase.documentId] } },
+          data: { phases: { connect: [docRef(entryPhase.documentId)] } },
         });
       }
       let emailSent = true;
@@ -760,7 +761,7 @@ export default factories.createCoreController(
       }
       await strapi.documents("api::report.report").update({
         documentId: report.documentId,
-        data: { phases: { connect: [phase.documentId] } },
+        data: { phases: { connect: [docRef(phase.documentId)] } },
       });
       return {
         data: {
@@ -805,7 +806,7 @@ export default factories.createCoreController(
       await strapi.documents("api::report.report").update({
         documentId: report.documentId,
         data: {
-          phases: { disconnect: [phase.documentId] },
+          phases: { disconnect: [docRef(phase.documentId)] },
           ...(bornHere ? { originPhase: null } : {}),
         },
       });
@@ -855,14 +856,14 @@ export default factories.createCoreController(
         await strapi.documents("api::report.report").update({
           documentId: report.documentId,
           data: {
-            phases: { disconnect: phaseIds },
+            phases: { disconnect: docRefs(phaseIds) },
             ...(bornHere ? { originPhase: null } : {}),
           },
         });
       }
       await strapi.documents("api::program.program").update({
         documentId: program.documentId,
-        data: { ongs: { disconnect: ongIds } },
+        data: { ongs: { disconnect: docRefs(ongIds) } },
       });
       return { message: "Organizațiile au fost eliminate din program" };
     },
