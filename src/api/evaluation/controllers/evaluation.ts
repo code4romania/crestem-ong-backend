@@ -39,7 +39,9 @@ const evaluationView = (evaluation: any, today: string) => ({
     ? {
         documentId: evaluation.report.documentId,
         name: evaluation.report.name,
+        createdAt: evaluation.report.createdAt,
         finished: evaluation.report.finished,
+        finishedAt: evaluation.report.finishedAt ?? null,
         phases: (evaluation.report.phases ?? []).map(reportPhaseView),
       }
     : null,
@@ -73,7 +75,9 @@ export default factories.createCoreController(
       const today = todayIso();
       return {
         data: evaluations
-          .filter((evaluation: any) => !allPhasesEnded(evaluation.report, today))
+          .filter(
+            (evaluation: any) => !allPhasesEnded(evaluation.report, today),
+          )
           .map((evaluation: any) => ({
             documentId: evaluation.documentId,
             user: respondentView(evaluation.user),

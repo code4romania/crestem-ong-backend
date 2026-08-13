@@ -67,6 +67,7 @@ export default {
         id: user.id,
         nume: user.nume,
         email: user.email,
+        createdAt: user.createdAt,
         role: user.role ? { type: user.role.type, name: user.role.name } : null,
       },
     };
