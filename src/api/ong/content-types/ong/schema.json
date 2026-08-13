@@ -70,6 +70,12 @@
       "target": "api::program.program",
       "mappedBy": "ongs"
     },
+    "conversations": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::conversation.conversation",
+      "mappedBy": "ong"
+    },
     "ngoStatus": {
       "type": "enumeration",
       "enum": [

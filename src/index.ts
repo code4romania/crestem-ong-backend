@@ -80,6 +80,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::report.report.detail",
     "api::report.report.finishOne",
     "api::report.report.deleteOne",
+    "api::conversation.conversation.list",
+    "api::conversation.conversation.messages",
+    "api::conversation.conversation.sendMessage",
   ],
   "ngo-member": [
     "api::auth.auth.me",
@@ -91,7 +94,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::evaluation.evaluation.updateOne",
     "api::evaluation.evaluation.finish",
   ],
-  mentor: ["api::auth.auth.me", "api::auth.auth.changePassword"],
+  mentor: [
+    "api::auth.auth.me",
+    "api::auth.auth.changePassword",
+    "api::conversation.conversation.listForMentor",
+    "api::conversation.conversation.messagesForMentor",
+    "api::conversation.conversation.sendMessageForMentor",
+  ],
   individual: ["api::auth.auth.me", "api::auth.auth.changePassword"],
 };
 
