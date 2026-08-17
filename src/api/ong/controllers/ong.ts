@@ -10,6 +10,7 @@ import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { requireOng } from "../../../utils/ong-scope";
+import { updateMyOngSchema } from "../validation/ong";
 import { decorateBlock } from "../../evaluation/utils/catalog";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
@@ -41,7 +42,6 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           website: ong.website,
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
-          domeniuActivitate: ong.domeniuActivitate,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -90,7 +90,6 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         website: ong.website,
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
-        domeniuActivitate: ong.domeniuActivitate,
         memberCount,
         admin: admin ? { nume: admin.nume } : null,
         programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -165,6 +164,63 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         accountStatus: member.accountStatus,
       })),
     };
+  },
+  async me(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const scope = await requireOng(strapi, ctx);
+    if ("error" in scope) {
+      return ctx.badRequest(scope.error);
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: scope.ong.documentId,
+      populate: {
+        judet: true,
+        localitate: true,
+        logo: true,
+        domeniuPrincipal: true,
+        domeniuSecundar: true,
+      },
+    });
+    const user = scope.user as any;
+    return { data: serializeMyOng(ong, user) };
+  },
+  async updateMe(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const scope = await requireOng(strapi, ctx);
+    if ("error" in scope) {
+      return ctx.badRequest(scope.error);
+    }
+    const parsed = await updateMyOngSchema.safeParseAsync(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const { logo, domeniuPrincipal, domeniuSecundar, ...rest } = parsed.data;
+    const updated = await strapi.documents("api::ong.ong").update({
+      documentId: scope.ong.documentId,
+      data: {
+        ...rest,
+        ...(domeniuPrincipal !== undefined
+          ? { domeniuPrincipal: { documentId: domeniuPrincipal } }
+          : {}),
+        ...(domeniuSecundar !== undefined
+          ? { domeniuSecundar: { documentId: domeniuSecundar } }
+          : {}),
+        ...(logo !== undefined ? { logo: logo === null ? null : { id: logo } } : {}),
+      },
+      populate: {
+        judet: true,
+        localitate: true,
+        logo: true,
+        domeniuPrincipal: true,
+        domeniuSecundar: true,
+      },
+    });
+    const user = scope.user as any;
+    return { data: serializeMyOng(updated, user) };
   },
   async evaluations(ctx: Context) {
     if (!ctx.state.user) {
@@ -292,3 +348,32 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     };
   },
 }));
+
+function serializeMyOng(ong: any, user: any) {
+  return {
+    documentId: ong.documentId,
+    name: ong.name,
+    cui: ong.cui,
+    judet: ong.judet ? { documentId: ong.judet.documentId, nume: ong.judet.nume } : null,
+    localitate: ong.localitate
+      ? { documentId: ong.localitate.documentId, nume: ong.localitate.nume }
+      : null,
+    contact: {
+      nume: user.nume,
+      prenume: user.prenume,
+      email: user.email,
+      telefon: user.telefon,
+    },
+    website: ong.website ?? null,
+    logo: ong.logo ? { url: ong.logo.url } : null,
+    domeniuPrincipal: ong.domeniuPrincipal
+      ? { documentId: ong.domeniuPrincipal.documentId, name: ong.domeniuPrincipal.name }
+      : null,
+    domeniuSecundar: ong.domeniuSecundar
+      ? { documentId: ong.domeniuSecundar.documentId, name: ong.domeniuSecundar.name }
+      : null,
+    socialMedia: ong.socialMedia ?? null,
+    descriere: ong.descriere ?? null,
+    cuvinteCheie: ong.cuvinteCheie ?? null,
+  };
+}

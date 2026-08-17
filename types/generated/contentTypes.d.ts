@@ -671,8 +671,17 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     cui: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
+    cuvinteCheie: Schema.Attribute.String;
     dataInfiintare: Schema.Attribute.Date;
-    domeniuActivitate: Schema.Attribute.String;
+    descriere: Schema.Attribute.Text;
+    domeniuPrincipal: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::domain.domain'
+    >;
+    domeniuSecundar: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::domain.domain'
+    >;
     judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localitate: Schema.Attribute.Relation<
@@ -689,6 +698,7 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     programs: Schema.Attribute.Relation<'manyToMany', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
+    socialMedia: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1355,6 +1365,11 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
+      }>;
+    prenume: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 2;
       }>;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;

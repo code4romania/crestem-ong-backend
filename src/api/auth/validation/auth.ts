@@ -14,6 +14,10 @@ export const registerNgoSchema = z.object({
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
+  prenume: z
+    .string({ message: "Prenumele persoanei este obligatoriu" })
+    .trim()
+    .min(2, "Prenumele trebuie să aibă minim 2 caractere"),
   email: z
     .email("Adresă de email invalidă")
     .lowercase()

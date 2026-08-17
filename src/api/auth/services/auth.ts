@@ -83,8 +83,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             name: data.numeOng,
             cui: data.cui,
             website: data.website,
-            judet: data.judet,
-            localitate: data.localitate,
+            judet: { documentId: data.judet },
+            localitate: { documentId: data.localitate },
             ngoStatus: "active",
           },
         });
@@ -92,6 +92,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         // 2. Create the account
         await strapi.plugin("users-permissions").service("user").add({
           nume: data.nume,
+          prenume: data.prenume,
           email: data.email,
           password: data.password,
           telefon: data.telefon,

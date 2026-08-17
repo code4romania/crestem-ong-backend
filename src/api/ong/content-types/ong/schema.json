@@ -49,7 +49,23 @@
     "dataInfiintare": {
       "type": "date"
     },
-    "domeniuActivitate": {
+    "domeniuPrincipal": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::domain.domain"
+    },
+    "domeniuSecundar": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::domain.domain"
+    },
+    "socialMedia": {
+      "type": "string"
+    },
+    "descriere": {
+      "type": "text"
+    },
+    "cuvinteCheie": {
       "type": "string"
     },
     "users": {

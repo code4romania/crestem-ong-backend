@@ -1,6 +1,7 @@
 import type { Core } from "@strapi/strapi";
 
 import { seedLocalities } from "./utils/seed-localities";
+import { seedDomains } from "./utils/seed-domains";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -71,6 +72,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
+    "api::ong.ong.me",
+    "api::ong.ong.updateMe",
+    "plugin::upload.content-api.upload",
     "api::program.program.mentors",
     "api::report.report.list",
     "api::report.report.current",
@@ -119,6 +123,7 @@ export default {
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
     await seedLocalities(strapi);
+    await seedDomains(strapi);
   },
 };
 
