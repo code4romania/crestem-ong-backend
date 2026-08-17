@@ -648,6 +648,44 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiOngJoinRequestOngJoinRequest
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'ong_join_requests';
+  info: {
+    description: '';
+    displayName: 'Ong Join Request';
+    pluralName: 'ong-join-requests';
+    singularName: 'ong-join-request';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ong-join-request.ong-join-request'
+    > &
+      Schema.Attribute.Private;
+    message: Schema.Attribute.Text;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['pending', 'accepted', 'rejected']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiOngOng extends Struct.CollectionTypeSchema {
   collectionName: 'ongs';
   info: {
@@ -702,10 +740,6 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    users: Schema.Attribute.Relation<
-      'manyToMany',
-      'plugin::users-permissions.user'
-    >;
     website: Schema.Attribute.String;
   };
 }
@@ -1360,16 +1394,11 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
-    ongs: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
+    ongMemberships: Schema.Attribute.Component<'ong.membership', true>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
-      }>;
-    prenume: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        minLength: 2;
       }>;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
@@ -1408,6 +1437,7 @@ declare module '@strapi/strapi' {
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::message.message': ApiMessageMessage;
+      'api::ong-join-request.ong-join-request': ApiOngJoinRequestOngJoinRequest;
       'api::ong.ong': ApiOngOng;
       'api::phase.phase': ApiPhasePhase;
       'api::program.program': ApiProgramProgram;

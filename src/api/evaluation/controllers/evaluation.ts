@@ -8,6 +8,7 @@ import { allPhasesEnded } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { belongsToOng, loadUserWithOngs } from "../../../utils/ong-scope";
+import { removeOngMembership } from "../../../utils/membership";
 import { computeEvaluationScores } from "../../report/utils/scores";
 
 const reportPhaseView = (phase: any) => ({
@@ -109,15 +110,26 @@ export default factories.createCoreController(
         .documents("plugin::users-permissions.user")
         .findOne({
           documentId: ctx.state.user.documentId,
-          populate: { ongs: { populate: { programs: true } } },
+          populate: {
+            ongMemberships: {
+              populate: {
+                ong: { populate: { programs: true, domeniuPrincipal: true } },
+              },
+            },
+          },
         });
       return {
-        data: ((user?.ongs ?? []) as any[])
-          .map((ong) => ({
+        data: ((user?.ongMemberships ?? []) as any[])
+          .map((membership) => membership.ong)
+          .filter(Boolean)
+          .map((ong: any) => ({
             documentId: ong.documentId,
             name: ong.name,
             cui: ong.cui,
-            domeniuActivitate: ong.domeniuActivitate,
+            website: ong.website ?? null,
+            adresa: ong.adresa ?? null,
+            dataInfiintare: ong.dataInfiintare ?? null,
+            domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
             programs: ((ong.programs ?? []) as any[]).map((program) => ({
               documentId: program.documentId,
               name: program.name,
@@ -126,6 +138,27 @@ export default factories.createCoreController(
           }))
           .sort((a, b) => `${a.name}`.localeCompare(`${b.name}`, "ro")),
       };
+    },
+    async leaveOng(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!user) {
+        return ctx.unauthorized();
+      }
+      if (!belongsToOng(user, ctx.params.ongDocumentId)) {
+        return ctx.badRequest("Nu faci parte din această organizație");
+      }
+      const result = await removeOngMembership(
+        strapi,
+        user.documentId,
+        ctx.params.ongDocumentId,
+      );
+      if ("error" in result) {
+        return ctx.badRequest(result.error);
+      }
+      return { data: result.data };
     },
     async myEvaluations(ctx: Context) {
       if (!ctx.state.user) {

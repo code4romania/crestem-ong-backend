@@ -36,11 +36,24 @@ export interface EvaluationQuestion extends Struct.ComponentSchema {
   };
 }
 
+export interface OngMembership extends Struct.ComponentSchema {
+  collectionName: 'components_ong_memberships';
+  info: {
+    description: '';
+    displayName: 'Ong Membership';
+  };
+  attributes: {
+    ong: Schema.Attribute.Relation<'oneToOne', 'api::ong.ong'>;
+    rolMembruOng: Schema.Attribute.String;
+  };
+}
+
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
       'evaluation.dimension': EvaluationDimension;
       'evaluation.question': EvaluationQuestion;
+      'ong.membership': OngMembership;
     }
   }
 }

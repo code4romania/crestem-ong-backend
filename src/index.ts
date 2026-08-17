@@ -72,8 +72,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
+    "api::ong.ong.removeMember",
     "api::ong.ong.me",
     "api::ong.ong.updateMe",
+    "api::ong.ong.joinRequests",
+    "api::ong.ong.acceptJoinRequest",
+    "api::ong.ong.rejectJoinRequest",
     "plugin::upload.content-api.upload",
     "api::program.program.mentors",
     "api::report.report.list",
@@ -92,11 +96,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
     "api::evaluation.evaluation.myOngs",
+    "api::evaluation.evaluation.leaveOng",
     "api::evaluation.evaluation.myEvaluations",
     "api::evaluation.evaluation.current",
     "api::evaluation.evaluation.detail",
     "api::evaluation.evaluation.updateOne",
     "api::evaluation.evaluation.finish",
+    "api::ong.ong.joinable",
+    "api::ong.ong.createJoinRequest",
   ],
   mentor: [
     "api::auth.auth.me",
@@ -105,7 +112,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.messagesForMentor",
     "api::conversation.conversation.sendMessageForMentor",
   ],
-  individual: ["api::auth.auth.me", "api::auth.auth.changePassword"],
+  individual: [
+    "api::auth.auth.me",
+    "api::auth.auth.changePassword",
+    "api::ong.ong.joinable",
+    "api::ong.ong.createJoinRequest",
+  ],
 };
 
 export default {

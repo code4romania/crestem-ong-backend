@@ -7,6 +7,12 @@ export default {
       config: {},
     },
     {
+      method: "DELETE",
+      path: "/me/ongs/:ongDocumentId",
+      handler: "evaluation.leaveOng",
+      config: {},
+    },
+    {
       method: "GET",
       path: "/evaluations/ong/:ongDocumentId",
       handler: "evaluation.myEvaluations",

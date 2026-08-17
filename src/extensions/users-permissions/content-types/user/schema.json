@@ -19,12 +19,6 @@
       "configurable": false,
       "required": true
     },
-    "prenume": {
-      "type": "string",
-      "minLength": 2,
-      "configurable": false,
-      "required": true
-    },
     "email": {
       "type": "email",
       "minLength": 6,
@@ -92,11 +86,10 @@
       "default": "active",
       "required": true
     },
-    "ongs": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::ong.ong",
-      "inversedBy": "users"
+    "ongMemberships": {
+      "type": "component",
+      "repeatable": true,
+      "component": "ong.membership"
     },
     "mentorJobTitle": {
       "type": "string"

@@ -1,0 +1,18 @@
+{
+  "collectionName": "components_ong_memberships",
+  "info": {
+    "displayName": "Ong Membership",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "ong": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::ong.ong"
+    },
+    "rolMembruOng": {
+      "type": "string"
+    }
+  }
+}

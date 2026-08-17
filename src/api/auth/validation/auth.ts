@@ -14,10 +14,6 @@ export const registerNgoSchema = z.object({
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
-  prenume: z
-    .string({ message: "Prenumele persoanei este obligatoriu" })
-    .trim()
-    .min(2, "Prenumele trebuie să aibă minim 2 caractere"),
   email: z
     .email("Adresă de email invalidă")
     .lowercase()
@@ -145,7 +141,9 @@ const inviteSchema = z.object({
 });
 
 export const registerMentorSchema = inviteSchema;
-export const registerMemberSchema = inviteSchema;
+export const registerMemberSchema = inviteSchema.extend({
+  rolMembruOng: z.string().trim().min(1, "Rolul în ONG este invalid").optional(),
+});
 
 export const activateAccountSchema = z
   .object({
