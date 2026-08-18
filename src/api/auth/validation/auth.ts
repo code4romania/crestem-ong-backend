@@ -65,11 +65,11 @@ export const registerNgoSchema = z.object({
   judet: z
     .string({ message: "Județul este obligatoriu" })
     .trim()
-    .length(24, "Județul selectat este invalid"),
+    .min(1, "Județul selectat este invalid"),
   localitate: z
     .string({ message: "Localitatea este obligatorie" })
     .trim()
-    .length(24, "Localitatea selectată este invalidă"),
+    .min(1, "Localitatea selectată este invalidă"),
   acordTermeniSiConditii: z.literal(true, {
     message: "Trebuie să accepți termenii și condițiile",
   }),
