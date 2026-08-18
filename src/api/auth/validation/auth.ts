@@ -8,6 +8,8 @@
 
 import { z } from "zod";
 
+import { ngoRoleSchema } from "../../../utils/ngo-role";
+
 export const registerNgoSchema = z.object({
   // --- Account (users-permissions user) ---
   nume: z
@@ -141,7 +143,8 @@ const inviteSchema = z.object({
 });
 
 export const registerMentorSchema = inviteSchema;
-export const registerMemberSchema = inviteSchema;
+/** Members belong to an organization, so they carry a role there. Mentors do not. */
+export const registerMemberSchema = inviteSchema.extend({ rol: ngoRoleSchema });
 
 export const activateAccountSchema = z
   .object({

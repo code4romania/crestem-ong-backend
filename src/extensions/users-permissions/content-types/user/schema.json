@@ -86,12 +86,6 @@
       "default": "active",
       "required": true
     },
-    "ongs": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::ong.ong",
-      "inversedBy": "users"
-    },
     "mentorJobTitle": {
       "type": "string"
     },
@@ -99,11 +93,18 @@
       "type": "string"
     },
     "avatar": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
       "allowedTypes": [
         "images"
-      ],
-      "type": "media",
-      "multiple": false
+      ]
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::ong.ong",
+      "inversedBy": "users"
     }
   }
 }

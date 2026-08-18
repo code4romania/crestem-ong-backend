@@ -648,6 +648,78 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiNgoMemberRoleNgoMemberRole
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'ngo_member_roles';
+  info: {
+    displayName: 'NGO Member Role';
+    pluralName: 'ngo-member-roles';
+    singularName: 'ngo-member-role';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ngo-member-role.ngo-member-role'
+    > &
+      Schema.Attribute.Private;
+    ngo: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    ngoMember: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    role: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiOngJoinRequestOngJoinRequest
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'ong_join_requests';
+  info: {
+    description: '';
+    displayName: 'Ong Join Request';
+    pluralName: 'ong-join-requests';
+    singularName: 'ong-join-request';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ong-join-request.ong-join-request'
+    > &
+      Schema.Attribute.Private;
+    message: Schema.Attribute.Text;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['pending', 'accepted', 'rejected']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiOngOng extends Struct.CollectionTypeSchema {
   collectionName: 'ongs';
   info: {
@@ -671,8 +743,17 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     cui: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
+    cuvinteCheie: Schema.Attribute.String;
     dataInfiintare: Schema.Attribute.Date;
-    domeniuActivitate: Schema.Attribute.String;
+    descriere: Schema.Attribute.Text;
+    domeniuPrincipal: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::domain.domain'
+    >;
+    domeniuSecundar: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::domain.domain'
+    >;
     judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localitate: Schema.Attribute.Relation<
@@ -689,6 +770,7 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     programs: Schema.Attribute.Relation<'manyToMany', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     reports: Schema.Attribute.Relation<'oneToMany', 'api::report.report'>;
+    socialMedia: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1350,7 +1432,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
-    ongs: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
+    ong: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
@@ -1393,6 +1475,8 @@ declare module '@strapi/strapi' {
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::message.message': ApiMessageMessage;
+      'api::ngo-member-role.ngo-member-role': ApiNgoMemberRoleNgoMemberRole;
+      'api::ong-join-request.ong-join-request': ApiOngJoinRequestOngJoinRequest;
       'api::ong.ong': ApiOngOng;
       'api::phase.phase': ApiPhasePhase;
       'api::program.program': ApiProgramProgram;

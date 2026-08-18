@@ -2,14 +2,14 @@ export default {
   routes: [
     {
       method: "GET",
-      path: "/ongs/members",
-      handler: "ong.members",
+      path: "/ongs/me",
+      handler: "ong.me",
       config: { policies: ["global::is-ngo-admin"] },
     },
     {
-      method: "DELETE",
-      path: "/ongs/members/:documentId",
-      handler: "ong.removeMember",
+      method: "PATCH",
+      path: "/ongs/me",
+      handler: "ong.updateMe",
       config: { policies: ["global::is-ngo-admin"] },
     },
   ],

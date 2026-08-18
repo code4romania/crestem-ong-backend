@@ -28,4 +28,10 @@ export type ChangePasswordPayload = z.infer<typeof changePasswordSchema>;
 export type InviteCreateResult = {
   id: number;
   emailSent: boolean;
+  activationLink?: string;
+};
+
+export type InviteResendResult = {
+  emailSent: boolean;
+  activationLink?: string;
 };

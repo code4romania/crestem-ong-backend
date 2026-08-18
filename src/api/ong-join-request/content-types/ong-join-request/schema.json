@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ong_join_requests",
+  "info": {
+    "singularName": "ong-join-request",
+    "pluralName": "ong-join-requests",
+    "displayName": "Ong Join Request",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong"
+    },
+    "message": {
+      "type": "text"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "accepted", "rejected"],
+      "default": "pending",
+      "required": true
+    }
+  }
+}

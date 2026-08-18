@@ -11,10 +11,12 @@ import {
   MemberCreatePayload,
   ActivateAccountPayload,
   InviteCreateResult,
+  InviteResendResult,
   ResetPasswordPayload,
   ChangePasswordPayload,
 } from "../interfaces/auth";
 import { docRef } from "../../../utils/relations";
+import { setNgoMemberRole } from "../../../utils/membership";
 import { EmailService } from "../../email/services/email";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
@@ -23,6 +25,7 @@ import {
   getEmailLinkSecret,
   signActivationToken,
   buildActivationLink,
+  exposeActivationLink,
   MENTOR_ACTIVATION_PATH,
   MEMBER_ACTIVATION_PATH,
   RESET_PURPOSE,
@@ -49,11 +52,14 @@ export interface AuthService {
   createMentor(data: MentorCreatePayload): Promise<InviteCreateResult>;
   createMember(
     data: MemberCreatePayload,
-    ong: { id: number; name: string },
+    ong: { id: number; documentId: string; name: string },
   ): Promise<InviteCreateResult>;
   activateAccount(data: ActivateAccountPayload): Promise<boolean>;
-  resendMentorInvite(userId: number): Promise<boolean>;
-  resendMemberInvite(userId: number, ongId: number): Promise<boolean>;
+  resendMentorInvite(userId: number): Promise<InviteResendResult>;
+  resendMemberInvite(
+    userId: number,
+    ongId: number,
+  ): Promise<InviteResendResult>;
   forgotPassword(email: string): Promise<void>;
   resetPassword(data: ResetPasswordPayload): Promise<boolean>;
   changePassword(
@@ -91,18 +97,21 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         });
 
         // 2. Create the account
-        await strapi.plugin("users-permissions").service("user").add({
-          nume: data.nume,
-          email: data.email,
-          password: data.password,
-          telefon: data.telefon,
-          acordTermeniSiConditii: data.acordTermeniSiConditii,
-          provider: "local",
-          confirmed: true,
-          blocked: false,
-          role: role.id,
-          ongs: [ong.id],
-        });
+        await strapi
+          .plugin("users-permissions")
+          .service("user")
+          .add({
+            nume: data.nume,
+            email: data.email,
+            password: data.password,
+            telefon: data.telefon,
+            acordTermeniSiConditii: data.acordTermeniSiConditii,
+            provider: "local",
+            confirmed: true,
+            blocked: false,
+            role: role.id,
+            ong: [ong.id],
+          });
 
         return true;
       });
@@ -203,14 +212,24 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     } catch (error) {
       console.error("createMentor email delivery failed", error);
+      console.warn(
+        "Mentor activation link (email delivery failed):",
+        buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+      );
       emailSent = false;
     }
 
-    return { id: user.id, emailSent };
+    return {
+      id: user.id,
+      emailSent,
+      ...(exposeActivationLink()
+        ? { activationLink: buildActivationLink(token, MENTOR_ACTIVATION_PATH) }
+        : {}),
+    };
   },
   async createMember(
     data: MemberCreatePayload,
-    ong: { id: number; name: string },
+    ong: { id: number; documentId: string; name: string },
   ): Promise<InviteCreateResult> {
     let user: { id: number };
     let token: string;
@@ -240,8 +259,21 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             confirmed: true,
             blocked: false,
             role: role.id,
-            ongs: [ong.id],
+            ong: [ong.id],
           });
+
+        if (!created.documentId) {
+          throw new Error(
+            "Contul de membru a fost creat fără documentId, rolul în organizație nu poate fi salvat.",
+          );
+        }
+
+        await setNgoMemberRole(
+          strapi,
+          created.documentId,
+          ong.documentId,
+          data.rol,
+        );
 
         const activationToken = signActivationToken(created.id);
 
@@ -272,10 +304,20 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     } catch (error) {
       console.error("createMember email delivery failed", error);
+      console.warn(
+        "Member activation link (email delivery failed):",
+        buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+      );
       emailSent = false;
     }
 
-    return { id: user.id, emailSent };
+    return {
+      id: user.id,
+      emailSent,
+      ...(exposeActivationLink()
+        ? { activationLink: buildActivationLink(token, MEMBER_ACTIVATION_PATH) }
+        : {}),
+    };
   },
   async activateAccount(data: ActivateAccountPayload) {
     let payload: ActivationTokenPayload;
@@ -307,14 +349,11 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     }
 
     try {
-      await strapi
-        .plugin("users-permissions")
-        .service("user")
-        .edit(user.id, {
-          password: data.password,
-          accountStatus: "active",
-          resetPasswordToken: null,
-        });
+      await strapi.plugin("users-permissions").service("user").edit(user.id, {
+        password: data.password,
+        accountStatus: "active",
+        resetPasswordToken: null,
+      });
 
       await (
         strapi.service(
@@ -348,25 +387,43 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .service("user")
       .edit(user.id, { resetPasswordToken: token });
 
-    await (
-      strapi.service("api::email.email") as EmailService
-    ).sendMentorActivation({
-      to: user.email,
-      nume: user.nume,
-      link: buildActivationLink(token, MENTOR_ACTIVATION_PATH),
-    });
+    let emailSent = true;
+    try {
+      await (
+        strapi.service("api::email.email") as EmailService
+      ).sendMentorActivation({
+        to: user.email,
+        nume: user.nume,
+        link: buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+      });
+    } catch (error) {
+      console.error("resendMentorInvite email delivery failed", error);
+      console.warn(
+        "Mentor activation link (email delivery failed):",
+        buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+      );
+      emailSent = false;
+    }
 
-    return true;
+    return {
+      emailSent,
+      ...(exposeActivationLink()
+        ? { activationLink: buildActivationLink(token, MENTOR_ACTIVATION_PATH) }
+        : {}),
+    };
   },
   async resendMemberInvite(userId: number, ongId: number) {
     const user = await strapi.db
       .query("plugin::users-permissions.user")
-      .findOne({ where: { id: userId }, populate: ["role", "ongs"] });
+      .findOne({
+        where: { id: userId },
+        populate: ["role", "ong"],
+      });
 
     if (
       !user ||
       user.role?.type !== "ngo-member" ||
-      !(user.ongs ?? []).some((entry: any) => entry.id === ongId)
+      !(user.ong ?? []).some((entry: any) => entry.id === ongId)
     ) {
       throw new Error("Contul de membru nu a fost găsit");
     }
@@ -382,24 +439,40 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .service("user")
       .edit(user.id, { resetPasswordToken: token });
 
-    await (
-      strapi.service("api::email.email") as EmailService
-    ).sendMemberActivation({
-      to: user.email,
-      nume: user.nume,
-      ongName:
-        (user.ongs ?? []).find((entry: any) => entry.id === ongId)?.name ?? "",
-      link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
-    });
+    let emailSent = true;
+    try {
+      await (
+        strapi.service("api::email.email") as EmailService
+      ).sendMemberActivation({
+        to: user.email,
+        nume: user.nume,
+        ongName:
+          (user.ong ?? []).find((entry: any) => entry.id === ongId)?.name ??
+          "",
+        link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+      });
+    } catch (error) {
+      console.error("resendMemberInvite email delivery failed", error);
+      console.warn(
+        "Member activation link (email delivery failed):",
+        buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+      );
+      emailSent = false;
+    }
 
-    return true;
+    return {
+      emailSent,
+      ...(exposeActivationLink()
+        ? { activationLink: buildActivationLink(token, MEMBER_ACTIVATION_PATH) }
+        : {}),
+    };
   },
   async forgotPassword(email: string) {
     const user = await strapi.db
       .query("plugin::users-permissions.user")
       .findOne({
         where: { email: { $eqi: email } },
-        populate: ["role", "ongs"],
+        populate: ["role", "ong"],
       });
 
     if (!user || user.accountStatus === "deleted") {
@@ -426,7 +499,10 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         return;
       }
 
-      if (user.role?.type === "ngo-member" && (user.ongs ?? []).length > 0) {
+      if (
+        user.role?.type === "ngo-member" &&
+        (user.ong ?? []).length > 0
+      ) {
         const token = signActivationToken(user.id);
 
         await strapi
@@ -439,7 +515,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ).sendMemberActivation({
           to: user.email,
           nume: user.nume,
-          ongName: (user.ongs ?? [])[0]?.name ?? "",
+          ongName: (user.ong ?? [])[0]?.name ?? "",
           link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
         });
 
@@ -456,7 +532,9 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .service("user")
       .edit(user.id, { resetPasswordToken: token });
 
-    await (strapi.service("api::email.email") as EmailService).sendPasswordReset({
+    await (
+      strapi.service("api::email.email") as EmailService
+    ).sendPasswordReset({
       to: user.email,
       nume: user.nume,
       link: buildResetLink(token),

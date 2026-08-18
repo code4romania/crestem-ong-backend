@@ -24,14 +24,14 @@ export const resolveMembers = async (
     .documents("plugin::users-permissions.user")
     .findMany({
       filters: { documentId: { $in: unique } },
-      populate: { ongs: true, role: true },
+      populate: { ong: true, role: true },
     });
   if (users.length !== unique.length) {
     return { error: "Unii utilizatori selectați nu există" };
   }
   for (const member of users) {
-    const inOng = ((member.ongs ?? []) as any[]).some(
-      (ong: any) => ong.documentId === ongDocumentId,
+    const inOng = ((member.ong ?? []) as any[]).some(
+      (ong: any) => ong?.documentId === ongDocumentId,
     );
     if (!inOng || member.role?.type !== "ngo-member") {
       return {

@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ngo_member_roles",
+  "info": {
+    "singularName": "ngo-member-role",
+    "pluralName": "ngo-member-roles",
+    "displayName": "NGO Member Role"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "ngoMember": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "role": {
+      "type": "string",
+      "required": true
+    },
+    "ngo": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong"
+    }
+  }
+}

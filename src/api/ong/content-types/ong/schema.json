@@ -49,14 +49,24 @@
     "dataInfiintare": {
       "type": "date"
     },
-    "domeniuActivitate": {
+    "domeniuPrincipal": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::domain.domain"
+    },
+    "domeniuSecundar": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::domain.domain"
+    },
+    "socialMedia": {
       "type": "string"
     },
-    "users": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "plugin::users-permissions.user",
-      "mappedBy": "ongs"
+    "descriere": {
+      "type": "text"
+    },
+    "cuvinteCheie": {
+      "type": "string"
     },
     "reports": {
       "type": "relation",
@@ -85,6 +95,12 @@
       ],
       "required": true,
       "default": "active"
+    },
+    "users": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "ong"
     }
   }
 }

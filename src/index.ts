@@ -1,6 +1,7 @@
 import type { Core } from "@strapi/strapi";
 
 import { seedLocalities } from "./utils/seed-localities";
+import { seedDomains } from "./utils/seed-domains";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -71,6 +72,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
+    "api::ong.ong.removeMember",
+    "api::ong.ong.me",
+    "api::ong.ong.updateMe",
+    "api::ong.ong.joinRequests",
+    "api::ong.ong.acceptJoinRequest",
+    "api::ong.ong.rejectJoinRequest",
+    "plugin::upload.content-api.upload",
     "api::program.program.mentors",
     "api::report.report.list",
     "api::report.report.current",
@@ -88,11 +96,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
     "api::evaluation.evaluation.myOngs",
+    "api::evaluation.evaluation.leaveOng",
     "api::evaluation.evaluation.myEvaluations",
     "api::evaluation.evaluation.current",
     "api::evaluation.evaluation.detail",
     "api::evaluation.evaluation.updateOne",
     "api::evaluation.evaluation.finish",
+    "api::ong.ong.joinable",
+    "api::ong.ong.createJoinRequest",
   ],
   mentor: [
     "api::auth.auth.me",
@@ -101,7 +112,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.messagesForMentor",
     "api::conversation.conversation.sendMessageForMentor",
   ],
-  individual: ["api::auth.auth.me", "api::auth.auth.changePassword"],
+  individual: [
+    "api::auth.auth.me",
+    "api::auth.auth.changePassword",
+    "api::ong.ong.joinable",
+    "api::ong.ong.createJoinRequest",
+  ],
 };
 
 export default {
@@ -109,7 +125,20 @@ export default {
    * An asynchronous register function that runs before
    * your application is initialized.
    */
-  register(/* { strapi }: { strapi: Core.Strapi } */) {},
+  register(/* { strapi }: { strapi: Core.Strapi } */) {
+    if (process.env.DEV_EXPOSE_ACTIVATION_LINK !== "true") return;
+    const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
+    if (appEnv === "production") {
+      throw new Error(
+        "DEV_EXPOSE_ACTIVATION_LINK nu poate fi activat în producție. " +
+          "Pe staging setează APP_ENV=staging.",
+      );
+    }
+    console.warn(
+      `[register] DEV_EXPOSE_ACTIVATION_LINK activ (APP_ENV=${appEnv}). ` +
+        "Linkurile de activare sunt expuse prin API. Dezactivează înainte de producție.",
+    );
+  },
 
   /**
    * An asynchronous bootstrap function that runs before
@@ -119,6 +148,7 @@ export default {
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
     await seedLocalities(strapi);
+    await seedDomains(strapi);
   },
 };
 
