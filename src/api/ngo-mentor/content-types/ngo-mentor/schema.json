@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ngo_mentors",
+  "info": {
+    "singularName": "ngo-mentor",
+    "pluralName": "ngo-mentors",
+    "displayName": "NgoMentor"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "ong": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::ong.ong"
+    },
+    "program": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::program.program"
+    },
+    "mentors": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}
