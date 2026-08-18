@@ -8,6 +8,8 @@
 
 import { z } from "zod";
 
+import { ngoRoleSchema } from "../../../utils/ngo-role";
+
 export const registerNgoSchema = z.object({
   // --- Account (users-permissions user) ---
   nume: z
@@ -65,11 +67,11 @@ export const registerNgoSchema = z.object({
   judet: z
     .string({ message: "Județul este obligatoriu" })
     .trim()
-    .length(24, "Județul selectat este invalid"),
+    .min(1, "Județul selectat este invalid"),
   localitate: z
     .string({ message: "Localitatea este obligatorie" })
     .trim()
-    .length(24, "Localitatea selectată este invalidă"),
+    .min(1, "Localitatea selectată este invalidă"),
   acordTermeniSiConditii: z.literal(true, {
     message: "Trebuie să accepți termenii și condițiile",
   }),
@@ -141,9 +143,8 @@ const inviteSchema = z.object({
 });
 
 export const registerMentorSchema = inviteSchema;
-export const registerMemberSchema = inviteSchema.extend({
-  rolMembruOng: z.string().trim().min(1, "Rolul în ONG este invalid").optional(),
-});
+/** Members belong to an organization, so they carry a role there. Mentors do not. */
+export const registerMemberSchema = inviteSchema.extend({ rol: ngoRoleSchema });
 
 export const activateAccountSchema = z
   .object({

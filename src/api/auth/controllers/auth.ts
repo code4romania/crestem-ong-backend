@@ -115,6 +115,9 @@ export default {
           : "Contul de mentor a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
       };
     } catch (error) {
       console.error("registerMentor failed", error);
@@ -140,7 +143,11 @@ export default {
 
       const result = await (
         strapi.service("api::auth.auth") as AuthService
-      ).createMember(parsed.data, { id: scope.ong.id, name: scope.ong.name });
+      ).createMember(parsed.data, {
+        id: scope.ong.id,
+        documentId: scope.ong.documentId,
+        name: scope.ong.name,
+      });
 
       return {
         message: result.emailSent
@@ -148,6 +155,9 @@ export default {
           : "Contul de membru a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
       };
     } catch (error) {
       console.error("registerMember failed", error);
@@ -185,12 +195,18 @@ export default {
         return ctx.badRequest("Identificator invalid");
       }
 
-      await (
+      const result = await (
         strapi.service("api::auth.auth") as AuthService
       ).resendMentorInvite(userId);
 
       return {
-        message: "Invitația a fost retrimisă.",
+        message: result.emailSent
+          ? "Invitația a fost retrimisă."
+          : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
+        emailSent: result.emailSent,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
       };
     } catch (error) {
       console.error("resendMentorInvite failed", error);
@@ -211,12 +227,18 @@ export default {
         return ctx.badRequest(scope.error);
       }
 
-      await (
+      const result = await (
         strapi.service("api::auth.auth") as AuthService
       ).resendMemberInvite(userId, scope.ong.id);
 
       return {
-        message: "Invitația a fost retrimisă.",
+        message: result.emailSent
+          ? "Invitația a fost retrimisă."
+          : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
+        emailSent: result.emailSent,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
       };
     } catch (error) {
       console.error("resendMemberInvite failed", error);

@@ -86,11 +86,6 @@
       "default": "active",
       "required": true
     },
-    "ongMemberships": {
-      "type": "component",
-      "repeatable": true,
-      "component": "ong.membership"
-    },
     "mentorJobTitle": {
       "type": "string"
     },
@@ -98,11 +93,18 @@
       "type": "string"
     },
     "avatar": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
       "allowedTypes": [
         "images"
-      ],
-      "type": "media",
-      "multiple": false
+      ]
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::ong.ong",
+      "inversedBy": "users"
     }
   }
 }

@@ -95,6 +95,12 @@
       ],
       "required": true,
       "default": "active"
+    },
+    "users": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "ong"
     }
   }
 }

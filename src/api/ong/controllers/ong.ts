@@ -9,9 +9,23 @@ import { computeReportScores } from "../../report/utils/scores";
 import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
-import { belongsToOng, loadUserWithOngs, requireOng } from "../../../utils/ong-scope";
-import { addOngMembership, removeOngMembership } from "../../../utils/membership";
+import {
+  belongsToOng,
+  loadUserWithOngs,
+  requireOng,
+} from "../../../utils/ong-scope";
+import {
+  addOngMembership,
+  getNgoMemberRoles,
+  removeOngMembership,
+} from "../../../utils/membership";
+import {
+  buildActivationLink,
+  exposeActivationLink,
+  MEMBER_ACTIVATION_PATH,
+} from "../../auth/utils/auth";
 import { updateMyOngSchema } from "../validation/ong";
+import { acceptJoinRequestSchema } from "../validation/join-request";
 import { decorateBlock } from "../../evaluation/utils/catalog";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
@@ -22,7 +36,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const ongs = await strapi.documents("api::ong.ong").findMany({
       filters: { ngoStatus: { $ne: "deleted" } },
       sort: { name: "asc" },
-      populate: { judet: true, localitate: true, programs: true },
+      populate: {
+        judet: true,
+        localitate: true,
+        programs: true,
+        domeniuPrincipal: true,
+      },
     });
     const byOng = await membersByOng(strapi);
     return {
@@ -38,6 +57,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           website: ong.website,
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
+          domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -63,7 +83,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     const ong = await strapi.documents("api::ong.ong").findOne({
       documentId: ctx.params.documentId,
-      populate: { judet: true, localitate: true, programs: true },
+      populate: {
+        judet: true,
+        localitate: true,
+        programs: true,
+        domeniuPrincipal: true,
+      },
     });
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
@@ -73,7 +98,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       .findMany({
         filters: {
           role: { type: { $in: ["ngo-admin", "ngo-member"] } },
-          ongMemberships: { ong: { documentId: ong.documentId } },
+          ong: { documentId: ong.documentId },
         },
         populate: { role: true },
       });
@@ -91,6 +116,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         website: ong.website,
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
+        domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
         memberCount,
         admin: admin ? { nume: admin.nume } : null,
         programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -152,24 +178,41 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       .documents("plugin::users-permissions.user")
       .findMany({
         filters: {
-          ongMemberships: { ong: { documentId: scope.ong.documentId } },
+          ong: { documentId: scope.ong.documentId },
           role: { type: "ngo-member" },
         },
         sort: { nume: "asc" },
-        populate: { ongMemberships: { populate: { ong: true } } },
       });
+    const activationTokens = exposeActivationLink()
+      ? await pendingActivationTokens(
+          strapi,
+          members.map((member) => member.documentId),
+        )
+      : new Map<string, string>();
+    const roles = await getNgoMemberRoles(
+      strapi,
+      scope.ong.documentId,
+      members.map((member) => member.documentId),
+    );
     return {
       data: members.map((member) => {
-        const membership = ((member.ongMemberships ?? []) as any[]).find(
-          (entry) => entry.ong?.documentId === scope.ong.documentId,
-        );
+        const activationToken = activationTokens.get(member.documentId);
         return {
+          id: member.id,
           documentId: member.documentId,
           nume: member.nume,
           email: member.email,
+          rol: roles.get(member.documentId) ?? null,
           accountStatus: member.accountStatus,
-          rolMembruOng: membership?.rolMembruOng ?? null,
           createdAt: member.createdAt,
+          ...(activationToken
+            ? {
+                activationLink: buildActivationLink(
+                  activationToken,
+                  MEMBER_ACTIVATION_PATH,
+                ),
+              }
+            : {}),
         };
       }),
     };
@@ -207,8 +250,20 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
     const memberOngIds = new Set(
-      ((user?.ongMemberships ?? []) as any[])
-        .map((membership) => membership.ong?.documentId)
+      ((user?.ong ?? []) as any[]).map((ong) => ong?.documentId).filter(Boolean),
+    );
+    const pendingRequests = await strapi
+      .documents("api::ong-join-request.ong-join-request")
+      .findMany({
+        filters: {
+          user: { documentId: user.documentId },
+          status: "pending",
+        },
+        populate: { ong: true },
+      });
+    const pendingOngIds = new Set(
+      (pendingRequests as any[])
+        .map((request) => request.ong?.documentId)
         .filter(Boolean),
     );
     const qParam = ctx.query.q;
@@ -239,6 +294,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           domeniu: ong.domeniuPrincipal?.name ?? null,
           localitate: ong.localitate?.nume ?? null,
           memberCount: byOng.get(ong.documentId)?.memberCount ?? 0,
+          hasPendingRequest: pendingOngIds.has(ong.documentId),
         })),
     };
   },
@@ -298,7 +354,10 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const requests = await strapi
       .documents("api::ong-join-request.ong-join-request")
       .findMany({
-        filters: { ong: { documentId: scope.ong.documentId }, status: "pending" },
+        filters: {
+          ong: { documentId: scope.ong.documentId },
+          status: "pending",
+        },
         sort: { createdAt: "asc" },
         populate: { user: true },
       });
@@ -325,6 +384,10 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if ("error" in scope) {
       return ctx.badRequest(scope.error);
     }
+    const parsed = acceptJoinRequestSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
     const request = await strapi
       .documents("api::ong-join-request.ong-join-request")
       .findOne({
@@ -342,7 +405,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       strapi,
       request.user.documentId,
       scope.ong.documentId,
-      "Membru",
+      parsed.data.rol,
     );
     await strapi.documents("api::ong-join-request.ong-join-request").update({
       documentId: request.documentId,
@@ -421,7 +484,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         ...(domeniuSecundar !== undefined
           ? { domeniuSecundar: { documentId: domeniuSecundar } }
           : {}),
-        ...(logo !== undefined ? { logo: logo === null ? null : { id: logo } } : {}),
+        ...(logo !== undefined
+          ? { logo: logo === null ? null : { id: logo } }
+          : {}),
       },
       populate: {
         judet: true,
@@ -561,6 +626,26 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   },
 }));
 
+async function pendingActivationTokens(
+  strapi: any,
+  documentIds: string[],
+): Promise<Map<string, string>> {
+  const tokens = new Map<string, string>();
+  if (documentIds.length === 0) return tokens;
+  const rows = await strapi.db
+    .query("plugin::users-permissions.user")
+    .findMany({
+      where: { documentId: { $in: documentIds }, accountStatus: "pending" },
+      select: ["documentId", "resetPasswordToken"],
+    });
+  for (const row of rows as any[]) {
+    if (row.resetPasswordToken) {
+      tokens.set(row.documentId, row.resetPasswordToken);
+    }
+  }
+  return tokens;
+}
+
 async function membersByOng(
   strapi: any,
 ): Promise<Map<string, { admin: any; memberCount: number }>> {
@@ -568,12 +653,12 @@ async function membersByOng(
     .documents("plugin::users-permissions.user")
     .findMany({
       filters: { role: { type: { $in: ["ngo-admin", "ngo-member"] } } },
-      populate: { role: true, ongMemberships: { populate: { ong: true } } },
+      populate: { role: true, ong: true },
     });
   const byOng = new Map<string, { admin: any; memberCount: number }>();
   for (const member of members as any[]) {
-    for (const membership of (member.ongMemberships ?? []) as any[]) {
-      const ongDocumentId = membership.ong?.documentId;
+    for (const ong of (member.ong ?? []) as any[]) {
+      const ongDocumentId = ong?.documentId;
       if (!ongDocumentId) continue;
       const entry = byOng.get(ongDocumentId) ?? { admin: null, memberCount: 0 };
       if (member.role?.type === "ngo-admin") {
@@ -593,7 +678,9 @@ function serializeMyOng(ong: any, user: any) {
     documentId: ong.documentId,
     name: ong.name,
     cui: ong.cui,
-    judet: ong.judet ? { documentId: ong.judet.documentId, nume: ong.judet.nume } : null,
+    judet: ong.judet
+      ? { documentId: ong.judet.documentId, nume: ong.judet.nume }
+      : null,
     localitate: ong.localitate
       ? { documentId: ong.localitate.documentId, nume: ong.localitate.nume }
       : null,
@@ -605,10 +692,16 @@ function serializeMyOng(ong: any, user: any) {
     website: ong.website ?? null,
     logo: ong.logo ? { url: ong.logo.url } : null,
     domeniuPrincipal: ong.domeniuPrincipal
-      ? { documentId: ong.domeniuPrincipal.documentId, name: ong.domeniuPrincipal.name }
+      ? {
+          documentId: ong.domeniuPrincipal.documentId,
+          name: ong.domeniuPrincipal.name,
+        }
       : null,
     domeniuSecundar: ong.domeniuSecundar
-      ? { documentId: ong.domeniuSecundar.documentId, name: ong.domeniuSecundar.name }
+      ? {
+          documentId: ong.domeniuSecundar.documentId,
+          name: ong.domeniuSecundar.name,
+        }
       : null,
     socialMedia: ong.socialMedia ?? null,
     descriere: ong.descriere ?? null,

@@ -1,5 +1,6 @@
 import type { EmailService } from "../../email/services/email";
 import { buildEvaluationLink } from "./invite-link";
+import { docRef } from "../../../utils/relations";
 
 export interface MemberView {
   documentId: string;
@@ -23,14 +24,14 @@ export const resolveMembers = async (
     .documents("plugin::users-permissions.user")
     .findMany({
       filters: { documentId: { $in: unique } },
-      populate: { ongMemberships: { populate: { ong: true } }, role: true },
+      populate: { ong: true, role: true },
     });
   if (users.length !== unique.length) {
     return { error: "Unii utilizatori selectați nu există" };
   }
   for (const member of users) {
-    const inOng = ((member.ongMemberships ?? []) as any[]).some(
-      (membership: any) => membership.ong?.documentId === ongDocumentId,
+    const inOng = ((member.ong ?? []) as any[]).some(
+      (ong: any) => ong?.documentId === ongDocumentId,
     );
     if (!inOng || member.role?.type !== "ngo-member") {
       return {
@@ -62,7 +63,10 @@ export const createEvaluations = async (
     const evaluation = await strapi
       .documents("api::evaluation.evaluation")
       .create({
-        data: { user: member.documentId, report: reportDocumentId },
+        data: {
+          user: docRef(member.documentId),
+          report: docRef(reportDocumentId),
+        },
       });
     created.push({ member, evaluationDocumentId: evaluation.documentId });
   }

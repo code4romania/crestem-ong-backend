@@ -648,6 +648,40 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiNgoMemberRoleNgoMemberRole
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'ngo_member_roles';
+  info: {
+    displayName: 'NGO Member Role';
+    pluralName: 'ngo-member-roles';
+    singularName: 'ngo-member-role';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ngo-member-role.ngo-member-role'
+    > &
+      Schema.Attribute.Private;
+    ngo: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    ngoMember: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    role: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiNgoMentorNgoMentor extends Struct.CollectionTypeSchema {
   collectionName: 'ngo_mentors';
   info: {
@@ -773,6 +807,10 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    >;
     website: Schema.Attribute.String;
   };
 }
@@ -1427,7 +1465,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
-    ongMemberships: Schema.Attribute.Component<'ong.membership', true>;
+    ong: Schema.Attribute.Relation<'manyToMany', 'api::ong.ong'>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
@@ -1470,6 +1508,7 @@ declare module '@strapi/strapi' {
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::message.message': ApiMessageMessage;
+      'api::ngo-member-role.ngo-member-role': ApiNgoMemberRoleNgoMemberRole;
       'api::ngo-mentor.ngo-mentor': ApiNgoMentorNgoMentor;
       'api::ong-join-request.ong-join-request': ApiOngJoinRequestOngJoinRequest;
       'api::ong.ong': ApiOngOng;

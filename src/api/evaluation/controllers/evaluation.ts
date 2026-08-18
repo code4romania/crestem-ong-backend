@@ -8,7 +8,10 @@ import { allPhasesEnded } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { belongsToOng, loadUserWithOngs } from "../../../utils/ong-scope";
-import { removeOngMembership } from "../../../utils/membership";
+import {
+  getNgoMemberRolesForUser,
+  removeOngMembership,
+} from "../../../utils/membership";
 import { computeEvaluationScores } from "../../report/utils/scores";
 
 const reportPhaseView = (phase: any) => ({
@@ -111,16 +114,15 @@ export default factories.createCoreController(
         .findOne({
           documentId: ctx.state.user.documentId,
           populate: {
-            ongMemberships: {
-              populate: {
-                ong: { populate: { programs: true, domeniuPrincipal: true } },
-              },
-            },
+            ong: { populate: { programs: true, domeniuPrincipal: true } },
           },
         });
+      const roles = await getNgoMemberRolesForUser(
+        strapi,
+        ctx.state.user.documentId,
+      );
       return {
-        data: ((user?.ongMemberships ?? []) as any[])
-          .map((membership) => membership.ong)
+        data: ((user?.ong ?? []) as any[])
           .filter(Boolean)
           .map((ong: any) => ({
             documentId: ong.documentId,
@@ -130,6 +132,7 @@ export default factories.createCoreController(
             adresa: ong.adresa ?? null,
             dataInfiintare: ong.dataInfiintare ?? null,
             domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+            rol: roles.get(ong.documentId) ?? null,
             programs: ((ong.programs ?? []) as any[]).map((program) => ({
               documentId: program.documentId,
               name: program.name,

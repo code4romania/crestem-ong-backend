@@ -6,13 +6,11 @@ export const loadUserWithOngs = async (
 ): Promise<any> =>
   strapi.documents("plugin::users-permissions.user").findOne({
     documentId: userDocumentId,
-    populate: { ongMemberships: { populate: { ong: true } } },
+    populate: { ong: true },
   });
 
 export const userOngs = (user: any): any[] =>
-  ((user?.ongMemberships ?? []) as any[])
-    .map((membership) => membership.ong)
-    .filter(Boolean);
+  ((user?.ong ?? []) as any[]).filter(Boolean);
 
 export const belongsToOng = (user: any, ongDocumentId: string) =>
   userOngs(user).some((ong) => ong.documentId === ongDocumentId);

@@ -127,7 +127,20 @@ export default {
    * An asynchronous register function that runs before
    * your application is initialized.
    */
-  register(/* { strapi }: { strapi: Core.Strapi } */) {},
+  register(/* { strapi }: { strapi: Core.Strapi } */) {
+    if (process.env.DEV_EXPOSE_ACTIVATION_LINK !== "true") return;
+    const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
+    if (appEnv === "production") {
+      throw new Error(
+        "DEV_EXPOSE_ACTIVATION_LINK nu poate fi activat în producție. " +
+          "Pe staging setează APP_ENV=staging.",
+      );
+    }
+    console.warn(
+      `[register] DEV_EXPOSE_ACTIVATION_LINK activ (APP_ENV=${appEnv}). ` +
+        "Linkurile de activare sunt expuse prin API. Dezactivează înainte de producție.",
+    );
+  },
 
   /**
    * An asynchronous bootstrap function that runs before
