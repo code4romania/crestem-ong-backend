@@ -1,6 +1,10 @@
 import { Context } from "koa";
-import { requireOng } from "../../../utils/ong-scope";
-import { syncConversationsForMentor, syncConversationsForOng } from "../utils/sync";
+import { getOngAdminNames, requireOng } from "../../../utils/ong-scope";
+import {
+  pairKey,
+  syncConversationsForMentor,
+  syncConversationsForOng,
+} from "../utils/sync";
 import { sendMessageSchema } from "../validation/send-message";
 
 const mentorView = (mentor: any) =>
@@ -19,11 +23,12 @@ const mentorView = (mentor: any) =>
       }
     : null;
 
-const ongView = (ong: any) =>
+const ongView = (ong: any, adminNume?: string | null) =>
   ong
     ? {
         documentId: ong.documentId,
         name: ong.name,
+        admin: adminNume ? { nume: adminNume } : null,
         logo: ong.logo
           ? {
               documentId: ong.logo.documentId,
@@ -33,6 +38,9 @@ const ongView = (ong: any) =>
           : null,
       }
     : null;
+
+const programView = (program: any) =>
+  program ? { documentId: program.documentId, name: program.name } : null;
 
 const messageView = (message: any, currentUserDocumentId: string) => ({
   documentId: message.documentId,
@@ -80,14 +88,18 @@ export default {
     }
     const ong = scope.ong;
 
-    const validMentorIds = await syncConversationsForOng(strapi, ong);
+    const validPairs = await syncConversationsForOng(strapi, ong);
 
     const conversations = (
       await strapi.documents("api::conversation.conversation").findMany({
         filters: { ong: { documentId: ong.documentId } },
-        populate: { mentor: { populate: { avatar: true } } },
+        populate: { mentor: { populate: { avatar: true } }, program: true },
       })
-    ).filter((conversation: any) => validMentorIds.has(conversation.mentor?.documentId));
+    ).filter((conversation: any) => {
+      const programId = conversation.program?.documentId;
+      const mentorId = conversation.mentor?.documentId;
+      return Boolean(programId && mentorId && validPairs.has(pairKey(programId, mentorId)));
+    });
 
     const conversationIds = (conversations as any[]).map((c) => c.documentId);
     const lastMessageByConversation = new Map<string, any>();
@@ -117,6 +129,7 @@ export default {
         return {
           documentId: conversation.documentId,
           mentor: mentorView(conversation.mentor),
+          program: programView(conversation.program),
           lastMessage: lastMessage
             ? { content: lastMessage.content, createdAt: lastMessage.createdAt }
             : null,
@@ -213,14 +226,18 @@ export default {
     }
     const mentorDocumentId = ctx.state.user.documentId;
 
-    const validOngIds = await syncConversationsForMentor(strapi, ctx.state.user);
+    const validPairs = await syncConversationsForMentor(strapi, ctx.state.user);
 
     const conversations = (
       await strapi.documents("api::conversation.conversation").findMany({
         filters: { mentor: { documentId: mentorDocumentId } },
-        populate: { ong: { populate: { logo: true } } },
+        populate: { ong: { populate: { logo: true } }, program: true },
       })
-    ).filter((conversation: any) => validOngIds.has(conversation.ong?.documentId));
+    ).filter((conversation: any) => {
+      const programId = conversation.program?.documentId;
+      const ongId = conversation.ong?.documentId;
+      return Boolean(programId && ongId && validPairs.has(pairKey(programId, ongId)));
+    });
 
     const conversationIds = (conversations as any[]).map((c) => c.documentId);
     const lastMessageByConversation = new Map<string, any>();
@@ -238,6 +255,13 @@ export default {
       }
     }
 
+    const ongDocumentIds = Array.from(
+      new Set(
+        (conversations as any[]).map((c) => c.ong?.documentId).filter(Boolean),
+      ),
+    );
+    const adminNameByOng = await getOngAdminNames(strapi, ongDocumentIds);
+
     const data = (conversations as any[])
       .map((conversation) => {
         const lastMessage =
@@ -249,7 +273,11 @@ export default {
               new Date(conversation.mentorLastReadAt));
         return {
           documentId: conversation.documentId,
-          ong: ongView(conversation.ong),
+          ong: ongView(
+            conversation.ong,
+            adminNameByOng.get(conversation.ong?.documentId) ?? null,
+          ),
+          program: programView(conversation.program),
           lastMessage: lastMessage
             ? { content: lastMessage.content, createdAt: lastMessage.createdAt }
             : null,

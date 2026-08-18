@@ -46,6 +46,33 @@ export const requestedOng = (ctx: Context): string | undefined => {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 };
 
+export const getOngAdminNames = async (
+  strapi: any,
+  ongDocumentIds: string[],
+): Promise<Map<string, string>> => {
+  const map = new Map<string, string>();
+  if (ongDocumentIds.length === 0) {
+    return map;
+  }
+  const admins = await strapi
+    .documents("plugin::users-permissions.user")
+    .findMany({
+      filters: {
+        role: { type: "ngo-admin" },
+        ong: { documentId: { $in: ongDocumentIds } },
+      },
+      populate: { ong: true },
+    });
+  for (const admin of admins as any[]) {
+    for (const ong of (admin.ong ?? []) as any[]) {
+      if (ong?.documentId && !map.has(ong.documentId)) {
+        map.set(ong.documentId, admin.nume);
+      }
+    }
+  }
+  return map;
+};
+
 export const requireOng = async (
   strapi: any,
   ctx: Context,

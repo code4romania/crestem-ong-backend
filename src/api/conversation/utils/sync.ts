@@ -1,97 +1,155 @@
 const collectOngEntries = (row: any) =>
   Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
 
-const getValidMentorIdsForOng = async (strapi: any, ongDocumentId: string) => {
+const toArray = (value: any) => (Array.isArray(value) ? value : value ? [value] : []);
+
+/**
+ * Each ngo-mentor row is created scoped to exactly one (ong, program) pair
+ * (see `findOrCreateNgoMentorRow` in the program controller) even though the
+ * relation is declared `oneToMany` on the schema, so a populated `program`
+ * comes back as a one-element array.
+ */
+const singleProgramId = (row: any): string | undefined => toArray(row.program)[0]?.documentId;
+
+export const pairKey = (programDocumentId: string, otherDocumentId: string) =>
+  `${programDocumentId}:${otherDocumentId}`;
+
+type OngMentorPair = { programDocumentId: string; mentorDocumentId: string };
+type OngProgramPair = { programDocumentId: string; ongDocumentId: string };
+
+const getValidPairsForOng = async (
+  strapi: any,
+  ongDocumentId: string,
+): Promise<Map<string, OngMentorPair>> => {
   const ngoMentorRows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
     filters: { ong: { documentId: ongDocumentId } },
-    populate: { mentors: true },
+    populate: { mentors: true, program: true },
   });
 
-  const mentorIds = new Set<string>();
+  const pairs = new Map<string, OngMentorPair>();
   for (const row of ngoMentorRows as any[]) {
-    for (const mentor of (row.mentors ?? []) as any[]) {
-      mentorIds.add(mentor.documentId);
+    const programDocumentId = singleProgramId(row);
+    if (!programDocumentId) continue;
+    for (const mentor of toArray(row.mentors)) {
+      if (!mentor?.documentId) continue;
+      pairs.set(pairKey(programDocumentId, mentor.documentId), {
+        programDocumentId,
+        mentorDocumentId: mentor.documentId,
+      });
     }
   }
-  return mentorIds;
+  return pairs;
 };
 
-const getValidOngIdsForMentor = async (strapi: any, mentorDocumentId: string) => {
+const getValidPairsForMentor = async (
+  strapi: any,
+  mentorDocumentId: string,
+): Promise<Map<string, OngProgramPair>> => {
   const ngoMentorRows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
     filters: { mentors: { documentId: mentorDocumentId } },
-    populate: { ong: true },
+    populate: { ong: true, program: true },
   });
 
-  const ongIds = new Set<string>();
+  const pairs = new Map<string, OngProgramPair>();
   for (const row of ngoMentorRows as any[]) {
+    const programDocumentId = singleProgramId(row);
+    if (!programDocumentId) continue;
     for (const ongEntry of collectOngEntries(row)) {
-      ongIds.add(ongEntry.documentId);
+      if (!ongEntry?.documentId) continue;
+      pairs.set(pairKey(programDocumentId, ongEntry.documentId), {
+        programDocumentId,
+        ongDocumentId: ongEntry.documentId,
+      });
     }
   }
-  return ongIds;
+  return pairs;
 };
 
 /**
- * Creates any missing Conversation rows for mentors currently assigned to
- * this ong via the ngo-mentor pivot, and returns that same valid-mentor-id
- * set so the caller can filter out Conversation rows that no longer match
- * (e.g. a mentor previously assigned, since unassigned).
+ * Creates any missing Conversation rows for (mentor, program) pairs
+ * currently assigned to this ong via the ngo-mentor pivot — one conversation
+ * per program a mentor is paired with this ong through, even if the same
+ * mentor is paired with it across several programs. Returns the valid pair
+ * map (keyed by `pairKey(programId, mentorId)`) so the caller can filter out
+ * Conversation rows that no longer match (e.g. an unassigned pairing, or a
+ * pre-existing conversation predating the program scoping).
  */
 export const syncConversationsForOng = async (strapi: any, ong: any) => {
-  const mentorIds = await getValidMentorIdsForOng(strapi, ong.documentId);
+  const pairs = await getValidPairsForOng(strapi, ong.documentId);
 
-  if (mentorIds.size === 0) {
-    return mentorIds;
+  if (pairs.size === 0) {
+    return pairs;
   }
 
   const existing = await strapi.documents("api::conversation.conversation").findMany({
     filters: { ong: { documentId: ong.documentId } },
-    populate: { mentor: true },
+    populate: { mentor: true, program: true },
   });
-  const existingMentorIds = new Set(
-    (existing as any[]).map((conversation) => conversation.mentor?.documentId).filter(Boolean),
+  const existingKeys = new Set(
+    (existing as any[])
+      .map((conversation) => {
+        const programId = conversation.program?.documentId;
+        const mentorId = conversation.mentor?.documentId;
+        return programId && mentorId ? pairKey(programId, mentorId) : null;
+      })
+      .filter(Boolean),
   );
 
-  for (const mentorId of mentorIds) {
-    if (existingMentorIds.has(mentorId)) {
+  for (const [key, pair] of pairs) {
+    if (existingKeys.has(key)) {
       continue;
     }
     await strapi.documents("api::conversation.conversation").create({
-      data: { ong: ong.documentId, mentor: mentorId },
+      data: {
+        ong: ong.documentId,
+        mentor: pair.mentorDocumentId,
+        program: pair.programDocumentId,
+      },
     });
   }
 
-  return mentorIds;
+  return pairs;
 };
 
 /**
- * Mirrors `syncConversationsForOng` for the mentor side: creates any
- * missing Conversation rows for ongs currently assigned to this mentor via
- * the ngo-mentor pivot, and returns the valid-ong-id set for filtering.
+ * Mirrors `syncConversationsForOng` for the mentor side: creates any missing
+ * Conversation rows for (ong, program) pairs currently assigned to this
+ * mentor via the ngo-mentor pivot, and returns the valid pair map for
+ * filtering.
  */
 export const syncConversationsForMentor = async (strapi: any, mentor: any) => {
-  const ongIds = await getValidOngIdsForMentor(strapi, mentor.documentId);
+  const pairs = await getValidPairsForMentor(strapi, mentor.documentId);
 
-  if (ongIds.size === 0) {
-    return ongIds;
+  if (pairs.size === 0) {
+    return pairs;
   }
 
   const existing = await strapi.documents("api::conversation.conversation").findMany({
     filters: { mentor: { documentId: mentor.documentId } },
-    populate: { ong: true },
+    populate: { ong: true, program: true },
   });
-  const existingOngIds = new Set(
-    (existing as any[]).map((conversation) => conversation.ong?.documentId).filter(Boolean),
+  const existingKeys = new Set(
+    (existing as any[])
+      .map((conversation) => {
+        const programId = conversation.program?.documentId;
+        const ongId = conversation.ong?.documentId;
+        return programId && ongId ? pairKey(programId, ongId) : null;
+      })
+      .filter(Boolean),
   );
 
-  for (const ongId of ongIds) {
-    if (existingOngIds.has(ongId)) {
+  for (const [key, pair] of pairs) {
+    if (existingKeys.has(key)) {
       continue;
     }
     await strapi.documents("api::conversation.conversation").create({
-      data: { ong: ongId, mentor: mentor.documentId },
+      data: {
+        ong: pair.ongDocumentId,
+        mentor: mentor.documentId,
+        program: pair.programDocumentId,
+      },
     });
   }
 
-  return ongIds;
+  return pairs;
 };

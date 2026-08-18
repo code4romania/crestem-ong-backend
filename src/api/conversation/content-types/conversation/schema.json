@@ -23,6 +23,11 @@
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user"
     },
+    "program": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::program.program"
+    },
     "messages": {
       "type": "relation",
       "relation": "oneToMany",

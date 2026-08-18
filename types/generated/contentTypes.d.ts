@@ -478,6 +478,7 @@ export interface ApiConversationConversation
     messages: Schema.Attribute.Relation<'oneToMany', 'api::message.message'>;
     ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
     ongLastReadAt: Schema.Attribute.DateTime;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
