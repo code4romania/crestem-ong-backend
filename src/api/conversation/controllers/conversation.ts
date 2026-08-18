@@ -1,6 +1,6 @@
 import { Context } from "koa";
 import { requireOng } from "../../../utils/ong-scope";
-import { syncConversationsForOng } from "../utils/sync";
+import { syncConversationsForMentor, syncConversationsForOng } from "../utils/sync";
 import { sendMessageSchema } from "../validation/send-message";
 
 const mentorView = (mentor: any) =>
@@ -80,14 +80,14 @@ export default {
     }
     const ong = scope.ong;
 
-    await syncConversationsForOng(strapi, ong);
+    const validMentorIds = await syncConversationsForOng(strapi, ong);
 
-    const conversations = await strapi
-      .documents("api::conversation.conversation")
-      .findMany({
+    const conversations = (
+      await strapi.documents("api::conversation.conversation").findMany({
         filters: { ong: { documentId: ong.documentId } },
         populate: { mentor: { populate: { avatar: true } } },
-      });
+      })
+    ).filter((conversation: any) => validMentorIds.has(conversation.mentor?.documentId));
 
     const conversationIds = (conversations as any[]).map((c) => c.documentId);
     const lastMessageByConversation = new Map<string, any>();
@@ -213,12 +213,14 @@ export default {
     }
     const mentorDocumentId = ctx.state.user.documentId;
 
-    const conversations = await strapi
-      .documents("api::conversation.conversation")
-      .findMany({
+    const validOngIds = await syncConversationsForMentor(strapi, ctx.state.user);
+
+    const conversations = (
+      await strapi.documents("api::conversation.conversation").findMany({
         filters: { mentor: { documentId: mentorDocumentId } },
         populate: { ong: { populate: { logo: true } } },
-      });
+      })
+    ).filter((conversation: any) => validOngIds.has(conversation.ong?.documentId));
 
     const conversationIds = (conversations as any[]).map((c) => c.documentId);
     const lastMessageByConversation = new Map<string, any>();

@@ -1,6 +1,7 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { assignMentorsSchema } from "../validation/assign-mentors";
+import { assignOngMentorsSchema } from "../validation/assign-ong-mentors";
 import {
   assignOngsSchema,
   assignPhaseEvaluationSchema,
@@ -65,6 +66,26 @@ const sortedPhaseViews = (phases: any[]) =>
   [...(phases ?? [])]
     .sort((a, b) => `${a.startDate}`.localeCompare(`${b.startDate}`))
     .map(phaseView);
+
+const findOrCreateNgoMentorRow = async (strapi: any, programId: string, ongId: string) => {
+  const existing = await strapi.documents("api::ngo-mentor.ngo-mentor").findFirst({
+    filters: {
+      program: { documentId: programId },
+      ong: { documentId: ongId },
+    },
+    populate: { mentors: { populate: { avatar: true } } },
+  });
+  if (existing) {
+    return existing;
+  }
+  return strapi.documents("api::ngo-mentor.ngo-mentor").create({
+    data: {
+      program: { connect: [programId] },
+      ong: { connect: [ongId] },
+    },
+    populate: { mentors: { populate: { avatar: true } } },
+  });
+};
 
 export default factories.createCoreController(
   "api::program.program",
@@ -465,11 +486,14 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: ctx.params.documentId,
-        populate: { ongs: true },
+        populate: { ongs: true, mentors: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const programMentorIds = new Set(
+        ((program.mentors ?? []) as any[]).map((mentor) => mentor.documentId),
+      );
       const reports = await reportsInProgram(strapi, program.documentId);
       const latestReportByOng = new Map<string, any>();
       for (const report of reports) {
@@ -482,6 +506,25 @@ export default factories.createCoreController(
           latestReportByOng.set(ongId, report);
         }
       }
+      const ngoMentorRows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+        filters: { program: { documentId: program.documentId } },
+        populate: { ong: true, mentors: { populate: { avatar: true } } },
+      });
+      const mentorsByOng = new Map<string, any[]>();
+      for (const row of ngoMentorRows as any[]) {
+        const rowOngs = Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
+        const mentors = ((row.mentors ?? []) as any[])
+          .map(mentorView)
+          .filter((mentor) => programMentorIds.has(mentor.documentId));
+        for (const ongEntry of rowOngs) {
+          const previous = mentorsByOng.get(ongEntry.documentId) ?? [];
+          const merged = [
+            ...previous,
+            ...mentors.filter((mentor) => !previous.some((p) => p.documentId === mentor.documentId)),
+          ];
+          mentorsByOng.set(ongEntry.documentId, merged);
+        }
+      }
       return {
         data: {
           ongs: ((program.ongs ?? []) as any[]).map((ong) => {
@@ -491,6 +534,7 @@ export default factories.createCoreController(
               evaluation: report
                 ? { documentId: report.documentId, name: report.name }
                 : null,
+              mentors: mentorsByOng.get(ong.documentId) ?? [],
             };
           }),
         },
@@ -573,6 +617,85 @@ export default factories.createCoreController(
         data: { mentors: { disconnect: mentorIds } },
       });
       return { message: "Mentorii au fost eliminați din program" };
+    },
+    async assignOngMentors(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const parsed = assignOngMentorsSchema.safeParse(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+      const { program: programId, ong: ongId, mentors: mentorIdsInput } = parsed.data;
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: programId,
+        populate: { ongs: true, mentors: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const programOngIds = new Set(((program.ongs ?? []) as any[]).map((ong) => ong.documentId));
+      if (!programOngIds.has(ongId)) {
+        return ctx.badRequest("Organizația nu este alocată acestui program");
+      }
+      const programMentorIds = new Set(
+        ((program.mentors ?? []) as any[]).map((mentor) => mentor.documentId),
+      );
+      const mentorIds = [...new Set(mentorIdsInput)];
+      const outsiderId = mentorIds.find((id) => !programMentorIds.has(id));
+      if (outsiderId) {
+        const outsider = await strapi
+          .documents("plugin::users-permissions.user")
+          .findOne({ documentId: outsiderId });
+        return ctx.badRequest(
+          outsider
+            ? `Persoana ${outsider.email} nu este alocată acestui program`
+            : "Persoana resursă nu există",
+        );
+      }
+      const row = await findOrCreateNgoMentorRow(strapi, programId, ongId);
+      const updated = await strapi.documents("api::ngo-mentor.ngo-mentor").update({
+        documentId: row.documentId,
+        data: { mentors: { connect: mentorIds } },
+        populate: { mentors: { populate: { avatar: true } } },
+      });
+      return { data: { mentors: ((updated.mentors ?? []) as any[]).map(mentorView) } };
+    },
+    async removeOngMentors(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const parsed = assignOngMentorsSchema.safeParse(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+      const { program: programId, ong: ongId, mentors: mentorIdsInput } = parsed.data;
+      const row = await strapi.documents("api::ngo-mentor.ngo-mentor").findFirst({
+        filters: {
+          program: { documentId: programId },
+          ong: { documentId: ongId },
+        },
+        populate: { mentors: true },
+      });
+      if (!row) {
+        return ctx.badRequest(
+          "Nicio persoană resursă nu este alocată acestei organizații în acest program",
+        );
+      }
+      const mentorIds = [...new Set(mentorIdsInput)];
+      const assigned = new Set(((row.mentors ?? []) as any[]).map((mentor) => mentor.documentId));
+      const outsiderIds = mentorIds.filter((id) => !assigned.has(id));
+      if (outsiderIds.length > 0) {
+        return ctx.badRequest(
+          "Persoana resursă nu este alocată acestei organizații în acest program",
+        );
+      }
+      const updated = await strapi.documents("api::ngo-mentor.ngo-mentor").update({
+        documentId: row.documentId,
+        data: { mentors: { disconnect: mentorIds } },
+        populate: { mentors: { populate: { avatar: true } } },
+      });
+      return { data: { mentors: ((updated.mentors ?? []) as any[]).map(mentorView) } };
     },
     async assignOngs(ctx: Context) {
       if (!ctx.state.user) {

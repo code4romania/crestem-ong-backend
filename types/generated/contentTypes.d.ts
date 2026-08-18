@@ -648,6 +648,39 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiNgoMentorNgoMentor extends Struct.CollectionTypeSchema {
+  collectionName: 'ngo_mentors';
+  info: {
+    displayName: 'NgoMentor';
+    pluralName: 'ngo-mentors';
+    singularName: 'ngo-mentor';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ngo-mentor.ngo-mentor'
+    > &
+      Schema.Attribute.Private;
+    mentors: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
+    ong: Schema.Attribute.Relation<'oneToMany', 'api::ong.ong'>;
+    program: Schema.Attribute.Relation<'oneToMany', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiOngJoinRequestOngJoinRequest
   extends Struct.CollectionTypeSchema {
   collectionName: 'ong_join_requests';
@@ -1437,6 +1470,7 @@ declare module '@strapi/strapi' {
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::message.message': ApiMessageMessage;
+      'api::ngo-mentor.ngo-mentor': ApiNgoMentorNgoMentor;
       'api::ong-join-request.ong-join-request': ApiOngJoinRequestOngJoinRequest;
       'api::ong.ong': ApiOngOng;
       'api::phase.phase': ApiPhasePhase;
