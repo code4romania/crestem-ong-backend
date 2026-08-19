@@ -1440,19 +1440,23 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.DefaultTo<'active'>;
     acordTermeniSiConditii: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    ariiDeExpertiza: Schema.Attribute.JSON;
     avatar: Schema.Attribute.Media<'images'>;
+    bio: Schema.Attribute.Text;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    dimensiuni: Schema.Attribute.JSON;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
       Schema.Attribute.Unique &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

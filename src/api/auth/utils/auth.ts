@@ -26,8 +26,16 @@ export const signActivationToken = (userId: number) =>
     expiresIn: process.env.ACTIVATION_TTL,
   } as jwt.SignOptions);
 
-export const MENTOR_ACTIVATION_PATH = "/mentor/activare";
-export const MEMBER_ACTIVATION_PATH = "/membru/activare";
+/**
+ * Shared by every invite flow (mentor, member, staff) — the frontend page
+ * hosting `ActivateAccountForm` is role-agnostic, so there is a single path.
+ */
+export const ACTIVATION_PATH = "/membru/activare";
+
+export const STAFF_ROLE_LABELS: Record<"super-admin" | "editor-fdsc", string> = {
+  "super-admin": "Admin FDSC",
+  "editor-fdsc": "Editor FDSC",
+};
 
 export const exposeActivationLink = () =>
   process.env.DEV_EXPOSE_ACTIVATION_LINK === "true";

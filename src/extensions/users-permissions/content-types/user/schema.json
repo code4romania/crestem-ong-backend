@@ -86,11 +86,23 @@
       "default": "active",
       "required": true
     },
+    "lastLoginAt": {
+      "type": "datetime"
+    },
     "mentorJobTitle": {
       "type": "string"
     },
     "mentorOrganization": {
       "type": "string"
+    },
+    "bio": {
+      "type": "text"
+    },
+    "dimensiuni": {
+      "type": "json"
+    },
+    "ariiDeExpertiza": {
+      "type": "json"
     },
     "avatar": {
       "type": "media",

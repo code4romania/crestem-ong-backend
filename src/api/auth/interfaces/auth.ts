@@ -8,6 +8,7 @@ import {
   registerIndividualSchema,
   registerMentorSchema,
   registerMemberSchema,
+  registerStaffSchema,
   activateAccountSchema,
   refreshTokenSchema,
   forgotPasswordSchema,
@@ -19,6 +20,7 @@ export type NgoCreatePayload = z.infer<typeof registerNgoSchema>;
 export type IndividualCreatePayload = z.infer<typeof registerIndividualSchema>;
 export type MentorCreatePayload = z.infer<typeof registerMentorSchema>;
 export type MemberCreatePayload = z.infer<typeof registerMemberSchema>;
+export type StaffCreatePayload = z.infer<typeof registerStaffSchema>;
 export type ActivateAccountPayload = z.infer<typeof activateAccountSchema>;
 export type RefreshTokenPayload = z.infer<typeof refreshTokenSchema>;
 export type ForgotPasswordPayload = z.infer<typeof forgotPasswordSchema>;

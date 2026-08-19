@@ -9,6 +9,7 @@ import { computeReportScores } from "../../report/utils/scores";
 import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
+import { pendingActivationTokens } from "../../../utils/activation";
 import {
   belongsToOng,
   loadUserWithOngs,
@@ -22,7 +23,7 @@ import {
 import {
   buildActivationLink,
   exposeActivationLink,
-  MEMBER_ACTIVATION_PATH,
+  ACTIVATION_PATH,
 } from "../../auth/utils/auth";
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
@@ -209,7 +210,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? {
                 activationLink: buildActivationLink(
                   activationToken,
-                  MEMBER_ACTIVATION_PATH,
+                  ACTIVATION_PATH,
                 ),
               }
             : {}),
@@ -625,26 +626,6 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     };
   },
 }));
-
-async function pendingActivationTokens(
-  strapi: any,
-  documentIds: string[],
-): Promise<Map<string, string>> {
-  const tokens = new Map<string, string>();
-  if (documentIds.length === 0) return tokens;
-  const rows = await strapi.db
-    .query("plugin::users-permissions.user")
-    .findMany({
-      where: { documentId: { $in: documentIds }, accountStatus: "pending" },
-      select: ["documentId", "resetPasswordToken"],
-    });
-  for (const row of rows as any[]) {
-    if (row.resetPasswordToken) {
-      tokens.set(row.documentId, row.resetPasswordToken);
-    }
-  }
-  return tokens;
-}
 
 async function membersByOng(
   strapi: any,

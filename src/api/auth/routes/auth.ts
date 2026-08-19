@@ -32,6 +32,12 @@ export default {
     },
     {
       method: "POST",
+      path: "/auth/register/staff",
+      handler: "auth.registerStaff",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
+      method: "POST",
       path: "/auth/register/member",
       handler: "auth.registerMember",
       config: { policies: ["global::is-ngo-admin"] },

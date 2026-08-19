@@ -7,6 +7,7 @@ import {
   registerIndividualSchema,
   registerMentorSchema,
   registerMemberSchema,
+  registerStaffSchema,
   activateAccountSchema,
   refreshTokenSchema,
   forgotPasswordSchema,
@@ -121,6 +122,36 @@ export default {
       };
     } catch (error) {
       console.error("registerMentor failed", error);
+      return ctx.badRequest(
+        "A apărut o eroare neașteptată în timpul înregistrării. Te rugăm să încerci din nou mai târziu.",
+      );
+    }
+  },
+  async registerStaff(ctx: Context) {
+    try {
+      const data = ctx.request.body;
+
+      const parsed = await registerStaffSchema.safeParseAsync(data);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).createStaff(parsed.data);
+
+      return {
+        message: result.emailSent
+          ? "Contul a fost creat. Invitația a fost trimisă pe email."
+          : "Contul a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
+        id: result.id,
+        emailSent: result.emailSent,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
+      };
+    } catch (error) {
+      console.error("registerStaff failed", error);
       return ctx.badRequest(
         "A apărut o eroare neașteptată în timpul înregistrării. Te rugăm să încerci din nou mai târziu.",
       );

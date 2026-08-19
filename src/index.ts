@@ -15,6 +15,11 @@ const APP_ROLES = [
     description: "Platform super administrator with full access.",
   },
   {
+    type: "editor-fdsc",
+    name: "Editor FDSC",
+    description: "Cont de personal FDSC fără permisiuni suplimentare alocate încă.",
+  },
+  {
     type: "ngo-admin",
     name: "NGO Admin",
     description: "Administrates a single organization and its data.",
@@ -42,6 +47,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.me",
     "api::auth.auth.registerMentor",
     "api::auth.auth.resendMentorInvite",
+    "api::auth.auth.registerStaff",
     "api::auth.auth.changePassword",
     "api::program.program.list",
     "api::program.program.detail",
@@ -66,7 +72,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.detail",
     "api::ong.ong.deleteOne",
     "api::mentor.mentor.listActive",
+    "api::admin-user.admin-user.list",
+    "api::admin-user.admin-user.update",
+    "plugin::upload.content-api.upload",
   ],
+  "editor-fdsc": ["api::auth.auth.me", "api::auth.auth.changePassword"],
   "ngo-admin": [
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
