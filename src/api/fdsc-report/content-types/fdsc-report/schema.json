@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "fdsc_reports",
+  "info": {
+    "singularName": "fdsc-report",
+    "pluralName": "fdsc-reports",
+    "displayName": "FDSC Report",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong",
+      "inversedBy": "fdscReports"
+    },
+    "program": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::program.program"
+    },
+    "file": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": ["files"]
+    },
+    "uploadedAt": {
+      "type": "datetime",
+      "required": true
+    }
+  }
+}
