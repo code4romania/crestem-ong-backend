@@ -58,6 +58,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
           domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+          descriere: ong.descriere ?? null,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -88,6 +89,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         localitate: true,
         programs: true,
         domeniuPrincipal: true,
+        domeniuSecundar: true,
       },
     });
     if (!ong) {
@@ -108,6 +110,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const memberCount = (members as any[]).filter(
       (member) => member.role?.type === "ngo-member",
     ).length;
+    let lastLogin: string | null = null;
+    if (admin) {
+      const latestToken = await strapi.db
+        .query("api::refresh-token.refresh-token")
+        .findOne({
+          where: { user: admin.id },
+          orderBy: { createdAt: "desc" },
+          select: ["createdAt"],
+        });
+      lastLogin = latestToken?.createdAt ?? null;
+    }
     return {
       data: {
         documentId: ong.documentId,
@@ -117,8 +130,19 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
         domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+        domeniuSecundar: ong.domeniuSecundar?.name ?? null,
+        socialMedia: ong.socialMedia ?? null,
+        descriere: ong.descriere ?? null,
         memberCount,
-        admin: admin ? { nume: admin.nume } : null,
+        admin: admin
+          ? {
+              nume: admin.nume,
+              email: admin.email,
+              telefon: admin.telefon ?? null,
+              createdAt: admin.createdAt,
+              lastLogin,
+            }
+          : null,
         programs: ((ong.programs ?? []) as any[]).map((program) => ({
           documentId: program.documentId,
           name: program.name,
@@ -498,6 +522,63 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     const user = scope.user as any;
     return { data: serializeMyOng(updated, user) };
+  },
+  async overview(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi.documents("api::report.report").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      sort: { createdAt: "desc" },
+      populate: {
+        phases: { populate: { program: true } },
+        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+      },
+    });
+    const today = todayInBucharest();
+    const current = (reports as any[]).find((report) => !isClosed(report, today));
+    const currentPhases = ((current?.phases ?? []) as any[]);
+    const currentProgram = currentPhases.find((phase) => phase.program)?.program ?? null;
+    const closedDate = (report: any) =>
+      report.finishedAt ??
+      ((report.phases ?? []) as any[])
+        .map((phase) => phase.endDate)
+        .filter(Boolean)
+        .sort()
+        .pop() ??
+      null;
+    const lastFinalizedDate = (reports as any[])
+      .filter((report) => isClosed(report, today))
+      .map(closedDate)
+      .filter(Boolean)
+      .sort()
+      .pop() ?? null;
+    return {
+      data: {
+        totalEvaluations: reports.length,
+        currentEvaluation: current
+          ? {
+              documentId: current.documentId,
+              invitedCount: (current.evaluations ?? []).length,
+              completedCount: (current.evaluations ?? []).filter(
+                (evaluation: any) =>
+                  computeProgress(evaluation.dimensions, isClosed(current, today))
+                    .complete,
+              ).length,
+              program: currentProgram
+                ? { documentId: currentProgram.documentId, name: currentProgram.name }
+                : null,
+            }
+          : null,
+        lastFinalizedDate,
+      },
+    };
   },
   async evaluations(ctx: Context) {
     if (!ctx.state.user) {

@@ -59,6 +59,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::program.program.removeOngMentors",
     "api::program.program.assignPhaseEvaluation",
     "api::program.program.removePhaseEvaluation",
+    "api::ong.ong.overview",
     "api::ong.ong.evaluations",
     "api::ong.ong.evaluationDetail",
     "api::ong.ong.list",
