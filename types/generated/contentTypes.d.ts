@@ -551,6 +551,39 @@ export interface ApiEvaluationEvaluation extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
+  collectionName: 'fdsc_reports';
+  info: {
+    description: '';
+    displayName: 'FDSC Report';
+    pluralName: 'fdsc-reports';
+    singularName: 'fdsc-report';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    file: Schema.Attribute.Media<'files'> & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::fdsc-report.fdsc-report'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    uploadedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+  };
+}
+
 export interface ApiJudetJudet extends Struct.CollectionTypeSchema {
   collectionName: 'judets';
   info: {
@@ -787,6 +820,10 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     domeniuSecundar: Schema.Attribute.Relation<
       'manyToOne',
       'api::domain.domain'
+    >;
+    fdscReports: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::fdsc-report.fdsc-report'
     >;
     judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1510,6 +1547,7 @@ declare module '@strapi/strapi' {
       'api::conversation.conversation': ApiConversationConversation;
       'api::domain.domain': ApiDomainDomain;
       'api::evaluation.evaluation': ApiEvaluationEvaluation;
+      'api::fdsc-report.fdsc-report': ApiFdscReportFdscReport;
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::message.message': ApiMessageMessage;

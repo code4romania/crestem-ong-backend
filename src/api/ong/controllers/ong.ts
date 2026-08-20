@@ -27,7 +27,9 @@ import {
 } from "../../auth/utils/auth";
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
+import { createFdscReportSchema } from "../validation/fdsc-report";
 import { decorateBlock } from "../../evaluation/utils/catalog";
+import { docRef } from "../../../utils/relations";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -59,6 +61,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
           domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+          descriere: ong.descriere ?? null,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -89,6 +92,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         localitate: true,
         programs: true,
         domeniuPrincipal: true,
+        domeniuSecundar: true,
       },
     });
     if (!ong) {
@@ -109,6 +113,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const memberCount = (members as any[]).filter(
       (member) => member.role?.type === "ngo-member",
     ).length;
+    let lastLogin: string | null = null;
+    if (admin) {
+      const latestToken = await strapi.db
+        .query("api::refresh-token.refresh-token")
+        .findOne({
+          where: { user: admin.id },
+          orderBy: { createdAt: "desc" },
+          select: ["createdAt"],
+        });
+      lastLogin = latestToken?.createdAt ?? null;
+    }
     return {
       data: {
         documentId: ong.documentId,
@@ -118,8 +133,19 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
         domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+        domeniuSecundar: ong.domeniuSecundar?.name ?? null,
+        socialMedia: ong.socialMedia ?? null,
+        descriere: ong.descriere ?? null,
         memberCount,
-        admin: admin ? { nume: admin.nume } : null,
+        admin: admin
+          ? {
+              nume: admin.nume,
+              email: admin.email,
+              telefon: admin.telefon ?? null,
+              createdAt: admin.createdAt,
+              lastLogin,
+            }
+          : null,
         programs: ((ong.programs ?? []) as any[]).map((program) => ({
           documentId: program.documentId,
           name: program.name,
@@ -500,6 +526,63 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const user = scope.user as any;
     return { data: serializeMyOng(updated, user) };
   },
+  async overview(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi.documents("api::report.report").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      sort: { createdAt: "desc" },
+      populate: {
+        phases: { populate: { program: true } },
+        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+      },
+    });
+    const today = todayInBucharest();
+    const current = (reports as any[]).find((report) => !isClosed(report, today));
+    const currentPhases = ((current?.phases ?? []) as any[]);
+    const currentProgram = currentPhases.find((phase) => phase.program)?.program ?? null;
+    const closedDate = (report: any) =>
+      report.finishedAt ??
+      ((report.phases ?? []) as any[])
+        .map((phase) => phase.endDate)
+        .filter(Boolean)
+        .sort()
+        .pop() ??
+      null;
+    const lastFinalizedDate = (reports as any[])
+      .filter((report) => isClosed(report, today))
+      .map(closedDate)
+      .filter(Boolean)
+      .sort()
+      .pop() ?? null;
+    return {
+      data: {
+        totalEvaluations: reports.length,
+        currentEvaluation: current
+          ? {
+              documentId: current.documentId,
+              invitedCount: (current.evaluations ?? []).length,
+              completedCount: (current.evaluations ?? []).filter(
+                (evaluation: any) =>
+                  computeProgress(evaluation.dimensions, isClosed(current, today))
+                    .complete,
+              ).length,
+              program: currentProgram
+                ? { documentId: currentProgram.documentId, name: currentProgram.name }
+                : null,
+            }
+          : null,
+        lastFinalizedDate,
+      },
+    };
+  },
   async evaluations(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
@@ -561,6 +644,96 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             : null,
         })),
       })),
+    };
+  },
+  async fdscReports(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .findMany({
+        filters: { ong: { documentId: ong.documentId } },
+        sort: { uploadedAt: "desc" },
+        populate: { program: true, file: true },
+      });
+    return {
+      data: (reports as any[]).map((report) => ({
+        documentId: report.documentId,
+        name: report.name,
+        uploadedAt: report.uploadedAt,
+        program: report.program
+          ? { documentId: report.program.documentId, name: report.program.name }
+          : null,
+        file: report.file
+          ? {
+              url: report.file.url,
+              name: report.file.name,
+              ext: report.file.ext,
+            }
+          : null,
+      })),
+    };
+  },
+  async createFdscReport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const parsed = createFdscReportSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const program = await strapi.documents("api::program.program").findOne({
+      documentId: parsed.data.program,
+      populate: { ongs: true },
+    });
+    if (!program) {
+      return ctx.badRequest("Programul nu există");
+    }
+    const participates = ((program.ongs ?? []) as any[]).some(
+      (entry) => entry.documentId === ong.documentId,
+    );
+    if (!participates) {
+      return ctx.badRequest("Organizația nu participă la acest program");
+    }
+    const created = await strapi.documents("api::fdsc-report.fdsc-report").create({
+      data: {
+        name: parsed.data.name,
+        ong: docRef(ong.documentId),
+        program: docRef(program.documentId),
+        file: { id: parsed.data.file },
+        uploadedAt: new Date().toISOString(),
+      },
+      populate: { program: true, file: true },
+    });
+    return {
+      data: {
+        documentId: created.documentId,
+        name: created.name,
+        uploadedAt: created.uploadedAt,
+        program: created.program
+          ? { documentId: created.program.documentId, name: created.program.name }
+          : null,
+        file: created.file
+          ? {
+              url: created.file.url,
+              name: created.file.name,
+              ext: created.file.ext,
+            }
+          : null,
+      },
     };
   },
   async evaluationDetail(ctx: Context) {

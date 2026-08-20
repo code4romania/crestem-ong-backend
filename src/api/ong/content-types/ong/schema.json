@@ -74,6 +74,12 @@
       "target": "api::report.report",
       "mappedBy": "ong"
     },
+    "fdscReports": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::fdsc-report.fdsc-report",
+      "mappedBy": "ong"
+    },
     "programs": {
       "type": "relation",
       "relation": "manyToMany",
