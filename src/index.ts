@@ -70,6 +70,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.evaluationDetail",
     "api::ong.ong.fdscReports",
     "api::ong.ong.createFdscReport",
+    "api::ong.ong.mentors",
+    "api::ong.ong.meetings",
     "plugin::upload.content-api.upload",
     "api::ong.ong.list",
     "api::ong.ong.listActive",

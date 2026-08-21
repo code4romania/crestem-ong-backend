@@ -80,6 +80,12 @@
       "target": "api::fdsc-report.fdsc-report",
       "mappedBy": "ong"
     },
+    "meetings": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::meeting.meeting",
+      "mappedBy": "ong"
+    },
     "programs": {
       "type": "relation",
       "relation": "manyToMany",

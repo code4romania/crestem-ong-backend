@@ -1,0 +1,68 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meetings",
+  "info": {
+    "singularName": "meeting",
+    "pluralName": "meetings",
+    "displayName": "Meeting",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "dataOra": {
+      "type": "datetime",
+      "required": true
+    },
+    "format": {
+      "type": "enumeration",
+      "enum": ["online", "fata_in_fata"],
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["programata", "efectuata", "anulata"],
+      "required": true,
+      "default": "programata"
+    },
+    "subiect": {
+      "type": "string",
+      "required": true
+    },
+    "linkIntalnire": {
+      "type": "string"
+    },
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong",
+      "inversedBy": "meetings"
+    },
+    "mentor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "program": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::program.program"
+    },
+    "activityType": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::activity-type.activity-type"
+    },
+    "dimensiuni": {
+      "type": "json"
+    },
+    "report": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["files"]
+    }
+  }
+}

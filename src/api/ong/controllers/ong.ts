@@ -30,6 +30,9 @@ import { acceptJoinRequestSchema } from "../validation/join-request";
 import { createFdscReportSchema } from "../validation/fdsc-report";
 import { decorateBlock } from "../../evaluation/utils/catalog";
 import { docRef } from "../../../utils/relations";
+import { DIMENSIONS } from "../../../constants/dimensions";
+
+const VALID_DIMENSION_KEYS = new Set(DIMENSIONS.map((dimension) => dimension.key));
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -736,6 +739,49 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     };
   },
+  async mentors(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      populate: { program: true, mentors: { populate: { avatar: true } } },
+    });
+    const mentorsById = new Map<string, any>();
+    for (const row of rows as any[]) {
+      const rowPrograms = Array.isArray(row.program) ? row.program : row.program ? [row.program] : [];
+      for (const mentor of (row.mentors ?? []) as any[]) {
+        const existing = mentorsById.get(mentor.documentId);
+        if (existing) {
+          for (const program of rowPrograms) {
+            if (!existing.programs.some((p: any) => p.documentId === program.documentId)) {
+              existing.programs.push({ documentId: program.documentId, name: program.name });
+            }
+          }
+          continue;
+        }
+        mentorsById.set(mentor.documentId, {
+          documentId: mentor.documentId,
+          nume: mentor.nume,
+          email: mentor.email,
+          mentorJobTitle: mentor.mentorJobTitle ?? null,
+          mentorOrganization: mentor.mentorOrganization ?? null,
+          ariiDeExpertiza: mentor.ariiDeExpertiza ?? [],
+          avatar: mentor.avatar
+            ? { documentId: mentor.avatar.documentId, name: mentor.avatar.name, url: mentor.avatar.url }
+            : null,
+          programs: rowPrograms.map((program: any) => ({ documentId: program.documentId, name: program.name })),
+        });
+      }
+    }
+    return { data: [...mentorsById.values()] };
+  },
   async evaluationDetail(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
@@ -796,6 +842,67 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           dimensions: (evaluation.dimensions ?? []).map(decorateBlock),
         })),
       },
+    };
+  },
+  async meetings(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+
+    const { mentor, program, status, format } = ctx.query;
+    const mentorId = typeof mentor === "string" ? mentor.trim() : "";
+    const programId = typeof program === "string" ? program.trim() : "";
+    const statusFilter = typeof status === "string" ? status.trim() : "";
+    const formatFilter = typeof format === "string" ? format.trim() : "";
+
+    const meetings = await strapi.documents("api::meeting.meeting").findMany({
+      filters: {
+        ong: { documentId: ong.documentId },
+        ...(mentorId ? { mentor: { documentId: mentorId } } : {}),
+        ...(programId ? { program: { documentId: programId } } : {}),
+        ...(statusFilter ? { status: statusFilter as any } : {}),
+        ...(formatFilter ? { format: formatFilter as any } : {}),
+      },
+      sort: { dataOra: "desc" },
+      populate: { mentor: true, program: true, activityType: true, report: true },
+    });
+
+    return {
+      data: (meetings as any[]).map((meeting) => ({
+        documentId: meeting.documentId,
+        dataOra: meeting.dataOra,
+        format: meeting.format,
+        status: meeting.status,
+        subiect: meeting.subiect,
+        linkIntalnire: meeting.linkIntalnire ?? null,
+        mentor: meeting.mentor
+          ? { documentId: meeting.mentor.documentId, nume: meeting.mentor.nume }
+          : null,
+        program: meeting.program
+          ? { documentId: meeting.program.documentId, name: meeting.program.name }
+          : null,
+        activityType: meeting.activityType
+          ? { documentId: meeting.activityType.documentId, name: meeting.activityType.name }
+          : null,
+        dimensiuni: Array.isArray(meeting.dimensiuni)
+          ? meeting.dimensiuni.filter(
+              (key: unknown): key is string => typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+            )
+          : [],
+        report: meeting.report
+          ? {
+              url: meeting.report.url,
+              name: meeting.report.name,
+              ext: meeting.report.ext,
+            }
+          : null,
+      })),
     };
   },
 }));
