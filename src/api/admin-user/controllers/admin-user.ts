@@ -10,13 +10,73 @@ import { updateMentorSchema, updateStaffSchema } from "../validation/admin-user"
 const PAGE_SIZE = 20;
 const EDITABLE_ROLES = ["mentor", "super-admin", "editor-fdsc"] as const;
 
+const SORT_OPTIONS: Record<string, Record<string, "asc" | "desc">> = {
+  "nume:asc": { nume: "asc" },
+  "createdAt:desc": { createdAt: "desc" },
+};
+const DEFAULT_SORT = SORT_OPTIONS["nume:asc"];
+
+// Mentor <-> program assignment lives on the ngo-mentor join content-type — the
+// user model has no direct relation to filter or populate — so resolve it separately.
+async function resolveProgramsByMentor(mentorIds: string[]) {
+  const programsByMentor = new Map<string, { documentId: string; name: string }[]>();
+  if (mentorIds.length === 0) return programsByMentor;
+
+  const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+    filters: { mentors: { documentId: { $in: mentorIds } } },
+    populate: { program: true, mentors: true },
+  });
+  for (const row of rows as any[]) {
+    const rowPrograms = Array.isArray(row.program) ? row.program : row.program ? [row.program] : [];
+    for (const mentor of (row.mentors ?? []) as any[]) {
+      if (!mentorIds.includes(mentor.documentId)) continue;
+      const existing = programsByMentor.get(mentor.documentId) ?? [];
+      for (const program of rowPrograms) {
+        if (!existing.some((p) => p.documentId === program.documentId)) {
+          existing.push({ documentId: program.documentId, name: program.name });
+        }
+      }
+      programsByMentor.set(mentor.documentId, existing);
+    }
+  }
+  return programsByMentor;
+}
+
+function mapUser(
+  user: any,
+  programs: { documentId: string; name: string }[],
+  activationToken: string | undefined,
+) {
+  return {
+    documentId: user.documentId,
+    nume: user.nume,
+    email: user.email,
+    accountStatus: user.accountStatus,
+    role: user.role ? { type: user.role.type, name: user.role.name } : null,
+    ong: (user.ong ?? []).map((ong: any) => ({
+      documentId: ong.documentId,
+      name: ong.name,
+    })),
+    avatar: user.avatar ? { id: user.avatar.id, url: user.avatar.url } : null,
+    createdAt: user.createdAt ?? null,
+    lastLoginAt: user.lastLoginAt ?? null,
+    bio: user.bio ?? null,
+    dimensiuni: user.dimensiuni ?? [],
+    ariiDeExpertiza: user.ariiDeExpertiza ?? [],
+    programs,
+    ...(activationToken
+      ? { activationLink: buildActivationLink(activationToken, ACTIVATION_PATH) }
+      : {}),
+  };
+}
+
 export default {
   async list(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
 
-    const { search, role, ong, status, page: pageParam } = ctx.query;
+    const { search, role, ong, status, program, sort, page: pageParam } = ctx.query;
 
     const parsedPage = Number(pageParam);
     const page =
@@ -25,6 +85,27 @@ export default {
     const roleType = typeof role === "string" ? role.trim() : "";
     const ongId = typeof ong === "string" ? ong.trim() : "";
     const accountStatus = typeof status === "string" ? status.trim() : "";
+    const programId = typeof program === "string" ? program.trim() : "";
+    const sortOrder =
+      typeof sort === "string" && SORT_OPTIONS[sort] ? SORT_OPTIONS[sort] : DEFAULT_SORT;
+
+    // Mentor <-> program assignment lives on the ngo-mentor join content-type — the
+    // user model has no direct relation to filter on — so resolve matching mentor
+    // ids up front when a program filter is requested.
+    let programMentorIds: string[] | null = null;
+    if (programId) {
+      const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+        filters: { program: { documentId: programId } },
+        populate: { mentors: true },
+      });
+      const idSet = new Set<string>();
+      for (const row of rows as any[]) {
+        for (const mentor of (row.mentors ?? []) as any[]) {
+          idSet.add(mentor.documentId);
+        }
+      }
+      programMentorIds = [...idSet];
+    }
 
     const filters: Record<string, unknown> = {
       ...(searchTerm
@@ -38,12 +119,13 @@ export default {
       ...(roleType ? { role: { type: roleType } } : {}),
       ...(ongId ? { ong: { documentId: ongId } } : {}),
       ...(accountStatus ? { accountStatus } : {}),
+      ...(programMentorIds ? { documentId: { $in: programMentorIds } } : {}),
     };
 
     const [users, total] = await Promise.all([
       strapi.documents("plugin::users-permissions.user").findMany({
         filters,
-        sort: { nume: "asc" },
+        sort: sortOrder,
         populate: { role: true, ong: true, avatar: true },
         pagination: { page, pageSize: PAGE_SIZE },
       }),
@@ -57,29 +139,20 @@ export default {
         )
       : new Map<string, string>();
 
+    const mentorIds = users
+      .filter((user) => user.role?.type === "mentor")
+      .map((user) => user.documentId);
+
+    const programsByMentor = await resolveProgramsByMentor(mentorIds);
+
     return {
-      data: users.map((user) => {
-        const activationToken = activationTokens.get(user.documentId);
-        return {
-          documentId: user.documentId,
-          nume: user.nume,
-          email: user.email,
-          accountStatus: user.accountStatus,
-          role: user.role ? { type: user.role.type, name: user.role.name } : null,
-          ong: (user.ong ?? []).map((ong) => ({
-            documentId: ong.documentId,
-            name: ong.name,
-          })),
-          avatar: user.avatar ? { id: user.avatar.id, url: user.avatar.url } : null,
-          lastLoginAt: user.lastLoginAt ?? null,
-          bio: user.bio ?? null,
-          dimensiuni: user.dimensiuni ?? [],
-          ariiDeExpertiza: user.ariiDeExpertiza ?? [],
-          ...(activationToken
-            ? { activationLink: buildActivationLink(activationToken, ACTIVATION_PATH) }
-            : {}),
-        };
-      }),
+      data: users.map((user) =>
+        mapUser(
+          user,
+          programsByMentor.get(user.documentId) ?? [],
+          activationTokens.get(user.documentId),
+        ),
+      ),
       meta: {
         pagination: {
           page,
@@ -88,6 +161,34 @@ export default {
           total,
         },
       },
+    };
+  },
+
+  async findOne(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+
+    const documentId = ctx.params.documentId as string;
+
+    const user = await strapi.documents("plugin::users-permissions.user").findOne({
+      documentId,
+      populate: { role: true, ong: true, avatar: true },
+    });
+
+    if (!user) {
+      return ctx.notFound("Utilizatorul nu a fost găsit");
+    }
+
+    const programsByMentor =
+      user.role?.type === "mentor" ? await resolveProgramsByMentor([user.documentId]) : new Map();
+
+    const activationToken = exposeActivationLink()
+      ? (await pendingActivationTokens(strapi, [user.documentId])).get(user.documentId)
+      : undefined;
+
+    return {
+      data: mapUser(user, programsByMentor.get(user.documentId) ?? [], activationToken),
     };
   },
 

@@ -79,6 +79,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.deleteOne",
     "api::mentor.mentor.listActive",
     "api::admin-user.admin-user.list",
+    "api::admin-user.admin-user.findOne",
     "api::admin-user.admin-user.update",
     "plugin::upload.content-api.upload",
   ],

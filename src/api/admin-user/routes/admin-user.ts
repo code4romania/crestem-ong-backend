@@ -7,6 +7,12 @@ export default {
       config: { policies: ["global::is-super-admin"] },
     },
     {
+      method: "GET",
+      path: "/admin/users/:documentId",
+      handler: "admin-user.findOne",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
       method: "PUT",
       path: "/admin/users/:documentId",
       handler: "admin-user.update",
