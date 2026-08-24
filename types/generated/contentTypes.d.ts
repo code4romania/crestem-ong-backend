@@ -661,6 +661,7 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
       "manyToOne",
       "api::activity-type.activity-type"
     >;
+    comentarii: Schema.Attribute.Text;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<"oneToOne", "admin::user"> &
       Schema.Attribute.Private;

@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/ongs/:documentId",
       handler: "ong.detail",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-super-admin-or-ngo-admin"] },
     },
   ],
 };

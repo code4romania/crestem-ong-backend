@@ -17,7 +17,8 @@ const APP_ROLES = [
   {
     type: "editor-fdsc",
     name: "Editor FDSC",
-    description: "Cont de personal FDSC fără permisiuni suplimentare alocate încă.",
+    description:
+      "Cont de personal FDSC fără permisiuni suplimentare alocate încă.",
   },
   {
     type: "ngo-admin",
@@ -112,6 +113,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "plugin::upload.content-api.upload",
     "api::program.program.mentors",
     "api::program.program.ongMentors",
+    "api::ong.ong.detail",
+    "api::ong.ong.mentors",
+    "api::ong.ong.meetings",
     "api::report.report.list",
     "api::report.report.current",
     "api::report.report.start",
@@ -149,6 +153,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.listForMentor",
     "api::conversation.conversation.messagesForMentor",
     "api::conversation.conversation.sendMessageForMentor",
+    "api::ong.ong.ongsForMentor",
+    "api::ong.ong.meetingsForMentor",
+    "api::ong.ong.createMeetingForMentor",
+    "api::ong.ong.updateMeetingForMentor",
+    "api::ong.ong.cancelMeetingForMentor",
+    "api::ong.ong.completeMeetingForMentor",
+    "api::ong.ong.uploadMeetingReportForMentor",
+    "api::activity-type.activity-type.list",
   ],
   individual: [
     "api::auth.auth.me",
