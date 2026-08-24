@@ -58,6 +58,9 @@
     "dimensiuni": {
       "type": "json"
     },
+    "comentarii": {
+      "type": "text"
+    },
     "report": {
       "type": "media",
       "multiple": false,

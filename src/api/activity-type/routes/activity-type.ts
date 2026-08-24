@@ -2,8 +2,8 @@ export default {
   routes: [
     {
       method: "GET",
-      path: "/ongs/:documentId",
-      handler: "ong.detail",
+      path: "/activity-types",
+      handler: "activity-type.list",
       config: { policies: ["global::is-super-admin-or-ngo-admin"] },
     },
   ],
