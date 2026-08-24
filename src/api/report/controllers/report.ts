@@ -279,7 +279,11 @@ export default factories.createCoreController(
         sort: { createdAt: "desc" },
         populate: {
           phases: { populate: { program: true } },
-          evaluations: { populate: { dimensions: true } },
+          // `quiz` is there only for `computeReportScores`; the counts below
+          // read `dimensions` alone. The Comparație tab compares the reports in
+          // this list, so the scores travel with it instead of costing one
+          // `detail` call per report.
+          evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
         },
       });
       const today = todayIso();
@@ -300,6 +304,7 @@ export default factories.createCoreController(
               (evaluation) =>
                 computeProgress(evaluation.dimensions, closed).complete,
             ).length,
+            scores: computeReportScores(evaluations),
           };
         }),
       };

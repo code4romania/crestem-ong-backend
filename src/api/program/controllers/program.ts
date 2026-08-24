@@ -22,8 +22,13 @@ import {
   overlappingPhases,
   phasesOutsideProgram,
 } from "../validation/program";
-import { phaseLockError, programDatesLockError } from "../utils/phase-locks";
+import {
+  phaseLockError,
+  programDatesLockError,
+  programFinishedError,
+} from "../utils/phase-locks";
 import { toDateString, todayInBucharest } from "../../../utils/date";
+import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
@@ -41,7 +46,13 @@ const programView = (program: any) => ({
   name: program.name,
   startDate: program.startDate,
   endDate: program.endDate,
-  programStatus: program.programStatus,
+  // Recomputed on read: the stored column only refreshes when the dates are
+  // edited, so a program that simply ran out of days still reads "Active".
+  programStatus: computeProgramStatus(
+    toDateString(program.startDate),
+    toDateString(program.endDate),
+    todayInBucharest(),
+  ),
 });
 
 const phaseView = (phase: any) => ({
@@ -192,6 +203,10 @@ export default factories.createCoreController(
       });
       if (!existing) {
         return ctx.badRequest("Programul nu există");
+      }
+      const finishedError = programFinishedError(existing, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
       }
       if (parsed.data.name !== undefined) {
         const duplicate = await strapi.db
@@ -374,6 +389,10 @@ export default factories.createCoreController(
       });
       if (!existing) {
         return ctx.badRequest("Programul nu există");
+      }
+      const finishedError = programFinishedError(existing, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
       }
       const withReports = ((existing.phases ?? []) as any[]).some(
         (phase) => (phase.reports ?? []).length > 0,
@@ -573,6 +592,10 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const mentorIds = [...new Set(parsed.data.mentors)];
       const mentorUsers = await strapi
         .documents("plugin::users-permissions.user")
@@ -616,6 +639,10 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const mentorIds = [...new Set(parsed.data.mentors)];
       const assigned = new Set(
         ((program.mentors ?? []) as any[]).map((mentor) => mentor.documentId),
@@ -653,6 +680,10 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const programOngIds = new Set(((program.ongs ?? []) as any[]).map((ong) => ong.documentId));
       if (!programOngIds.has(ongId)) {
         return ctx.badRequest("Organizația nu este alocată acestui program");
@@ -689,6 +720,16 @@ export default factories.createCoreController(
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
       const { program: programId, ong: ongId, mentors: mentorIdsInput } = parsed.data;
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: programId,
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const row = await strapi.documents("api::ngo-mentor.ngo-mentor").findFirst({
         filters: {
           program: { documentId: programId },
@@ -730,6 +771,10 @@ export default factories.createCoreController(
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
+      }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
       }
       const entries = parsed.data.ongs;
       const ongIds = [...new Set(entries.map((entry) => entry.ong))];
@@ -854,6 +899,10 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const phase = ((program.phases ?? []) as any[]).find(
         (candidate) => candidate.documentId === ctx.params.phaseDocumentId,
       );
@@ -922,6 +971,10 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
+      }
       const phase = ((program.phases ?? []) as any[]).find(
         (candidate) => candidate.documentId === ctx.params.phaseDocumentId,
       );
@@ -967,6 +1020,10 @@ export default factories.createCoreController(
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
+      }
+      const finishedError = programFinishedError(program, todayInBucharest());
+      if (finishedError) {
+        return ctx.badRequest(finishedError);
       }
       const ongIds = [...new Set(parsed.data.ongs)];
       const participating = new Set(

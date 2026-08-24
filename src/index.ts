@@ -44,6 +44,7 @@ const APP_ROLES = [
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   "super-admin": [
+    "api::dashboard.dashboard.fdsc",
     "api::auth.auth.me",
     "api::auth.auth.registerMentor",
     "api::auth.auth.resendMentorInvite",
@@ -87,6 +88,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   "editor-fdsc": ["api::auth.auth.me", "api::auth.auth.changePassword"],
   "ngo-admin": [
+    "api::dashboard.dashboard.ong",
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
     // Granted deliberately even though BR-32 blocks the deletion itself: the
@@ -142,6 +144,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.createJoinRequest",
   ],
   mentor: [
+    "api::dashboard.dashboard.mentor",
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
     "api::auth.auth.deleteAccount",
