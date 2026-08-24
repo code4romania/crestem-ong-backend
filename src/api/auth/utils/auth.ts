@@ -48,3 +48,23 @@ export const buildResetLink = (token: string) => {
   const base = process.env.FRONTEND_URL || "http://localhost:1337";
   return `${base.replace(/\/+$/, "")}/resetare-parola?token=${encodeURIComponent(token)}`;
 };
+
+export const EMAIL_CHANGE_PURPOSE = "email-change";
+
+export type EmailChangeTokenPayload = AuthTokenPayload & { newEmail: string };
+
+export const EMAIL_CHANGE_PATH = "/schimbare-email";
+
+export const signEmailChangeToken = (userId: number, newEmail: string) =>
+  jwt.sign(
+    { id: userId, purpose: EMAIL_CHANGE_PURPOSE, newEmail },
+    getEmailLinkSecret(),
+    {
+      expiresIn: process.env.EMAIL_CHANGE_TTL || "1h",
+    } as jwt.SignOptions,
+  );
+
+export const buildEmailChangeLink = (token: string) => {
+  const base = process.env.FRONTEND_URL || "http://localhost:1337";
+  return `${base.replace(/\/+$/, "")}${EMAIL_CHANGE_PATH}?token=${encodeURIComponent(token)}`;
+};

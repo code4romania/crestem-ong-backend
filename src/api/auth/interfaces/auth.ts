@@ -13,6 +13,8 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  requestEmailChangeSchema,
+  confirmEmailChangeSchema,
 } from "../validation/auth";
 
 export type NgoCreatePayload = z.infer<typeof registerNgoSchema>;
@@ -24,6 +26,8 @@ export type RefreshTokenPayload = z.infer<typeof refreshTokenSchema>;
 export type ForgotPasswordPayload = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordPayload = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordPayload = z.infer<typeof changePasswordSchema>;
+export type RequestEmailChangePayload = z.infer<typeof requestEmailChangeSchema>;
+export type ConfirmEmailChangePayload = z.infer<typeof confirmEmailChangeSchema>;
 
 export type InviteCreateResult = {
   id: number;
@@ -35,3 +39,7 @@ export type InviteResendResult = {
   emailSent: boolean;
   activationLink?: string;
 };
+
+export interface DeleteAccountPayload {
+  currentPassword: string;
+}

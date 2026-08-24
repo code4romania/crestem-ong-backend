@@ -200,3 +200,27 @@ export const changePasswordSchema = z
     message: "Parolele nu coincid",
     path: ["confirmedPassword"],
   });
+
+export const requestEmailChangeSchema = z.object({
+  currentPassword: z
+    .string({ message: "Parola actuală este obligatorie" })
+    .min(1, "Parola actuală este obligatorie"),
+  email: z
+    .email("Adresă de email invalidă")
+    .lowercase()
+    .min(6, "Adresa de email este prea scurtă")
+    .refine(
+      async (email) =>
+        !(await strapi.db
+          .query("plugin::users-permissions.user")
+          .findOne({ where: { email: { $eqi: email } } })),
+      "Există deja un cont cu această adresă de email",
+    ),
+});
+
+export const confirmEmailChangeSchema = z.object({
+  token: z
+    .string({ message: "Tokenul este obligatoriu" })
+    .trim()
+    .min(1, "Tokenul este obligatoriu"),
+});

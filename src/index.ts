@@ -43,6 +43,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.registerMentor",
     "api::auth.auth.resendMentorInvite",
     "api::auth.auth.changePassword",
+    "api::auth.auth.deleteAccount",
+    "api::auth.auth.requestEmailChange",
     "api::program.program.list",
     "api::program.program.detail",
     "api::program.program.stats",
@@ -70,6 +72,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   "ngo-admin": [
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
+    // Granted deliberately even though BR-32 blocks the deletion itself: the
+    // handler must be reachable so the contact person gets the Romanian
+    // explanation of the steps available to them, not a bare 403.
+    "api::auth.auth.deleteAccount",
     "api::evaluation.evaluation.myOngs",
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
@@ -77,11 +83,18 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.removeMember",
     "api::ong.ong.me",
     "api::ong.ong.updateMe",
+    // "Business rules.txt": `Șterge ONG` sits in the Admin ONG's own Acțiuni
+    // menu, with no approval step — and BR-32 dead-ends them without it. The
+    // permission only opens the route; the handler still refuses any
+    // organization the caller does not belong to, and refuses it with the
+    // "does not exist" answer so the endpoint cannot be used to enumerate ids.
+    "api::ong.ong.deleteOne",
     "api::ong.ong.joinRequests",
     "api::ong.ong.acceptJoinRequest",
     "api::ong.ong.rejectJoinRequest",
     "plugin::upload.content-api.upload",
     "api::program.program.mentors",
+    "api::program.program.ongMentors",
     "api::report.report.list",
     "api::report.report.current",
     "api::report.report.start",
@@ -97,9 +110,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   "ngo-member": [
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
+    "api::auth.auth.deleteAccount",
+    "api::auth.auth.requestEmailChange",
     "api::evaluation.evaluation.myOngs",
     "api::evaluation.evaluation.leaveOng",
     "api::evaluation.evaluation.myEvaluations",
+    "api::evaluation.evaluation.ongRounds",
+    "api::evaluation.evaluation.ongMentors",
     "api::evaluation.evaluation.current",
     "api::evaluation.evaluation.detail",
     "api::evaluation.evaluation.updateOne",
@@ -110,6 +127,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   mentor: [
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
+    "api::auth.auth.deleteAccount",
+    "api::auth.auth.requestEmailChange",
     "api::conversation.conversation.listForMentor",
     "api::conversation.conversation.messagesForMentor",
     "api::conversation.conversation.sendMessageForMentor",
@@ -117,6 +136,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   individual: [
     "api::auth.auth.me",
     "api::auth.auth.changePassword",
+    "api::auth.auth.deleteAccount",
+    "api::auth.auth.requestEmailChange",
     "api::ong.ong.joinable",
     "api::ong.ong.createJoinRequest",
   ],
@@ -149,10 +170,34 @@ export default {
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
+    await backfillAccountStatus(strapi);
     await seedLocalities(strapi);
     await seedDomains(strapi);
   },
 };
+
+/**
+ * Accounts created before `accountStatus` was added to the user schema kept a
+ * NULL value — Strapi only applies enum defaults on insert. Anything checking
+ * `accountStatus === "active"` (changePassword, refresh-token rotation) rejects
+ * those users, so bring them up to the schema default. Idempotent.
+ */
+async function backfillAccountStatus(strapi: Core.Strapi) {
+  const legacy = await strapi.db
+    .query("plugin::users-permissions.user")
+    .findMany({ where: { accountStatus: null }, select: ["id"] });
+
+  if (!legacy.length) return;
+
+  await strapi.db.query("plugin::users-permissions.user").updateMany({
+    where: { id: { $in: legacy.map((user: { id: number }) => user.id) } },
+    data: { accountStatus: "active" },
+  });
+
+  strapi.log.info(
+    `[bootstrap] Backfilled accountStatus="active" for ${legacy.length} legacy user(s).`,
+  );
+}
 
 /**
  * Creates any missing application roles. Idempotent: existing roles

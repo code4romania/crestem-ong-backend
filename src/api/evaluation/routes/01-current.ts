@@ -14,6 +14,18 @@ export default {
     },
     {
       method: "GET",
+      path: "/me/ongs/:ongDocumentId/rounds",
+      handler: "evaluation.ongRounds",
+      config: { policies: ["global::is-ngo-member"] },
+    },
+    {
+      method: "GET",
+      path: "/me/ongs/:ongDocumentId/mentors",
+      handler: "evaluation.ongMentors",
+      config: { policies: ["global::is-ngo-member"] },
+    },
+    {
+      method: "GET",
       path: "/evaluations/ong/:ongDocumentId",
       handler: "evaluation.myEvaluations",
       config: { policies: ["global::is-ngo-member"] },

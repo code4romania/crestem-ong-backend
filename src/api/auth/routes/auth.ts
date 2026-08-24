@@ -78,5 +78,32 @@ export default {
       handler: "auth.changePassword",
       config: { middlewares: ["plugin::users-permissions.rateLimit"] },
     },
+    {
+      method: "POST",
+      path: "/auth/change-email",
+      handler: "auth.requestEmailChange",
+      config: { middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
+    {
+      method: "GET",
+      path: "/auth/change-email/preview",
+      handler: "auth.previewEmailChange",
+      config: { auth: false },
+    },
+    {
+      method: "POST",
+      path: "/auth/change-email/confirm",
+      handler: "auth.confirmEmailChange",
+      config: {
+        auth: false,
+        middlewares: ["plugin::users-permissions.rateLimit"],
+      },
+    },
+    {
+      method: "POST",
+      path: "/auth/delete-account",
+      handler: "auth.deleteAccount",
+      config: { middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
   ],
 };

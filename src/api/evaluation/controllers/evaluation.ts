@@ -5,6 +5,7 @@ import { computeProgress } from "../utils/progress";
 import { normalizeBlocks } from "../utils/normalize";
 import { decorateBlock } from "../utils/catalog";
 import { allPhasesEnded } from "../../report/utils/association";
+import { memberView } from "../../report/utils/members";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { belongsToOng, loadUserWithOngs } from "../../../utils/ong-scope";
@@ -13,6 +14,8 @@ import {
   removeOngMembership,
 } from "../../../utils/membership";
 import { computeEvaluationScores } from "../../report/utils/scores";
+import { buildProgramRounds } from "../../report/utils/rounds";
+import { ngoMentorsFor } from "../../../utils/ngo-mentors";
 
 const reportPhaseView = (phase: any) => ({
   documentId: phase.documentId,
@@ -24,10 +27,14 @@ const reportPhaseView = (phase: any) => ({
     : null,
 });
 
-const respondentView = (user: any) =>
-  user
-    ? { documentId: user.documentId, nume: user.nume, email: user.email }
-    : null;
+/**
+ * The same projection as the report member list. An anonymized respondent must
+ * not leak the `deleted-<documentId>@anonim.local` placeholder as if it were a
+ * real address (BR-27); reusing `memberView` — identical shape, already
+ * `isAnonymized`-aware — keeps the three read paths in agreement instead of
+ * repeating the check a third time.
+ */
+const respondentView = (user: any) => (user ? memberView(user) : null);
 
 const evaluationView = (evaluation: any, today: string) => ({
   documentId: evaluation.documentId,
@@ -141,6 +148,64 @@ export default factories.createCoreController(
           }))
           .sort((a, b) => `${a.name}`.localeCompare(`${b.name}`, "ro")),
       };
+    },
+    /**
+     * The member-side twin of `/reports/current`, scoped to one of the
+     * organizations the caller belongs to. Same `programRounds` payload, so
+     * both dashboards compute their Overview counters from identical data.
+     * `standaloneReports` is deliberately left out: only an ngo-admin can
+     * start an independent evaluation, so it has nothing to say here.
+     */
+    async ongRounds(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!user) {
+        return ctx.unauthorized();
+      }
+      const ongDocumentId = ctx.params.ongDocumentId;
+      if (!belongsToOng(user, ongDocumentId)) {
+        return ctx.badRequest("Nu faci parte din această organizație");
+      }
+      const programRounds = await buildProgramRounds(
+        strapi,
+        ongDocumentId,
+        todayIso(),
+      );
+      return { data: { programRounds } };
+    },
+    /** The persoane resursă of the caller's organization inside one program. */
+    async ongMentors(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!user) {
+        return ctx.unauthorized();
+      }
+      const ongDocumentId = ctx.params.ongDocumentId;
+      if (!belongsToOng(user, ongDocumentId)) {
+        return ctx.badRequest("Nu faci parte din această organizație");
+      }
+      const programDocumentId = (ctx.query as any)?.program;
+      if (typeof programDocumentId !== "string" || !programDocumentId) {
+        return ctx.badRequest("Programul este obligatoriu");
+      }
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: programDocumentId,
+        populate: { mentors: true, ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === ongDocumentId,
+      );
+      if (!participates) {
+        return ctx.forbidden("Organizația ta nu participă la acest program");
+      }
+      return { data: await ngoMentorsFor(strapi, program, ongDocumentId) };
     },
     async leaveOng(ctx: Context) {
       if (!ctx.state.user) {

@@ -47,6 +47,11 @@
       "configurable": false,
       "private": true
     },
+    "emailChangeToken": {
+      "type": "string",
+      "configurable": false,
+      "private": true
+    },
     "confirmationToken": {
       "type": "string",
       "configurable": false,

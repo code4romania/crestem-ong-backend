@@ -1,17 +1,19 @@
 import type { EmailService } from "../../email/services/email";
 import { buildEvaluationLink } from "./invite-link";
 import { docRef } from "../../../utils/relations";
+import { isAnonymized } from "../../../utils/anonymize";
 
 export interface MemberView {
   documentId: string;
   nume: string;
-  email: string;
+  /** `null` once the account is anonymized — the stored address is a placeholder. */
+  email: string | null;
 }
 
 export const memberView = (user: any): MemberView => ({
   documentId: user.documentId,
   nume: user.nume,
-  email: user.email,
+  email: isAnonymized(user) ? null : user.email,
 });
 
 export const resolveMembers = async (
@@ -30,6 +32,16 @@ export const resolveMembers = async (
     return { error: "Unii utilizatori selectați nu există" };
   }
   for (const member of users) {
+    // Checked before the membership rule: deletion clears `ong` and demotes the
+    // role, so a deleted account always fails the membership check too — and
+    // would then be reported with the generic message, quoting its
+    // `deleted-…@anonim.local` placeholder as if it were an address. The
+    // specific message has to win, so it is tested first.
+    if (member.accountStatus === "deleted") {
+      return {
+        error: `Utilizatorul ${member.nume} și-a șters contul și nu mai poate fi invitat`,
+      };
+    }
     const inOng = ((member.ong ?? []) as any[]).some(
       (ong: any) => ong?.documentId === ongDocumentId,
     );

@@ -9,6 +9,7 @@ import { computeReportScores } from "../../report/utils/scores";
 import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
+import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
   loadUserWithOngs,
@@ -27,14 +28,20 @@ import {
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
 import { decorateBlock } from "../../evaluation/utils/catalog";
+import { performOngDeletion } from "../services/delete-ong";
+import { authorizeOngDeletion } from "../utils/delete-access";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
+    // Anonymized organizations stay listed (BR-33): FDSC must still see that
+    // their evaluations were completed, and this list is the only navigation to
+    // them. `ngoStatus` rides along so the frontend can badge them "Retras".
+    // `listActive` below keeps its own `ngoStatus: "active"` filter — a deleted
+    // organization must never reach an "available to assign" picker.
     const ongs = await strapi.documents("api::ong.ong").findMany({
-      filters: { ngoStatus: { $ne: "deleted" } },
       sort: { name: "asc" },
       populate: {
         judet: true,
@@ -54,6 +61,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           documentId: ong.documentId,
           name: ong.name,
           cui: ong.cui,
+          ngoStatus: ong.ngoStatus,
           website: ong.website,
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
@@ -135,21 +143,38 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     };
   },
+  /**
+   * `Șterge ONG` for a super-admin (any organization) and for an ngo-admin
+   * (only one they belong to).
+   *
+   * The route policy establishes the caller's *role*; it says nothing about
+   * *which* organization is theirs. Ownership is therefore decided here, by
+   * `authorizeOngDeletion`, against memberships loaded from the database. The
+   * only identifier that reaches it is `ctx.params.documentId` — the request
+   * body, query string and headers are never consulted, and the role comes from
+   * `ctx.state.user`, set by the authentication layer.
+   *
+   * An ngo-admin who does not own the target gets exactly the response they
+   * would get for an organization that does not exist, so the endpoint cannot
+   * be used to enumerate organization ids.
+   */
   async deleteOne(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
-    const existing = await strapi.documents("api::ong.ong").findOne({
-      documentId: ctx.params.documentId,
+    const targetDocumentId = ctx.params.documentId;
+    const decision = await authorizeOngDeletion(strapi, {
+      actorDocumentId: ctx.state.user.documentId,
+      roleType: ctx.state.user.role?.type,
+      targetDocumentId,
     });
-    if (!existing) {
-      return ctx.badRequest("Organizația nu există");
+    if (decision.outcome === "denied") {
+      return decision.status === "forbidden"
+        ? ctx.forbidden(decision.message)
+        : ctx.badRequest(decision.message);
     }
-    await strapi.documents("api::ong.ong").update({
-      documentId: ctx.params.documentId,
-      data: { ngoStatus: "deleted" },
-    });
-    return { data: { documentId: ctx.params.documentId } };
+    await performOngDeletion(strapi, targetDocumentId);
+    return { data: { documentId: targetDocumentId } };
   },
   async listActive(ctx: Context) {
     if (!ctx.state.user) {
@@ -612,7 +637,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? {
                 documentId: evaluation.user.documentId,
                 nume: evaluation.user.nume,
-                email: evaluation.user.email,
+                email: isAnonymized(evaluation.user) ? null : evaluation.user.email,
               }
             : null,
           progress: computeProgress(
