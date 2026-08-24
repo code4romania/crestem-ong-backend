@@ -936,12 +936,6 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
-    if (ctx.state.user.role?.type === "ngo-admin") {
-      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
-      if (!belongsToOng(user, ong.documentId)) {
-        return ctx.forbidden("Nu ai acces la această organizație");
-      }
-    }
 
     const parsed = createMeetingSchema.safeParse(ctx.request.body);
     if (!parsed.success) {
@@ -1041,12 +1035,6 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
-    }
-    if (ctx.state.user.role?.type === "ngo-admin") {
-      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
-      if (!belongsToOng(user, ong.documentId)) {
-        return ctx.forbidden("Nu ai acces la această organizație");
-      }
     }
 
     const meeting = await strapi.documents("api::meeting.meeting").findOne({
