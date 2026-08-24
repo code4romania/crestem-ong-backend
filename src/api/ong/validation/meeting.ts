@@ -19,3 +19,9 @@ export const createMeetingSchema = z.object({
   dimensiuni: z.array(z.string()).optional(),
   comentarii: z.string().trim().max(2000).optional().nullable(),
 });
+
+export const createMentorMeetingSchema = createMeetingSchema
+  .omit({ mentor: true })
+  .extend({
+    ong: z.string().trim().min(1, "Organizația este obligatorie"),
+  });
