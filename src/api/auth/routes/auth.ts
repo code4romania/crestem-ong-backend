@@ -32,6 +32,12 @@ export default {
     },
     {
       method: "POST",
+      path: "/auth/register/staff",
+      handler: "auth.registerStaff",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
+      method: "POST",
       path: "/auth/register/member",
       handler: "auth.registerMember",
       config: { policies: ["global::is-ngo-admin"] },
@@ -76,6 +82,33 @@ export default {
       method: "POST",
       path: "/auth/change-password",
       handler: "auth.changePassword",
+      config: { middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
+    {
+      method: "POST",
+      path: "/auth/change-email",
+      handler: "auth.requestEmailChange",
+      config: { middlewares: ["plugin::users-permissions.rateLimit"] },
+    },
+    {
+      method: "GET",
+      path: "/auth/change-email/preview",
+      handler: "auth.previewEmailChange",
+      config: { auth: false },
+    },
+    {
+      method: "POST",
+      path: "/auth/change-email/confirm",
+      handler: "auth.confirmEmailChange",
+      config: {
+        auth: false,
+        middlewares: ["plugin::users-permissions.rateLimit"],
+      },
+    },
+    {
+      method: "POST",
+      path: "/auth/delete-account",
+      handler: "auth.deleteAccount",
       config: { middlewares: ["plugin::users-permissions.rateLimit"] },
     },
   ],

@@ -9,16 +9,21 @@ import {
   IndividualCreatePayload,
   MentorCreatePayload,
   MemberCreatePayload,
+  StaffCreatePayload,
   ActivateAccountPayload,
   InviteCreateResult,
   InviteResendResult,
   ResetPasswordPayload,
   ChangePasswordPayload,
+  RequestEmailChangePayload,
+  ConfirmEmailChangePayload,
+  DeleteAccountPayload,
 } from "../interfaces/auth";
 import { docRef } from "../../../utils/relations";
 import { setNgoMemberRole } from "../../../utils/membership";
 import { EmailService } from "../../email/services/email";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
+import { performAccountDeletion } from "./delete-account";
 import {
   ACTIVATION_PURPOSE,
   ActivationTokenPayload,
@@ -26,12 +31,16 @@ import {
   signActivationToken,
   buildActivationLink,
   exposeActivationLink,
-  MENTOR_ACTIVATION_PATH,
-  MEMBER_ACTIVATION_PATH,
+  ACTIVATION_PATH,
+  STAFF_ROLE_LABELS,
   RESET_PURPOSE,
   AuthTokenPayload,
   signResetToken,
   buildResetLink,
+  EMAIL_CHANGE_PURPOSE,
+  EmailChangeTokenPayload,
+  signEmailChangeToken,
+  buildEmailChangeLink,
 } from "../utils/auth";
 
 export interface AuthService {
@@ -54,6 +63,7 @@ export interface AuthService {
     data: MemberCreatePayload,
     ong: { id: number; documentId: string; name: string },
   ): Promise<InviteCreateResult>;
+  createStaff(data: StaffCreatePayload): Promise<InviteCreateResult>;
   activateAccount(data: ActivateAccountPayload): Promise<boolean>;
   resendMentorInvite(userId: number): Promise<InviteResendResult>;
   resendMemberInvite(
@@ -67,6 +77,27 @@ export interface AuthService {
     data: ChangePasswordPayload,
     userAgent?: string,
   ): Promise<{ jwt: string; refreshToken: string }>;
+  /**
+   * Mint a one-time link that switches the account to `data.email`. The address
+   * is only applied once the link is confirmed, so a typo can never lock the
+   * account out. Returns the link itself only while invitation emails are
+   * unavailable (`DEV_EXPOSE_ACTIVATION_LINK`).
+   */
+  requestEmailChange(
+    userId: number,
+    data: RequestEmailChangePayload,
+  ): Promise<{ confirmationLink?: string }>;
+  /** Address a pending token would switch to, for the confirmation screen. */
+  previewEmailChange(token: string): Promise<{ email: string }>;
+  confirmEmailChange(
+    data: ConfirmEmailChangePayload,
+  ): Promise<{ email: string }>;
+  /**
+   * Anonymize the caller's own account (BR-24). Throws with a Romanian message
+   * when a precondition fails — wrong password, or a role that must be handed
+   * over first.
+   */
+  deleteAccount(userId: number, data: DeleteAccountPayload): Promise<void>;
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -182,6 +213,10 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             confirmed: true,
             blocked: false,
             role: role.id,
+            bio: data.bio,
+            avatar: data.avatar,
+            dimensiuni: data.dimensiuni,
+            ariiDeExpertiza: data.ariiDeExpertiza,
           });
 
         const activationToken = signActivationToken(created.id);
@@ -205,17 +240,14 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     try {
       await (
         strapi.service("api::email.email") as EmailService
-      ).sendMentorActivation({
+      ).sendAccountActivation({
         to: data.email,
         nume: data.nume,
-        link: buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+        roleLabel: "mentor",
+        link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
       console.error("createMentor email delivery failed", error);
-      console.warn(
-        "Mentor activation link (email delivery failed):",
-        buildActivationLink(token, MENTOR_ACTIVATION_PATH),
-      );
       emailSent = false;
     }
 
@@ -223,7 +255,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       id: user.id,
       emailSent,
       ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, MENTOR_ACTIVATION_PATH) }
+        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
         : {}),
     };
   },
@@ -300,13 +332,13 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         to: data.email,
         nume: data.nume,
         ongName: ong.name,
-        link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+        link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
       console.error("createMember email delivery failed", error);
       console.warn(
         "Member activation link (email delivery failed):",
-        buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+        buildActivationLink(token, ACTIVATION_PATH),
       );
       emailSent = false;
     }
@@ -315,7 +347,78 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       id: user.id,
       emailSent,
       ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, MEMBER_ACTIVATION_PATH) }
+        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
+        : {}),
+    };
+  },
+  async createStaff(data: StaffCreatePayload): Promise<InviteCreateResult> {
+    let user: { id: number };
+    let token: string;
+
+    try {
+      const result = await strapi.db.transaction(async () => {
+        const role = await strapi.db
+          .query("plugin::users-permissions.role")
+          .findOne({ where: { type: data.role } });
+
+        if (!role) {
+          throw new Error(
+            `Rolul "${data.role}" nu a fost găsit. Verifică inițializarea rolurilor în bootstrap.`,
+          );
+        }
+
+        const created = await strapi
+          .plugin("users-permissions")
+          .service("user")
+          .add({
+            nume: data.nume,
+            email: data.email,
+            telefon: data.telefon,
+            password: crypto.randomBytes(32).toString("hex"),
+            provider: "local",
+            accountStatus: "pending",
+            confirmed: true,
+            blocked: false,
+            role: role.id,
+          });
+
+        const activationToken = signActivationToken(created.id);
+
+        await strapi
+          .plugin("users-permissions")
+          .service("user")
+          .edit(created.id, { resetPasswordToken: activationToken });
+
+        return { created, activationToken };
+      });
+
+      user = result.created;
+      token = result.activationToken;
+    } catch (error) {
+      console.error("createStaff failed", error);
+      throw new Error("A apărut o eroare necunoscută");
+    }
+
+    let emailSent = true;
+    try {
+      await (
+        strapi.service("api::email.email") as EmailService
+      ).sendAccountActivation({
+        to: data.email,
+        nume: data.nume,
+        roleLabel: STAFF_ROLE_LABELS[data.role],
+        link: buildActivationLink(token, ACTIVATION_PATH),
+      });
+    } catch (error) {
+      console.error("createStaff email delivery failed", error);
+      emailSent = false;
+    }
+
+    return {
+      id: user.id,
+      emailSent,
+      ...(exposeActivationLink()
+        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
         : {}),
     };
   },
@@ -341,7 +444,9 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
 
     if (
       !user ||
-      !["mentor", "ngo-member"].includes(user.role?.type) ||
+      !["mentor", "ngo-member", "super-admin", "editor-fdsc"].includes(
+        user.role?.type,
+      ) ||
       user.accountStatus !== "pending" ||
       user.resetPasswordToken !== data.token
     ) {
@@ -391,16 +496,17 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     try {
       await (
         strapi.service("api::email.email") as EmailService
-      ).sendMentorActivation({
+      ).sendAccountActivation({
         to: user.email,
         nume: user.nume,
-        link: buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+        roleLabel: "mentor",
+        link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
       console.error("resendMentorInvite email delivery failed", error);
       console.warn(
         "Mentor activation link (email delivery failed):",
-        buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+        buildActivationLink(token, ACTIVATION_PATH),
       );
       emailSent = false;
     }
@@ -408,7 +514,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     return {
       emailSent,
       ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, MENTOR_ACTIVATION_PATH) }
+        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
         : {}),
     };
   },
@@ -449,13 +555,13 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ongName:
           (user.ong ?? []).find((entry: any) => entry.id === ongId)?.name ??
           "",
-        link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+        link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
       console.error("resendMemberInvite email delivery failed", error);
       console.warn(
         "Member activation link (email delivery failed):",
-        buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+        buildActivationLink(token, ACTIVATION_PATH),
       );
       emailSent = false;
     }
@@ -463,7 +569,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     return {
       emailSent,
       ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, MEMBER_ACTIVATION_PATH) }
+        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
         : {}),
     };
   },
@@ -490,10 +596,31 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
 
         await (
           strapi.service("api::email.email") as EmailService
-        ).sendMentorActivation({
+        ).sendAccountActivation({
           to: user.email,
           nume: user.nume,
-          link: buildActivationLink(token, MENTOR_ACTIVATION_PATH),
+          roleLabel: "mentor",
+          link: buildActivationLink(token, ACTIVATION_PATH),
+        });
+
+        return;
+      }
+
+      if (user.role?.type === "super-admin" || user.role?.type === "editor-fdsc") {
+        const token = signActivationToken(user.id);
+
+        await strapi
+          .plugin("users-permissions")
+          .service("user")
+          .edit(user.id, { resetPasswordToken: token });
+
+        await (
+          strapi.service("api::email.email") as EmailService
+        ).sendAccountActivation({
+          to: user.email,
+          nume: user.nume,
+          roleLabel: STAFF_ROLE_LABELS[user.role.type as "super-admin" | "editor-fdsc"],
+          link: buildActivationLink(token, ACTIVATION_PATH),
         });
 
         return;
@@ -516,7 +643,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           to: user.email,
           nume: user.nume,
           ongName: (user.ong ?? [])[0]?.name ?? "",
-          link: buildActivationLink(token, MEMBER_ACTIVATION_PATH),
+          link: buildActivationLink(token, ACTIVATION_PATH),
         });
 
         return;
@@ -636,4 +763,127 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       throw new Error("A apărut o eroare necunoscută");
     }
   },
+
+  async requestEmailChange(userId: number, data: RequestEmailChangePayload) {
+    const user = await strapi.db
+      .query("plugin::users-permissions.user")
+      .findOne({ where: { id: userId } });
+
+    if (!user || user.accountStatus !== "active") {
+      throw new Error("Contul nu a fost găsit");
+    }
+
+    const isCurrentPasswordValid = await strapi
+      .plugin("users-permissions")
+      .service("user")
+      .validatePassword(data.currentPassword, user.password);
+
+    if (!isCurrentPasswordValid) {
+      throw new Error("Parola actuală este incorectă");
+    }
+
+    if (user.email.toLowerCase() === data.email) {
+      throw new Error("Aceasta este deja adresa contului tău");
+    }
+
+    try {
+      const token = signEmailChangeToken(user.id, data.email);
+
+      // Storing the token makes it single-use and invalidates any earlier
+      // request, the same way `resetPasswordToken` guards password resets.
+      await strapi
+        .plugin("users-permissions")
+        .service("user")
+        .edit(user.id, { emailChangeToken: token });
+
+      return exposeActivationLink()
+        ? { confirmationLink: buildEmailChangeLink(token) }
+        : {};
+    } catch (error) {
+      console.error("requestEmailChange failed", error);
+      throw new Error("A apărut o eroare necunoscută");
+    }
+  },
+
+  async previewEmailChange(token: string) {
+    const { newEmail } = await verifyEmailChangeToken(strapi, token);
+    return { email: newEmail };
+  },
+
+  async confirmEmailChange(data: ConfirmEmailChangePayload) {
+    const { user, newEmail } = await verifyEmailChangeToken(strapi, data.token);
+
+    // Re-checked here, not just at request time: the address may have been
+    // claimed by another account while the link sat unopened.
+    const taken = await strapi.db
+      .query("plugin::users-permissions.user")
+      .findOne({ where: { email: { $eqi: newEmail } } });
+
+    if (taken && taken.id !== user.id) {
+      throw new Error("Există deja un cont cu această adresă de email");
+    }
+
+    try {
+      await strapi
+        .plugin("users-permissions")
+        .service("user")
+        .edit(user.id, {
+          email: newEmail,
+          emailChangeToken: null,
+          // Strapi matches the login identifier against email *or* username,
+          // so a username left holding the old address would keep working.
+          ...(user.username ? { username: newEmail } : {}),
+        });
+
+      await (
+        strapi.service(
+          "api::refresh-token.refresh-token",
+        ) as RefreshTokenService
+      ).revokeAllForUser(user.id);
+
+      return { email: newEmail };
+    } catch (error) {
+      console.error("confirmEmailChange failed", error);
+      throw new Error("A apărut o eroare necunoscută");
+    }
+  },
+
+  async deleteAccount(userId: number, data: DeleteAccountPayload) {
+    await performAccountDeletion(strapi, userId, data);
+  },
 });
+
+/**
+ * Shared guard for the two token-facing steps: valid signature, right purpose,
+ * still the token we handed out, and an account that may still use it.
+ */
+async function verifyEmailChangeToken(strapi: Core.Strapi, token: string) {
+  let payload: EmailChangeTokenPayload;
+
+  try {
+    payload = jwt.verify(
+      token,
+      getEmailLinkSecret(),
+    ) as EmailChangeTokenPayload;
+  } catch (error) {
+    throw new Error("Link de confirmare invalid sau expirat");
+  }
+
+  if (payload.purpose !== EMAIL_CHANGE_PURPOSE || !payload.newEmail) {
+    throw new Error("Link de confirmare invalid sau expirat");
+  }
+
+  const user = await strapi.db
+    .query("plugin::users-permissions.user")
+    .findOne({ where: { id: payload.id } });
+
+  if (
+    !user ||
+    user.accountStatus !== "active" ||
+    user.emailChangeToken !== token
+  ) {
+    throw new Error("Link de confirmare invalid sau expirat");
+  }
+
+  return { user, newEmail: payload.newEmail };
+}

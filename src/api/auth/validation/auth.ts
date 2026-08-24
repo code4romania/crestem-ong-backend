@@ -9,6 +9,9 @@
 import { z } from "zod";
 
 import { ngoRoleSchema } from "../../../utils/ngo-role";
+import { DIMENSIONS } from "../../../constants/dimensions";
+
+const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
 
 export const registerNgoSchema = z.object({
   // --- Account (users-permissions user) ---
@@ -142,9 +145,31 @@ const inviteSchema = z.object({
     .optional(),
 });
 
-export const registerMentorSchema = inviteSchema;
+export const registerMentorSchema = inviteSchema.extend({
+  bio: z
+    .string()
+    .trim()
+    .max(1000, "Bio-ul poate avea maxim 1000 de caractere")
+    .optional(),
+  avatar: z.number().int().positive().optional(),
+  dimensiuni: z
+    .array(z.string())
+    .refine(
+      (keys) => keys.every((key) => DIMENSION_KEYS.includes(key)),
+      "Dimensiune invalidă",
+    )
+    .optional(),
+  ariiDeExpertiza: z
+    .array(z.string().trim().min(1))
+    .max(20, "Poți adăuga maxim 20 de arii de expertiză")
+    .optional(),
+});
 /** Members belong to an organization, so they carry a role there. Mentors do not. */
 export const registerMemberSchema = inviteSchema.extend({ rol: ngoRoleSchema });
+/** FDSC staff accounts (super-admin / editor-fdsc) — nume + email only, no org. */
+export const registerStaffSchema = inviteSchema.extend({
+  role: z.enum(["super-admin", "editor-fdsc"], { message: "Rol invalid" }),
+});
 
 export const activateAccountSchema = z
   .object({
@@ -200,3 +225,27 @@ export const changePasswordSchema = z
     message: "Parolele nu coincid",
     path: ["confirmedPassword"],
   });
+
+export const requestEmailChangeSchema = z.object({
+  currentPassword: z
+    .string({ message: "Parola actuală este obligatorie" })
+    .min(1, "Parola actuală este obligatorie"),
+  email: z
+    .email("Adresă de email invalidă")
+    .lowercase()
+    .min(6, "Adresa de email este prea scurtă")
+    .refine(
+      async (email) =>
+        !(await strapi.db
+          .query("plugin::users-permissions.user")
+          .findOne({ where: { email: { $eqi: email } } })),
+      "Există deja un cont cu această adresă de email",
+    ),
+});
+
+export const confirmEmailChangeSchema = z.object({
+  token: z
+    .string({ message: "Tokenul este obligatoriu" })
+    .trim()
+    .min(1, "Tokenul este obligatoriu"),
+});

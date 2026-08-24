@@ -29,6 +29,14 @@ export default (plugin: any) => {
         );
       }
 
+      try {
+        await strapi.db
+          .query("plugin::users-permissions.user")
+          .update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+      } catch (error) {
+        strapi.log.error("Failed to record lastLoginAt", error);
+      }
+
       const refreshToken = await (
         strapi.service(
           "api::refresh-token.refresh-token",

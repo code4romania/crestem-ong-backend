@@ -5,6 +5,8 @@
   "description": "A Strapi application",
   "scripts": {
     "build": "strapi build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "console": "strapi console",
     "deploy": "strapi deploy",
     "dev": "strapi develop",
@@ -32,7 +34,8 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": ">=20.0.0 <=26.x.x",

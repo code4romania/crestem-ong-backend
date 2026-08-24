@@ -47,6 +47,11 @@
       "configurable": false,
       "private": true
     },
+    "emailChangeToken": {
+      "type": "string",
+      "configurable": false,
+      "private": true
+    },
     "confirmationToken": {
       "type": "string",
       "configurable": false,
@@ -86,11 +91,23 @@
       "default": "active",
       "required": true
     },
+    "lastLoginAt": {
+      "type": "datetime"
+    },
     "mentorJobTitle": {
       "type": "string"
     },
     "mentorOrganization": {
       "type": "string"
+    },
+    "bio": {
+      "type": "text"
+    },
+    "dimensiuni": {
+      "type": "json"
+    },
+    "ariiDeExpertiza": {
+      "type": "json"
     },
     "avatar": {
       "type": "media",

@@ -551,6 +551,39 @@ export interface ApiEvaluationEvaluation extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
+  collectionName: 'fdsc_reports';
+  info: {
+    description: '';
+    displayName: 'FDSC Report';
+    pluralName: 'fdsc-reports';
+    singularName: 'fdsc-report';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    file: Schema.Attribute.Media<'files'> & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::fdsc-report.fdsc-report'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    uploadedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+  };
+}
+
 export interface ApiJudetJudet extends Struct.CollectionTypeSchema {
   collectionName: 'judets';
   info: {
@@ -606,6 +639,57 @@ export interface ApiLocalitateLocalitate extends Struct.CollectionTypeSchema {
     nume: Schema.Attribute.String;
     ongs: Schema.Attribute.Relation<'oneToMany', 'api::ong.ong'>;
     publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
+  collectionName: 'meetings';
+  info: {
+    description: '';
+    displayName: 'Meeting';
+    pluralName: 'meetings';
+    singularName: 'meeting';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    activityType: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::activity-type.activity-type'
+    >;
+    comentarii: Schema.Attribute.Text;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dataOra: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    dimensiuni: Schema.Attribute.JSON;
+    format: Schema.Attribute.Enumeration<['online', 'fata_in_fata']> &
+      Schema.Attribute.Required;
+    linkIntalnire: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::meeting.meeting'
+    > &
+      Schema.Attribute.Private;
+    mentor: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    report: Schema.Attribute.Media<'files'>;
+    status: Schema.Attribute.Enumeration<
+      ['programata', 'efectuata', 'anulata']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'programata'>;
+    subiect: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -788,6 +872,10 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
       'manyToOne',
       'api::domain.domain'
     >;
+    fdscReports: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::fdsc-report.fdsc-report'
+    >;
     judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localitate: Schema.Attribute.Relation<
@@ -797,6 +885,7 @@ export interface ApiOngOng extends Struct.CollectionTypeSchema {
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::ong.ong'> &
       Schema.Attribute.Private;
     logo: Schema.Attribute.Media<'images'>;
+    meetings: Schema.Attribute.Relation<'oneToMany', 'api::meeting.meeting'>;
     name: Schema.Attribute.String;
     ngoStatus: Schema.Attribute.Enumeration<['active', 'blocked', 'deleted']> &
       Schema.Attribute.Required &
@@ -1440,19 +1529,24 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.DefaultTo<'active'>;
     acordTermeniSiConditii: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    ariiDeExpertiza: Schema.Attribute.JSON;
     avatar: Schema.Attribute.Media<'images'>;
+    bio: Schema.Attribute.Text;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    dimensiuni: Schema.Attribute.JSON;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
       Schema.Attribute.Unique &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    emailChangeToken: Schema.Attribute.String & Schema.Attribute.Private;
+    lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1506,8 +1600,10 @@ declare module '@strapi/strapi' {
       'api::conversation.conversation': ApiConversationConversation;
       'api::domain.domain': ApiDomainDomain;
       'api::evaluation.evaluation': ApiEvaluationEvaluation;
+      'api::fdsc-report.fdsc-report': ApiFdscReportFdscReport;
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
+      'api::meeting.meeting': ApiMeetingMeeting;
       'api::message.message': ApiMessageMessage;
       'api::ngo-member-role.ngo-member-role': ApiNgoMemberRoleNgoMemberRole;
       'api::ngo-mentor.ngo-mentor': ApiNgoMentorNgoMentor;

@@ -1,6 +1,12 @@
 export default {
   routes: [
     {
+      method: "GET",
+      path: "/programs/:documentId/ong-mentors",
+      handler: "program.ongMentors",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
       method: "POST",
       path: "/programs/assign-ong-mentors",
       handler: "program.assignOngMentors",

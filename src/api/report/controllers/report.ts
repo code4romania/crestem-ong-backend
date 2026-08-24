@@ -1,6 +1,7 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
+import { buildProgramRounds, reportView } from "../utils/rounds";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { hasResponses, isClosed, isProgramReport } from "../utils/lifecycle";
 import { startEvaluationSchema } from "../validation/start-evaluation";
@@ -25,21 +26,6 @@ import {
 } from "../../../utils/date";
 import { docRef } from "../../../utils/relations";
 import { requireOng } from "../../../utils/ong-scope";
-
-const reportView = (report: any, today: string) => {
-  const evaluations = (report.evaluations ?? []) as any[];
-  const closed = isClosed(report, today);
-  return {
-    documentId: report.documentId,
-    name: report.name,
-    finished: closed,
-    invitedCount: evaluations.length,
-    completedCount: evaluations.filter(
-      (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
-    ).length,
-    score: computeReportScores(evaluations).overall,
-  };
-};
 
 const todayIso = () => todayInBucharest();
 
@@ -66,57 +52,7 @@ export default factories.createCoreController(
       }
       const ong = scope.ong;
       const today = todayIso();
-      const programs = await strapi.documents("api::program.program").findMany({
-        filters: {
-          ongs: { documentId: ong.documentId },
-        },
-        sort: { startDate: "desc" },
-        populate: { phases: true, ongs: true },
-      });
-      const programRounds = [];
-      for (const program of programs) {
-        const reports = await strapi.documents("api::report.report").findMany({
-          filters: {
-            ong: { documentId: ong.documentId },
-            phases: { program: { documentId: program.documentId } },
-          },
-          populate: {
-            evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
-            phases: true,
-          },
-        });
-        const programEntry: any = {
-          program: {
-            documentId: program.documentId,
-            name: program.name,
-            startDate: program.startDate,
-            endDate: program.endDate,
-            programStatus: program.programStatus,
-            ongsCount: ((program.ongs ?? []) as any[]).length,
-          },
-        };
-        const phases = [...((program.phases ?? []) as any[])].sort((a, b) =>
-          `${a.startDate}`.localeCompare(`${b.startDate}`),
-        );
-        const reportByPhase = new Map<string, any>();
-        for (const report of reports as any[]) {
-          for (const phase of (report.phases ?? []) as any[]) {
-            reportByPhase.set(phase.documentId, report);
-          }
-        }
-        programEntry.phases = phases.map((phase) => ({
-          documentId: phase.documentId,
-          title: phase.title,
-          startDate: phase.startDate,
-          endDate: phase.endDate,
-          hasEvaluation: phase.hasEvaluation,
-          active: `${phase.startDate}` <= today && `${phase.endDate}` >= today,
-          report: reportByPhase.has(phase.documentId)
-            ? reportView(reportByPhase.get(phase.documentId), today)
-            : null,
-        }));
-        programRounds.push(programEntry);
-      }
+      const programRounds = await buildProgramRounds(strapi, ong.documentId, today);
       const unfinished = await strapi.documents("api::report.report").findMany({
         filters: { ong: { documentId: ong.documentId }, finished: false },
         sort: { createdAt: "desc" },
@@ -343,7 +279,11 @@ export default factories.createCoreController(
         sort: { createdAt: "desc" },
         populate: {
           phases: { populate: { program: true } },
-          evaluations: { populate: { dimensions: true } },
+          // `quiz` is there only for `computeReportScores`; the counts below
+          // read `dimensions` alone. The Comparație tab compares the reports in
+          // this list, so the scores travel with it instead of costing one
+          // `detail` call per report.
+          evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
         },
       });
       const today = todayIso();
@@ -364,6 +304,7 @@ export default factories.createCoreController(
               (evaluation) =>
                 computeProgress(evaluation.dimensions, closed).complete,
             ).length,
+            scores: computeReportScores(evaluations),
           };
         }),
       };

@@ -1,9 +1,10 @@
 import type { Core } from "@strapi/strapi";
 import { toDateString } from "../../../utils/date";
 
-export interface SendMentorActivationArgs {
+export interface SendAccountActivationArgs {
   to: string;
   nume: string;
+  roleLabel: string;
   link: string;
 }
 
@@ -36,7 +37,7 @@ export interface SendEvaluationInviteArgs {
 }
 
 export interface EmailService {
-  sendMentorActivation(args: SendMentorActivationArgs): Promise<void>;
+  sendAccountActivation(args: SendAccountActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
@@ -44,17 +45,17 @@ export interface EmailService {
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
-  async sendMentorActivation({ to, nume, link }: SendMentorActivationArgs) {
+  async sendAccountActivation({ to, nume, roleLabel, link }: SendAccountActivationArgs) {
     await strapi
       .plugin("email")
       .service("email")
       .send({
         to,
-        subject: "Activează-ți contul de mentor",
+        subject: `Activează-ți contul de ${roleLabel}`,
         text: [
           `Bună, ${nume},`,
           "",
-          "Un administrator ți-a creat un cont de mentor pe platforma Creștem ONG.",
+          `Un administrator ți-a creat un cont de ${roleLabel} pe platforma Creștem ONG.`,
           "Pentru a-l activa, accesează linkul de mai jos și setează-ți parola:",
           "",
           link,

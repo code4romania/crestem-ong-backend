@@ -9,6 +9,8 @@ import { computeReportScores } from "../../report/utils/scores";
 import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
+import { pendingActivationTokens } from "../../../utils/activation";
+import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
   loadUserWithOngs,
@@ -22,19 +24,36 @@ import {
 import {
   buildActivationLink,
   exposeActivationLink,
-  MEMBER_ACTIVATION_PATH,
+  ACTIVATION_PATH,
 } from "../../auth/utils/auth";
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
+import { createFdscReportSchema } from "../validation/fdsc-report";
+import {
+  createMeetingSchema,
+  createMentorMeetingSchema,
+} from "../validation/meeting";
 import { decorateBlock } from "../../evaluation/utils/catalog";
+import { docRef } from "../../../utils/relations";
+import { DIMENSIONS } from "../../../constants/dimensions";
+
+const VALID_DIMENSION_KEYS = new Set(
+  DIMENSIONS.map((dimension) => dimension.key),
+);
+import { performOngDeletion } from "../services/delete-ong";
+import { authorizeOngDeletion } from "../utils/delete-access";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
+    // Anonymized organizations stay listed (BR-33): FDSC must still see that
+    // their evaluations were completed, and this list is the only navigation to
+    // them. `ngoStatus` rides along so the frontend can badge them "Retras".
+    // `listActive` below keeps its own `ngoStatus: "active"` filter — a deleted
+    // organization must never reach an "available to assign" picker.
     const ongs = await strapi.documents("api::ong.ong").findMany({
-      filters: { ngoStatus: { $ne: "deleted" } },
       sort: { name: "asc" },
       populate: {
         judet: true,
@@ -54,10 +73,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           documentId: ong.documentId,
           name: ong.name,
           cui: ong.cui,
+          ngoStatus: ong.ngoStatus,
           website: ong.website,
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
           domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+          descriere: ong.descriere ?? null,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -88,10 +109,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         localitate: true,
         programs: true,
         domeniuPrincipal: true,
+        domeniuSecundar: true,
       },
     });
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
+    }
+    if (ctx.state.user.role?.type === "ngo-admin") {
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!belongsToOng(user, ong.documentId)) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
     }
     const members = await strapi
       .documents("plugin::users-permissions.user")
@@ -108,6 +136,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const memberCount = (members as any[]).filter(
       (member) => member.role?.type === "ngo-member",
     ).length;
+    let lastLogin: string | null = null;
+    if (admin) {
+      const latestToken = await strapi.db
+        .query("api::refresh-token.refresh-token")
+        .findOne({
+          where: { user: admin.id },
+          orderBy: { createdAt: "desc" },
+          select: ["createdAt"],
+        });
+      lastLogin = latestToken?.createdAt ?? null;
+    }
     return {
       data: {
         documentId: ong.documentId,
@@ -117,8 +156,19 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         adresa: ong.adresa,
         dataInfiintare: ong.dataInfiintare,
         domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
+        domeniuSecundar: ong.domeniuSecundar?.name ?? null,
+        socialMedia: ong.socialMedia ?? null,
+        descriere: ong.descriere ?? null,
         memberCount,
-        admin: admin ? { nume: admin.nume } : null,
+        admin: admin
+          ? {
+              nume: admin.nume,
+              email: admin.email,
+              telefon: admin.telefon ?? null,
+              createdAt: admin.createdAt,
+              lastLogin,
+            }
+          : null,
         programs: ((ong.programs ?? []) as any[]).map((program) => ({
           documentId: program.documentId,
           name: program.name,
@@ -135,21 +185,38 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     };
   },
+  /**
+   * `Șterge ONG` for a super-admin (any organization) and for an ngo-admin
+   * (only one they belong to).
+   *
+   * The route policy establishes the caller's *role*; it says nothing about
+   * *which* organization is theirs. Ownership is therefore decided here, by
+   * `authorizeOngDeletion`, against memberships loaded from the database. The
+   * only identifier that reaches it is `ctx.params.documentId` — the request
+   * body, query string and headers are never consulted, and the role comes from
+   * `ctx.state.user`, set by the authentication layer.
+   *
+   * An ngo-admin who does not own the target gets exactly the response they
+   * would get for an organization that does not exist, so the endpoint cannot
+   * be used to enumerate organization ids.
+   */
   async deleteOne(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
-    const existing = await strapi.documents("api::ong.ong").findOne({
-      documentId: ctx.params.documentId,
+    const targetDocumentId = ctx.params.documentId;
+    const decision = await authorizeOngDeletion(strapi, {
+      actorDocumentId: ctx.state.user.documentId,
+      roleType: ctx.state.user.role?.type,
+      targetDocumentId,
     });
-    if (!existing) {
-      return ctx.badRequest("Organizația nu există");
+    if (decision.outcome === "denied") {
+      return decision.status === "forbidden"
+        ? ctx.forbidden(decision.message)
+        : ctx.badRequest(decision.message);
     }
-    await strapi.documents("api::ong.ong").update({
-      documentId: ctx.params.documentId,
-      data: { ngoStatus: "deleted" },
-    });
-    return { data: { documentId: ctx.params.documentId } };
+    await performOngDeletion(strapi, targetDocumentId);
+    return { data: { documentId: targetDocumentId } };
   },
   async listActive(ctx: Context) {
     if (!ctx.state.user) {
@@ -209,7 +276,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? {
                 activationLink: buildActivationLink(
                   activationToken,
-                  MEMBER_ACTIVATION_PATH,
+                  ACTIVATION_PATH,
                 ),
               }
             : {}),
@@ -250,7 +317,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
     const memberOngIds = new Set(
-      ((user?.ong ?? []) as any[]).map((ong) => ong?.documentId).filter(Boolean),
+      ((user?.ong ?? []) as any[])
+        .map((ong) => ong?.documentId)
+        .filter(Boolean),
     );
     const pendingRequests = await strapi
       .documents("api::ong-join-request.ong-join-request")
@@ -499,6 +568,72 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const user = scope.user as any;
     return { data: serializeMyOng(updated, user) };
   },
+  async overview(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi.documents("api::report.report").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      sort: { createdAt: "desc" },
+      populate: {
+        phases: { populate: { program: true } },
+        evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+      },
+    });
+    const today = todayInBucharest();
+    const current = (reports as any[]).find(
+      (report) => !isClosed(report, today),
+    );
+    const currentPhases = (current?.phases ?? []) as any[];
+    const currentProgram =
+      currentPhases.find((phase) => phase.program)?.program ?? null;
+    const closedDate = (report: any) =>
+      report.finishedAt ??
+      ((report.phases ?? []) as any[])
+        .map((phase) => phase.endDate)
+        .filter(Boolean)
+        .sort()
+        .pop() ??
+      null;
+    const lastFinalizedDate =
+      (reports as any[])
+        .filter((report) => isClosed(report, today))
+        .map(closedDate)
+        .filter(Boolean)
+        .sort()
+        .pop() ?? null;
+    return {
+      data: {
+        totalEvaluations: reports.length,
+        currentEvaluation: current
+          ? {
+              documentId: current.documentId,
+              invitedCount: (current.evaluations ?? []).length,
+              completedCount: (current.evaluations ?? []).filter(
+                (evaluation: any) =>
+                  computeProgress(
+                    evaluation.dimensions,
+                    isClosed(current, today),
+                  ).complete,
+              ).length,
+              program: currentProgram
+                ? {
+                    documentId: currentProgram.documentId,
+                    name: currentProgram.name,
+                  }
+                : null,
+            }
+          : null,
+        lastFinalizedDate,
+      },
+    };
+  },
   async evaluations(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
@@ -562,6 +697,173 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       })),
     };
   },
+  async fdscReports(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const reports = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .findMany({
+        filters: { ong: { documentId: ong.documentId } },
+        sort: { uploadedAt: "desc" },
+        populate: { program: true, file: true },
+      });
+    return {
+      data: (reports as any[]).map((report) => ({
+        documentId: report.documentId,
+        name: report.name,
+        uploadedAt: report.uploadedAt,
+        program: report.program
+          ? { documentId: report.program.documentId, name: report.program.name }
+          : null,
+        file: report.file
+          ? {
+              url: report.file.url,
+              name: report.file.name,
+              ext: report.file.ext,
+            }
+          : null,
+      })),
+    };
+  },
+  async createFdscReport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const parsed = createFdscReportSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const program = await strapi.documents("api::program.program").findOne({
+      documentId: parsed.data.program,
+      populate: { ongs: true },
+    });
+    if (!program) {
+      return ctx.badRequest("Programul nu există");
+    }
+    const participates = ((program.ongs ?? []) as any[]).some(
+      (entry) => entry.documentId === ong.documentId,
+    );
+    if (!participates) {
+      return ctx.badRequest("Organizația nu participă la acest program");
+    }
+    const uploaded = await uploadSingleFile(ctx);
+    if ("error" in uploaded) {
+      return ctx.badRequest(uploaded.error);
+    }
+    const created = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .create({
+        data: {
+          name: parsed.data.name,
+          ong: docRef(ong.documentId),
+          program: docRef(program.documentId),
+          file: { id: uploaded.id },
+          uploadedAt: new Date().toISOString(),
+        },
+        populate: { program: true, file: true },
+      });
+    return {
+      data: {
+        documentId: created.documentId,
+        name: created.name,
+        uploadedAt: created.uploadedAt,
+        program: created.program
+          ? {
+              documentId: created.program.documentId,
+              name: created.program.name,
+            }
+          : null,
+        file: created.file
+          ? {
+              url: created.file.url,
+              name: created.file.name,
+              ext: created.file.ext,
+            }
+          : null,
+      },
+    };
+  },
+  async mentors(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    if (ctx.state.user.role?.type === "ngo-admin") {
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!belongsToOng(user, ong.documentId)) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
+
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: { ong: { documentId: ong.documentId } },
+      populate: { program: true, mentors: { populate: { avatar: true } } },
+    });
+    const mentorsById = new Map<string, any>();
+    for (const row of rows as any[]) {
+      const rowPrograms = Array.isArray(row.program)
+        ? row.program
+        : row.program
+          ? [row.program]
+          : [];
+      for (const mentor of (row.mentors ?? []) as any[]) {
+        const existing = mentorsById.get(mentor.documentId);
+        if (existing) {
+          for (const program of rowPrograms) {
+            if (
+              !existing.programs.some(
+                (p: any) => p.documentId === program.documentId,
+              )
+            ) {
+              existing.programs.push({
+                documentId: program.documentId,
+                name: program.name,
+              });
+            }
+          }
+          continue;
+        }
+        mentorsById.set(mentor.documentId, {
+          documentId: mentor.documentId,
+          nume: mentor.nume,
+          email: mentor.email,
+          mentorJobTitle: mentor.mentorJobTitle ?? null,
+          mentorOrganization: mentor.mentorOrganization ?? null,
+          ariiDeExpertiza: mentor.ariiDeExpertiza ?? [],
+          avatar: mentor.avatar
+            ? {
+                documentId: mentor.avatar.documentId,
+                name: mentor.avatar.name,
+                url: mentor.avatar.url,
+              }
+            : null,
+          programs: rowPrograms.map((program: any) => ({
+            documentId: program.documentId,
+            name: program.name,
+          })),
+        });
+      }
+    }
+    return { data: [...mentorsById.values()] };
+  },
   async evaluationDetail(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
@@ -612,7 +914,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? {
                 documentId: evaluation.user.documentId,
                 nume: evaluation.user.nume,
-                email: evaluation.user.email,
+                email: isAnonymized(evaluation.user)
+                  ? null
+                  : evaluation.user.email,
               }
             : null,
           progress: computeProgress(
@@ -624,26 +928,770 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     };
   },
+  async meetings(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    if (ctx.state.user.role?.type === "ngo-admin") {
+      const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
+      if (!belongsToOng(user, ong.documentId)) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
+
+    const { mentor, program, status, format } = ctx.query;
+    const mentorId = typeof mentor === "string" ? mentor.trim() : "";
+    const programId = typeof program === "string" ? program.trim() : "";
+    const statusFilter = typeof status === "string" ? status.trim() : "";
+    const formatFilter = typeof format === "string" ? format.trim() : "";
+
+    const meetings = await strapi.documents("api::meeting.meeting").findMany({
+      filters: {
+        ong: { documentId: ong.documentId },
+        ...(mentorId ? { mentor: { documentId: mentorId } } : {}),
+        ...(programId ? { program: { documentId: programId } } : {}),
+        ...(statusFilter ? { status: statusFilter as any } : {}),
+        ...(formatFilter ? { format: formatFilter as any } : {}),
+      },
+      sort: { dataOra: "desc" },
+      populate: {
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+
+    return {
+      data: (meetings as any[]).map((meeting) => ({
+        documentId: meeting.documentId,
+        dataOra: meeting.dataOra,
+        format: meeting.format,
+        status: meeting.status,
+        subiect: meeting.subiect,
+        linkIntalnire: meeting.linkIntalnire ?? null,
+        mentor: meeting.mentor
+          ? { documentId: meeting.mentor.documentId, nume: meeting.mentor.nume }
+          : null,
+        program: meeting.program
+          ? {
+              documentId: meeting.program.documentId,
+              name: meeting.program.name,
+            }
+          : null,
+        activityType: meeting.activityType
+          ? {
+              documentId: meeting.activityType.documentId,
+              name: meeting.activityType.name,
+            }
+          : null,
+        dimensiuni: Array.isArray(meeting.dimensiuni)
+          ? meeting.dimensiuni.filter(
+              (key: unknown): key is string =>
+                typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+            )
+          : [],
+        comentarii: meeting.comentarii ?? null,
+        report: meeting.report
+          ? {
+              url: meeting.report.url,
+              name: meeting.report.name,
+              ext: meeting.report.ext,
+            }
+          : null,
+      })),
+    };
+  },
+  async createMeeting(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+
+    const parsed = createMeetingSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const data = parsed.data;
+
+    const mentorRows = await strapi
+      .documents("api::ngo-mentor.ngo-mentor")
+      .findMany({
+        filters: {
+          ong: { documentId: ong.documentId },
+          mentors: { documentId: data.mentor },
+        },
+      });
+    if (mentorRows.length === 0) {
+      return ctx.badRequest(
+        "Persoana resursă selectată nu aparține acestei organizații",
+      );
+    }
+
+    if (data.program) {
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: data.program,
+        populate: { ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === ong.documentId,
+      );
+      if (!participates) {
+        return ctx.badRequest("Organizația nu participă la acest program");
+      }
+    }
+
+    if (data.activityType) {
+      const activityType = await strapi
+        .documents("api::activity-type.activity-type")
+        .findOne({ documentId: data.activityType });
+      if (!activityType) {
+        return ctx.badRequest("Tipul activității nu există");
+      }
+    }
+
+    const dimensiuni = Array.isArray(data.dimensiuni)
+      ? data.dimensiuni.filter((key) => VALID_DIMENSION_KEYS.has(key))
+      : [];
+
+    const created = await strapi.documents("api::meeting.meeting").create({
+      data: {
+        subiect: data.subiect,
+        dataOra: data.dataOra,
+        format: data.format,
+        status: "programata",
+        linkIntalnire: data.linkIntalnire || null,
+        comentarii: data.comentarii || null,
+        dimensiuni,
+        ong: docRef(ong.documentId),
+        mentor: docRef(data.mentor),
+        ...(data.program ? { program: docRef(data.program) } : {}),
+        ...(data.activityType
+          ? { activityType: docRef(data.activityType) }
+          : {}),
+      },
+      populate: { mentor: true, program: true, activityType: true },
+    });
+
+    return {
+      data: {
+        documentId: created.documentId,
+        dataOra: created.dataOra,
+        format: created.format,
+        status: created.status,
+        subiect: created.subiect,
+        linkIntalnire: created.linkIntalnire ?? null,
+        comentarii: created.comentarii ?? null,
+        mentor: created.mentor
+          ? { documentId: created.mentor.documentId, nume: created.mentor.nume }
+          : null,
+        program: created.program
+          ? {
+              documentId: created.program.documentId,
+              name: created.program.name,
+            }
+          : null,
+        activityType: created.activityType
+          ? {
+              documentId: created.activityType.documentId,
+              name: created.activityType.name,
+            }
+          : null,
+        dimensiuni: Array.isArray(created.dimensiuni)
+          ? created.dimensiuni.filter(
+              (key: unknown): key is string =>
+                typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+            )
+          : [],
+        report: null,
+      },
+    };
+  },
+  async updateMeeting(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+
+    const meeting = await strapi.documents("api::meeting.meeting").findOne({
+      documentId: ctx.params.meetingDocumentId,
+      populate: { ong: true },
+    });
+    if (!meeting || meeting.ong?.documentId !== ong.documentId) {
+      return ctx.badRequest("Întâlnirea nu există");
+    }
+    if (meeting.status !== "programata") {
+      return ctx.badRequest("Doar întâlnirile programate pot fi editate");
+    }
+
+    const parsed = createMeetingSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const data = parsed.data;
+
+    const mentorRows = await strapi
+      .documents("api::ngo-mentor.ngo-mentor")
+      .findMany({
+        filters: {
+          ong: { documentId: ong.documentId },
+          mentors: { documentId: data.mentor },
+        },
+      });
+    if (mentorRows.length === 0) {
+      return ctx.badRequest(
+        "Persoana resursă selectată nu aparține acestei organizații",
+      );
+    }
+
+    if (data.program) {
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: data.program,
+        populate: { ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === ong.documentId,
+      );
+      if (!participates) {
+        return ctx.badRequest("Organizația nu participă la acest program");
+      }
+    }
+
+    if (data.activityType) {
+      const activityType = await strapi
+        .documents("api::activity-type.activity-type")
+        .findOne({ documentId: data.activityType });
+      if (!activityType) {
+        return ctx.badRequest("Tipul activității nu există");
+      }
+    }
+
+    const dimensiuni = Array.isArray(data.dimensiuni)
+      ? data.dimensiuni.filter((key) => VALID_DIMENSION_KEYS.has(key))
+      : [];
+
+    if (!(await claimMeetingStatus(meeting.documentId, "programata"))) {
+      return ctx.badRequest(
+        "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
+      );
+    }
+
+    const updated = await strapi.documents("api::meeting.meeting").update({
+      documentId: meeting.documentId,
+      data: {
+        subiect: data.subiect,
+        dataOra: data.dataOra,
+        format: data.format,
+        linkIntalnire: data.linkIntalnire || null,
+        comentarii: data.comentarii || null,
+        dimensiuni,
+        mentor: docRef(data.mentor),
+        program: data.program ? docRef(data.program) : null,
+        activityType: data.activityType ? docRef(data.activityType) : null,
+      },
+      populate: { mentor: true, program: true, activityType: true },
+    });
+
+    return {
+      data: {
+        documentId: updated.documentId,
+        dataOra: updated.dataOra,
+        format: updated.format,
+        status: updated.status,
+        subiect: updated.subiect,
+        linkIntalnire: updated.linkIntalnire ?? null,
+        comentarii: updated.comentarii ?? null,
+        mentor: updated.mentor
+          ? { documentId: updated.mentor.documentId, nume: updated.mentor.nume }
+          : null,
+        program: updated.program
+          ? {
+              documentId: updated.program.documentId,
+              name: updated.program.name,
+            }
+          : null,
+        activityType: updated.activityType
+          ? {
+              documentId: updated.activityType.documentId,
+              name: updated.activityType.name,
+            }
+          : null,
+        dimensiuni: Array.isArray(updated.dimensiuni)
+          ? updated.dimensiuni.filter(
+              (key: unknown): key is string =>
+                typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+            )
+          : [],
+        report: null,
+      },
+    };
+  },
+
+  async ongsForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: { mentors: { documentId: ctx.state.user.documentId } },
+      populate: { ong: true, program: true },
+    });
+    const ongsById = new Map<
+      string,
+      {
+        documentId: string;
+        name: string;
+        programs: { documentId: string; name: string }[];
+      }
+    >();
+    for (const row of rows as any[]) {
+      const rowOngs = Array.isArray(row.ong)
+        ? row.ong
+        : row.ong
+          ? [row.ong]
+          : [];
+      const rowPrograms = Array.isArray(row.program)
+        ? row.program
+        : row.program
+          ? [row.program]
+          : [];
+      for (const ong of rowOngs) {
+        const existing = ongsById.get(ong.documentId) ?? {
+          documentId: ong.documentId,
+          name: ong.name,
+          programs: [] as { documentId: string; name: string }[],
+        };
+        for (const program of rowPrograms) {
+          if (
+            !existing.programs.some((p) => p.documentId === program.documentId)
+          ) {
+            existing.programs.push({
+              documentId: program.documentId,
+              name: program.name,
+            });
+          }
+        }
+        ongsById.set(ong.documentId, existing);
+      }
+    }
+    return {
+      data: Array.from(ongsById.values()).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    };
+  },
+
+  async meetingsForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const { ong, program, status, format } = ctx.query;
+    const ongId = typeof ong === "string" ? ong.trim() : "";
+    const programId = typeof program === "string" ? program.trim() : "";
+    const statusFilter = typeof status === "string" ? status.trim() : "";
+    const formatFilter = typeof format === "string" ? format.trim() : "";
+
+    const meetings = await strapi.documents("api::meeting.meeting").findMany({
+      filters: {
+        mentor: { documentId: ctx.state.user.documentId },
+        ...(ongId ? { ong: { documentId: ongId } } : {}),
+        ...(programId ? { program: { documentId: programId } } : {}),
+        ...(statusFilter ? { status: statusFilter as any } : {}),
+        ...(formatFilter ? { format: formatFilter as any } : {}),
+      },
+      sort: { dataOra: "desc" },
+      populate: {
+        ong: true,
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+
+    return { data: (meetings as any[]).map(mentorMeetingView) };
+  },
+
+  async createMeetingForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const parsed = createMentorMeetingSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const data = parsed.data;
+
+    const ong = await strapi
+      .documents("api::ong.ong")
+      .findOne({ documentId: data.ong });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const assignmentRows = await strapi
+      .documents("api::ngo-mentor.ngo-mentor")
+      .findMany({
+        filters: {
+          ong: { documentId: ong.documentId },
+          mentors: { documentId: ctx.state.user.documentId },
+        },
+      });
+    if (assignmentRows.length === 0) {
+      return ctx.badRequest("Nu ești alocat acestei organizații");
+    }
+
+    if (data.program) {
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: data.program,
+        populate: { ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === ong.documentId,
+      );
+      if (!participates) {
+        return ctx.badRequest("Organizația nu participă la acest program");
+      }
+    }
+
+    if (data.activityType) {
+      const activityType = await strapi
+        .documents("api::activity-type.activity-type")
+        .findOne({ documentId: data.activityType });
+      if (!activityType) {
+        return ctx.badRequest("Tipul activității nu există");
+      }
+    }
+
+    const dimensiuni = Array.isArray(data.dimensiuni)
+      ? data.dimensiuni.filter((key) => VALID_DIMENSION_KEYS.has(key))
+      : [];
+
+    const created = await strapi.documents("api::meeting.meeting").create({
+      data: {
+        subiect: data.subiect,
+        dataOra: data.dataOra,
+        format: data.format,
+        status: "programata",
+        linkIntalnire: data.linkIntalnire || null,
+        comentarii: data.comentarii || null,
+        dimensiuni,
+        ong: docRef(ong.documentId),
+        mentor: docRef(ctx.state.user.documentId),
+        ...(data.program ? { program: docRef(data.program) } : {}),
+        ...(data.activityType
+          ? { activityType: docRef(data.activityType) }
+          : {}),
+      },
+      populate: { ong: true, mentor: true, program: true, activityType: true },
+    });
+
+    return { data: mentorMeetingView({ ...created, report: null }) };
+  },
+
+  async updateMeetingForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const meeting = await strapi.documents("api::meeting.meeting").findOne({
+      documentId: ctx.params.meetingDocumentId,
+      populate: { mentor: true, ong: true },
+    });
+    if (!meeting || meeting.mentor?.documentId !== ctx.state.user.documentId) {
+      return ctx.badRequest("Întâlnirea nu există");
+    }
+    if (meeting.status !== "programata") {
+      return ctx.badRequest("Doar întâlnirile programate pot fi editate");
+    }
+
+    const parsed = createMentorMeetingSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+    const data = parsed.data;
+
+    if (data.ong !== meeting.ong?.documentId) {
+      return ctx.badRequest("Organizația unei întâlniri nu poate fi schimbată");
+    }
+
+    if (data.program) {
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: data.program,
+        populate: { ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === meeting.ong?.documentId,
+      );
+      if (!participates) {
+        return ctx.badRequest("Organizația nu participă la acest program");
+      }
+    }
+
+    if (data.activityType) {
+      const activityType = await strapi
+        .documents("api::activity-type.activity-type")
+        .findOne({ documentId: data.activityType });
+      if (!activityType) {
+        return ctx.badRequest("Tipul activității nu există");
+      }
+    }
+
+    const dimensiuni = Array.isArray(data.dimensiuni)
+      ? data.dimensiuni.filter((key) => VALID_DIMENSION_KEYS.has(key))
+      : [];
+
+    if (!(await claimMeetingStatus(meeting.documentId, "programata"))) {
+      return ctx.badRequest(
+        "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
+      );
+    }
+
+    const updated = await strapi.documents("api::meeting.meeting").update({
+      documentId: meeting.documentId,
+      data: {
+        subiect: data.subiect,
+        dataOra: data.dataOra,
+        format: data.format,
+        linkIntalnire: data.linkIntalnire || null,
+        comentarii: data.comentarii || null,
+        dimensiuni,
+        program: data.program ? docRef(data.program) : null,
+        activityType: data.activityType ? docRef(data.activityType) : null,
+      },
+      populate: {
+        ong: true,
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+
+    return { data: mentorMeetingView(updated) };
+  },
+
+  async cancelMeetingForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const meeting = await strapi.documents("api::meeting.meeting").findOne({
+      documentId: ctx.params.meetingDocumentId,
+      populate: { mentor: true },
+    });
+    if (!meeting || meeting.mentor?.documentId !== ctx.state.user.documentId) {
+      return ctx.badRequest("Întâlnirea nu există");
+    }
+    if (meeting.status !== "programata") {
+      return ctx.badRequest("Doar întâlnirile programate pot fi anulate");
+    }
+    // A single query-engine call does the "still programată?" check and the
+    // status write together, so a concurrent request can't slip in between
+    // the check above and this write and leave the meeting in both states.
+    const updated = await strapi.db.query("api::meeting.meeting").update({
+      where: { documentId: meeting.documentId, status: "programata" },
+      data: { status: "anulata" },
+      populate: {
+        ong: true,
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+    if (!updated) {
+      return ctx.badRequest(
+        "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
+      );
+    }
+    return { data: mentorMeetingView(updated) };
+  },
+
+  async completeMeetingForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const meeting = await strapi.documents("api::meeting.meeting").findOne({
+      documentId: ctx.params.meetingDocumentId,
+      populate: { mentor: true },
+    });
+    if (!meeting || meeting.mentor?.documentId !== ctx.state.user.documentId) {
+      return ctx.badRequest("Întâlnirea nu există");
+    }
+    if (meeting.status !== "programata") {
+      return ctx.badRequest(
+        "Doar întâlnirile programate pot fi marcate ca efectuate",
+      );
+    }
+    const updated = await strapi.db.query("api::meeting.meeting").update({
+      where: { documentId: meeting.documentId, status: "programata" },
+      data: { status: "efectuata" },
+      populate: {
+        ong: true,
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+    if (!updated) {
+      return ctx.badRequest(
+        "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
+      );
+    }
+    return { data: mentorMeetingView(updated) };
+  },
+
+  async uploadMeetingReportForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const meeting = await strapi.documents("api::meeting.meeting").findOne({
+      documentId: ctx.params.meetingDocumentId,
+      populate: { mentor: true },
+    });
+    if (!meeting || meeting.mentor?.documentId !== ctx.state.user.documentId) {
+      return ctx.badRequest("Întâlnirea nu există");
+    }
+    if (meeting.status !== "efectuata") {
+      return ctx.badRequest(
+        "Raportul poate fi adăugat doar pentru întâlniri efectuate",
+      );
+    }
+    const uploaded = await uploadSingleFile(ctx);
+    if ("error" in uploaded) {
+      return ctx.badRequest(uploaded.error);
+    }
+    if (!(await claimMeetingStatus(meeting.documentId, "efectuata"))) {
+      return ctx.badRequest(
+        "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
+      );
+    }
+    const updated = await strapi.documents("api::meeting.meeting").update({
+      documentId: meeting.documentId,
+      data: { report: { id: uploaded.id } },
+      populate: {
+        ong: true,
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
+    });
+    return { data: mentorMeetingView(updated) };
+  },
 }));
 
-async function pendingActivationTokens(
-  strapi: any,
-  documentIds: string[],
-): Promise<Map<string, string>> {
-  const tokens = new Map<string, string>();
-  if (documentIds.length === 0) return tokens;
-  const rows = await strapi.db
-    .query("plugin::users-permissions.user")
-    .findMany({
-      where: { documentId: { $in: documentIds }, accountStatus: "pending" },
-      select: ["documentId", "resetPasswordToken"],
-    });
-  for (const row of rows as any[]) {
-    if (row.resetPasswordToken) {
-      tokens.set(row.documentId, row.resetPasswordToken);
-    }
+/**
+ * Uploads the single file on this request through the Upload plugin's own
+ * service — not the public `/api/upload` HTTP route — so nothing is created
+ * until every other validation in the calling action has already passed.
+ * That keeps a rejected request (bad ownership, wrong meeting status, wrong
+ * program, ...) from leaving an orphaned file behind, which the old
+ * upload-then-attach flow could do whenever the attach step failed.
+ */
+async function uploadSingleFile(
+  ctx: Context,
+): Promise<{ id: number } | { error: string }> {
+  const files = (ctx.request as any).files?.files;
+  if (!files) {
+    return { error: "Fișierul este obligatoriu" };
   }
-  return tokens;
+  if (Array.isArray(files)) {
+    return { error: "Poți încărca un singur fișier" };
+  }
+  const uploaded = await strapi
+    .plugin("upload")
+    .service("upload")
+    .upload({ data: {}, files });
+  const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+  return { id: file.id };
+}
+
+/**
+ * Optimistic-concurrency guard for a meeting write that also touches
+ * relations (so it can't go through the single query-engine call `cancel`/
+ * `complete` use below). Re-asserts, in one query-engine call immediately
+ * before the real write, that the meeting's status still matches what was
+ * read earlier in the request — a no-op status write that only succeeds if
+ * nothing else changed the status in between. Closes the gap between an
+ * earlier `findOne` status check and the eventual `update`, where two
+ * concurrent requests could otherwise both pass the check and both write.
+ */
+async function claimMeetingStatus(
+  documentId: string,
+  expectedStatus: string,
+): Promise<boolean> {
+  const claimed = await strapi.db.query("api::meeting.meeting").update({
+    where: { documentId, status: expectedStatus },
+    data: { status: expectedStatus },
+  });
+  return Boolean(claimed);
+}
+
+function mentorMeetingView(meeting: any) {
+  return {
+    documentId: meeting.documentId,
+    dataOra: meeting.dataOra,
+    format: meeting.format,
+    status: meeting.status,
+    subiect: meeting.subiect,
+    linkIntalnire: meeting.linkIntalnire ?? null,
+    ong: meeting.ong
+      ? { documentId: meeting.ong.documentId, name: meeting.ong.name }
+      : null,
+    mentor: meeting.mentor
+      ? { documentId: meeting.mentor.documentId, nume: meeting.mentor.nume }
+      : null,
+    program: meeting.program
+      ? { documentId: meeting.program.documentId, name: meeting.program.name }
+      : null,
+    activityType: meeting.activityType
+      ? {
+          documentId: meeting.activityType.documentId,
+          name: meeting.activityType.name,
+        }
+      : null,
+    dimensiuni: Array.isArray(meeting.dimensiuni)
+      ? meeting.dimensiuni.filter(
+          (key: unknown): key is string =>
+            typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+        )
+      : [],
+    comentarii: meeting.comentarii ?? null,
+    report: meeting.report
+      ? {
+          url: meeting.report.url,
+          name: meeting.report.name,
+          ext: meeting.report.ext,
+        }
+      : null,
+  };
 }
 
 async function membersByOng(
