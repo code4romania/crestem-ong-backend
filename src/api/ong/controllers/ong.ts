@@ -10,6 +10,7 @@ import { phaseOfSameProgram } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { pendingActivationTokens } from "../../../utils/activation";
+import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
   loadUserWithOngs,
@@ -32,15 +33,23 @@ import { decorateBlock } from "../../evaluation/utils/catalog";
 import { docRef } from "../../../utils/relations";
 import { DIMENSIONS } from "../../../constants/dimensions";
 
-const VALID_DIMENSION_KEYS = new Set(DIMENSIONS.map((dimension) => dimension.key));
+const VALID_DIMENSION_KEYS = new Set(
+  DIMENSIONS.map((dimension) => dimension.key),
+);
+import { performOngDeletion } from "../services/delete-ong";
+import { authorizeOngDeletion } from "../utils/delete-access";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
+    // Anonymized organizations stay listed (BR-33): FDSC must still see that
+    // their evaluations were completed, and this list is the only navigation to
+    // them. `ngoStatus` rides along so the frontend can badge them "Retras".
+    // `listActive` below keeps its own `ngoStatus: "active"` filter — a deleted
+    // organization must never reach an "available to assign" picker.
     const ongs = await strapi.documents("api::ong.ong").findMany({
-      filters: { ngoStatus: { $ne: "deleted" } },
       sort: { name: "asc" },
       populate: {
         judet: true,
@@ -60,6 +69,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           documentId: ong.documentId,
           name: ong.name,
           cui: ong.cui,
+          ngoStatus: ong.ngoStatus,
           website: ong.website,
           adresa: ong.adresa,
           dataInfiintare: ong.dataInfiintare,
@@ -165,21 +175,38 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     };
   },
+  /**
+   * `Șterge ONG` for a super-admin (any organization) and for an ngo-admin
+   * (only one they belong to).
+   *
+   * The route policy establishes the caller's *role*; it says nothing about
+   * *which* organization is theirs. Ownership is therefore decided here, by
+   * `authorizeOngDeletion`, against memberships loaded from the database. The
+   * only identifier that reaches it is `ctx.params.documentId` — the request
+   * body, query string and headers are never consulted, and the role comes from
+   * `ctx.state.user`, set by the authentication layer.
+   *
+   * An ngo-admin who does not own the target gets exactly the response they
+   * would get for an organization that does not exist, so the endpoint cannot
+   * be used to enumerate organization ids.
+   */
   async deleteOne(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
-    const existing = await strapi.documents("api::ong.ong").findOne({
-      documentId: ctx.params.documentId,
+    const targetDocumentId = ctx.params.documentId;
+    const decision = await authorizeOngDeletion(strapi, {
+      actorDocumentId: ctx.state.user.documentId,
+      roleType: ctx.state.user.role?.type,
+      targetDocumentId,
     });
-    if (!existing) {
-      return ctx.badRequest("Organizația nu există");
+    if (decision.outcome === "denied") {
+      return decision.status === "forbidden"
+        ? ctx.forbidden(decision.message)
+        : ctx.badRequest(decision.message);
     }
-    await strapi.documents("api::ong.ong").update({
-      documentId: ctx.params.documentId,
-      data: { ngoStatus: "deleted" },
-    });
-    return { data: { documentId: ctx.params.documentId } };
+    await performOngDeletion(strapi, targetDocumentId);
+    return { data: { documentId: targetDocumentId } };
   },
   async listActive(ctx: Context) {
     if (!ctx.state.user) {
@@ -280,7 +307,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
     const memberOngIds = new Set(
-      ((user?.ong ?? []) as any[]).map((ong) => ong?.documentId).filter(Boolean),
+      ((user?.ong ?? []) as any[])
+        .map((ong) => ong?.documentId)
+        .filter(Boolean),
     );
     const pendingRequests = await strapi
       .documents("api::ong-join-request.ong-join-request")
@@ -548,9 +577,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     });
     const today = todayInBucharest();
-    const current = (reports as any[]).find((report) => !isClosed(report, today));
-    const currentPhases = ((current?.phases ?? []) as any[]);
-    const currentProgram = currentPhases.find((phase) => phase.program)?.program ?? null;
+    const current = (reports as any[]).find(
+      (report) => !isClosed(report, today),
+    );
+    const currentPhases = (current?.phases ?? []) as any[];
+    const currentProgram =
+      currentPhases.find((phase) => phase.program)?.program ?? null;
     const closedDate = (report: any) =>
       report.finishedAt ??
       ((report.phases ?? []) as any[])
@@ -559,12 +591,13 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         .sort()
         .pop() ??
       null;
-    const lastFinalizedDate = (reports as any[])
-      .filter((report) => isClosed(report, today))
-      .map(closedDate)
-      .filter(Boolean)
-      .sort()
-      .pop() ?? null;
+    const lastFinalizedDate =
+      (reports as any[])
+        .filter((report) => isClosed(report, today))
+        .map(closedDate)
+        .filter(Boolean)
+        .sort()
+        .pop() ?? null;
     return {
       data: {
         totalEvaluations: reports.length,
@@ -574,11 +607,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
               invitedCount: (current.evaluations ?? []).length,
               completedCount: (current.evaluations ?? []).filter(
                 (evaluation: any) =>
-                  computeProgress(evaluation.dimensions, isClosed(current, today))
-                    .complete,
+                  computeProgress(
+                    evaluation.dimensions,
+                    isClosed(current, today),
+                  ).complete,
               ).length,
               program: currentProgram
-                ? { documentId: currentProgram.documentId, name: currentProgram.name }
+                ? {
+                    documentId: currentProgram.documentId,
+                    name: currentProgram.name,
+                  }
                 : null,
             }
           : null,
@@ -711,23 +749,28 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!participates) {
       return ctx.badRequest("Organizația nu participă la acest program");
     }
-    const created = await strapi.documents("api::fdsc-report.fdsc-report").create({
-      data: {
-        name: parsed.data.name,
-        ong: docRef(ong.documentId),
-        program: docRef(program.documentId),
-        file: { id: parsed.data.file },
-        uploadedAt: new Date().toISOString(),
-      },
-      populate: { program: true, file: true },
-    });
+    const created = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .create({
+        data: {
+          name: parsed.data.name,
+          ong: docRef(ong.documentId),
+          program: docRef(program.documentId),
+          file: { id: parsed.data.file },
+          uploadedAt: new Date().toISOString(),
+        },
+        populate: { program: true, file: true },
+      });
     return {
       data: {
         documentId: created.documentId,
         name: created.name,
         uploadedAt: created.uploadedAt,
         program: created.program
-          ? { documentId: created.program.documentId, name: created.program.name }
+          ? {
+              documentId: created.program.documentId,
+              name: created.program.name,
+            }
           : null,
         file: created.file
           ? {
@@ -755,13 +798,24 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     const mentorsById = new Map<string, any>();
     for (const row of rows as any[]) {
-      const rowPrograms = Array.isArray(row.program) ? row.program : row.program ? [row.program] : [];
+      const rowPrograms = Array.isArray(row.program)
+        ? row.program
+        : row.program
+          ? [row.program]
+          : [];
       for (const mentor of (row.mentors ?? []) as any[]) {
         const existing = mentorsById.get(mentor.documentId);
         if (existing) {
           for (const program of rowPrograms) {
-            if (!existing.programs.some((p: any) => p.documentId === program.documentId)) {
-              existing.programs.push({ documentId: program.documentId, name: program.name });
+            if (
+              !existing.programs.some(
+                (p: any) => p.documentId === program.documentId,
+              )
+            ) {
+              existing.programs.push({
+                documentId: program.documentId,
+                name: program.name,
+              });
             }
           }
           continue;
@@ -774,9 +828,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           mentorOrganization: mentor.mentorOrganization ?? null,
           ariiDeExpertiza: mentor.ariiDeExpertiza ?? [],
           avatar: mentor.avatar
-            ? { documentId: mentor.avatar.documentId, name: mentor.avatar.name, url: mentor.avatar.url }
+            ? {
+                documentId: mentor.avatar.documentId,
+                name: mentor.avatar.name,
+                url: mentor.avatar.url,
+              }
             : null,
-          programs: rowPrograms.map((program: any) => ({ documentId: program.documentId, name: program.name })),
+          programs: rowPrograms.map((program: any) => ({
+            documentId: program.documentId,
+            name: program.name,
+          })),
         });
       }
     }
@@ -832,7 +893,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             ? {
                 documentId: evaluation.user.documentId,
                 nume: evaluation.user.nume,
-                email: evaluation.user.email,
+                email: isAnonymized(evaluation.user)
+                  ? null
+                  : evaluation.user.email,
               }
             : null,
           progress: computeProgress(
@@ -870,7 +933,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         ...(formatFilter ? { format: formatFilter as any } : {}),
       },
       sort: { dataOra: "desc" },
-      populate: { mentor: true, program: true, activityType: true, report: true },
+      populate: {
+        mentor: true,
+        program: true,
+        activityType: true,
+        report: true,
+      },
     });
 
     return {
@@ -885,14 +953,21 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           ? { documentId: meeting.mentor.documentId, nume: meeting.mentor.nume }
           : null,
         program: meeting.program
-          ? { documentId: meeting.program.documentId, name: meeting.program.name }
+          ? {
+              documentId: meeting.program.documentId,
+              name: meeting.program.name,
+            }
           : null,
         activityType: meeting.activityType
-          ? { documentId: meeting.activityType.documentId, name: meeting.activityType.name }
+          ? {
+              documentId: meeting.activityType.documentId,
+              name: meeting.activityType.name,
+            }
           : null,
         dimensiuni: Array.isArray(meeting.dimensiuni)
           ? meeting.dimensiuni.filter(
-              (key: unknown): key is string => typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
+              (key: unknown): key is string =>
+                typeof key === "string" && VALID_DIMENSION_KEYS.has(key),
             )
           : [],
         report: meeting.report

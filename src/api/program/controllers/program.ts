@@ -26,25 +26,14 @@ import { phaseLockError, programDatesLockError } from "../utils/phase-locks";
 import { toDateString, todayInBucharest } from "../../../utils/date";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
-
-const mentorView = (mentor: any) => ({
-  documentId: mentor.documentId,
-  nume: mentor.nume,
-  email: mentor.email,
-  mentorJobTitle: mentor.mentorJobTitle ?? null,
-  mentorOrganization: mentor.mentorOrganization ?? null,
-  avatar: mentor.avatar
-    ? {
-        documentId: mentor.avatar.documentId,
-        name: mentor.avatar.name,
-        url: mentor.avatar.url,
-      }
-    : null,
-});
+import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
 
 const ongView = (ong: any) => ({
   documentId: ong.documentId,
   name: ong.name,
+  // Drives the "Retras" badge: an ONG deleted while enrolled stays in the
+  // program with its reports and scores intact (BR-33).
+  ngoStatus: ong.ngoStatus,
 });
 
 const programView = (program: any) => ({
@@ -480,6 +469,35 @@ export default factories.createCoreController(
         }
       }
       return { data: (program.mentors ?? []).map(mentorView) };
+    },
+    /**
+     * The mentors assigned to the *calling* organization inside a program, as
+     * opposed to `mentors`, which lists everybody working on the program.
+     * Reads the (ong, program) `ngo-mentor` row and, like `ongs`, drops mentors
+     * who were since removed from the program itself — the row keeps them.
+     */
+    async ongMentors(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: ctx.params.documentId,
+        populate: { mentors: true, ongs: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const participates = ((program.ongs ?? []) as any[]).some(
+        (entry) => entry.documentId === scope.ong.documentId,
+      );
+      if (!participates) {
+        return ctx.forbidden("Organizația ta nu participă la acest program");
+      }
+      return { data: await ngoMentorsFor(strapi, program, scope.ong.documentId) };
     },
     async ongs(ctx: Context) {
       if (!ctx.state.user) {

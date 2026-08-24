@@ -13,7 +13,10 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  requestEmailChangeSchema,
+  confirmEmailChangeSchema,
 } from "../validation/auth";
+import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
@@ -370,6 +373,91 @@ export default {
     } catch (error) {
       console.error("changePassword failed", error);
       return ctx.badRequest(error.message);
+    }
+  },
+  async requestEmailChange(ctx: Context) {
+    try {
+      const parsed = await requestEmailChangeSchema.safeParseAsync(
+        ctx.request.body,
+      );
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).requestEmailChange(ctx.state.user.id, parsed.data);
+
+      return {
+        ...result,
+        message:
+          "Am generat linkul de confirmare. Deschide-l pentru a finaliza schimbarea",
+      };
+    } catch (error) {
+      console.error("requestEmailChange failed", error);
+      return ctx.badRequest(error.message);
+    }
+  },
+  async previewEmailChange(ctx: Context) {
+    try {
+      const token = ctx.query.token;
+      if (typeof token !== "string" || !token.trim()) {
+        return ctx.badRequest("Tokenul este obligatoriu");
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).previewEmailChange(token);
+
+      return { data: result };
+    } catch (error) {
+      return ctx.badRequest(error.message);
+    }
+  },
+  async confirmEmailChange(ctx: Context) {
+    try {
+      const parsed = await confirmEmailChangeSchema.safeParseAsync(
+        ctx.request.body,
+      );
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const result = await (
+        strapi.service("api::auth.auth") as AuthService
+      ).confirmEmailChange(parsed.data);
+
+      return {
+        ...result,
+        message:
+          "Adresa de email a fost schimbată. Autentifică-te cu noua adresă",
+      };
+    } catch (error) {
+      console.error("confirmEmailChange failed", error);
+      return ctx.badRequest(error.message);
+    }
+  },
+  async deleteAccount(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+
+    const parsed = deleteAccountSchema.safeParse(ctx.request.body);
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+
+    try {
+      await (strapi.service("api::auth.auth") as AuthService).deleteAccount(
+        ctx.state.user.id,
+        { currentPassword: parsed.data.currentPassword },
+      );
+      return { message: "Contul a fost șters" };
+    } catch (error) {
+      console.error("deleteAccount failed", error);
+      // The service throws Romanian, user-facing reasons (wrong password,
+      // contact person, last administrator) — surface them verbatim.
+      return ctx.badRequest((error as Error).message);
     }
   },
 };
