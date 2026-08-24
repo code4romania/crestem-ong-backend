@@ -18,7 +18,8 @@ export interface ReportScores {
   overall: number | null;
 }
 
-const round1 = (value: number) => Math.round(value * 10) / 10;
+/** One decimal, the precision every score in the app is reported at. */
+export const round1 = (value: number) => Math.round(value * 10) / 10;
 
 const answeredIds = (block: ScoringBlock) =>
   new Set((block?.quiz ?? []).map((question) => question.questionId));

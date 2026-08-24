@@ -1,4 +1,5 @@
 import { toDateString } from "../../../utils/date";
+import { computeProgramStatus } from "./status";
 
 export type PhaseBucket = "finished" | "current" | "future";
 
@@ -106,3 +107,20 @@ export const phaseLockError = (
 
   return null;
 };
+
+/**
+ * A finished program is read-only: no edits, no deletion, no assignment
+ * changes. The status is recomputed from the dates rather than read from the
+ * stored `programStatus` column, which only refreshes when the dates change.
+ */
+export const programFinishedError = (
+  program: { startDate?: unknown; endDate?: unknown },
+  today: string,
+): string | null =>
+  computeProgramStatus(
+    toDateString(program.startDate),
+    toDateString(program.endDate),
+    today,
+  ) === "Finished"
+    ? "Programul este finalizat și nu mai poate fi modificat"
+    : null;
