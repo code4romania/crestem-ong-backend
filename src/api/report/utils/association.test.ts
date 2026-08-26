@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   phaseEndedForUnfinishedReport,
   phaseEvaluationsView,
+  phaseOfSameProgram,
+  programOfReport,
   resolvePickPhase,
 } from "./association";
 
@@ -148,6 +150,39 @@ describe("phaseEvaluationsView", () => {
     expect(phaseEvaluationsView(prog, "ong-1", [])).toEqual([
       { phaseDocumentId: "phase-1", phaseTitle: "Faza 1", report: null },
     ]);
+  });
+});
+
+describe("phaseOfSameProgram", () => {
+  it("finds the phase belonging to the given program", () => {
+    const target = { documentId: "phase-2", program: { documentId: "program-1" } };
+    const linkedReport = report({
+      phases: [{ documentId: "phase-1", program: { documentId: "program-2" } }, target],
+    });
+    expect(phaseOfSameProgram(linkedReport, "program-1")).toEqual(target);
+  });
+
+  it("returns null when no phase belongs to the given program", () => {
+    const linkedReport = report({
+      phases: [{ documentId: "phase-1", program: { documentId: "program-2" } }],
+    });
+    expect(phaseOfSameProgram(linkedReport, "program-1")).toBeNull();
+  });
+});
+
+describe("programOfReport", () => {
+  it("returns the program of the report's first phase that has one", () => {
+    const linkedReport = report({
+      phases: [
+        { documentId: "phase-1", program: null },
+        { documentId: "phase-2", program: { documentId: "program-1", name: "Program 1" } },
+      ],
+    });
+    expect(programOfReport(linkedReport)).toEqual({ documentId: "program-1", name: "Program 1" });
+  });
+
+  it("returns null when the report has no phases with a program", () => {
+    expect(programOfReport(report({ phases: [] }))).toBeNull();
   });
 });
 

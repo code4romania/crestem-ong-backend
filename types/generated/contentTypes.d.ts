@@ -566,6 +566,7 @@ export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    evaluation: Schema.Attribute.Relation<'manyToOne', 'api::report.report'>;
     file: Schema.Attribute.Media<'files'> & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -575,7 +576,6 @@ export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
-    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

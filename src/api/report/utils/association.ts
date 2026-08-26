@@ -162,3 +162,7 @@ export const phaseOfSameProgram = (report: any, programDocumentId: string) =>
   ((report.phases ?? []) as any[]).find(
     (phase) => phase.program?.documentId === programDocumentId,
   ) ?? null;
+
+export const programOfReport = (report: any) =>
+  ((report?.phases ?? []) as any[]).find((phase) => phase.program)?.program ??
+  null;

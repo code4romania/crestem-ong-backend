@@ -6,7 +6,7 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { computeReportScores } from "../../report/utils/scores";
-import { phaseOfSameProgram } from "../../report/utils/association";
+import { phaseOfSameProgram, programOfReport } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { pendingActivationTokens } from "../../../utils/activation";
@@ -42,6 +42,7 @@ const VALID_DIMENSION_KEYS = new Set(
 );
 import { performOngDeletion } from "../services/delete-ong";
 import { authorizeOngDeletion } from "../utils/delete-access";
+import { deleteUploadedFile } from "../../../utils/media";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -667,7 +668,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     const eligible = programDocumentId
       ? reports.filter(
-          (report: any) => !phaseOfSameProgram(report, programDocumentId),
+          (report: any) => phaseOfSameProgram(report, programDocumentId),
         )
       : reports;
     const today = todayInBucharest();
@@ -712,15 +713,22 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       .findMany({
         filters: { ong: { documentId: ong.documentId } },
         sort: { uploadedAt: "desc" },
-        populate: { program: true, file: true },
+        populate: {
+          evaluation: { populate: { phases: { populate: { program: true } } } },
+          file: true,
+        },
       });
     return {
       data: (reports as any[]).map((report) => ({
         documentId: report.documentId,
         name: report.name,
         uploadedAt: report.uploadedAt,
-        program: report.program
-          ? { documentId: report.program.documentId, name: report.program.name }
+        evaluation: report.evaluation
+          ? {
+              documentId: report.evaluation.documentId,
+              name: report.evaluation.name,
+              program: programOfReport(report.evaluation),
+            }
           : null,
         file: report.file
           ? {
@@ -746,18 +754,15 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!parsed.success) {
       return ctx.badRequest("Date invalide: ", parsed.error.flatten());
     }
-    const program = await strapi.documents("api::program.program").findOne({
-      documentId: parsed.data.program,
-      populate: { ongs: true },
+    const evaluation = await strapi.documents("api::report.report").findOne({
+      documentId: parsed.data.evaluation,
+      populate: { ong: true, phases: { populate: { program: true } } },
     });
-    if (!program) {
-      return ctx.badRequest("Programul nu există");
+    if (!evaluation) {
+      return ctx.badRequest("Evaluarea nu există");
     }
-    const participates = ((program.ongs ?? []) as any[]).some(
-      (entry) => entry.documentId === ong.documentId,
-    );
-    if (!participates) {
-      return ctx.badRequest("Organizația nu participă la acest program");
+    if ((evaluation.ong as any)?.documentId !== ong.documentId) {
+      return ctx.badRequest("Evaluarea nu aparține acestei organizații");
     }
     const uploaded = await uploadSingleFile(ctx);
     if ("error" in uploaded) {
@@ -769,21 +774,25 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         data: {
           name: parsed.data.name,
           ong: docRef(ong.documentId),
-          program: docRef(program.documentId),
+          evaluation: docRef(evaluation.documentId),
           file: { id: uploaded.id },
           uploadedAt: new Date().toISOString(),
         },
-        populate: { program: true, file: true },
+        populate: {
+          evaluation: { populate: { phases: { populate: { program: true } } } },
+          file: true,
+        },
       });
     return {
       data: {
         documentId: created.documentId,
         name: created.name,
         uploadedAt: created.uploadedAt,
-        program: created.program
+        evaluation: created.evaluation
           ? {
-              documentId: created.program.documentId,
-              name: created.program.name,
+              documentId: created.evaluation.documentId,
+              name: created.evaluation.name,
+              program: programOfReport(created.evaluation),
             }
           : null,
         file: created.file
@@ -795,6 +804,31 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           : null,
       },
     };
+  },
+  async deleteFdscReport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const report = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .findOne({
+        documentId: ctx.params.reportDocumentId,
+        populate: { ong: true, file: true },
+      });
+    if (!report || (report.ong as any)?.documentId !== ong.documentId) {
+      return ctx.badRequest("Raportul nu există");
+    }
+    await deleteUploadedFile(strapi, report.file as any);
+    await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .delete({ documentId: report.documentId });
+    return { message: "Raportul a fost șters cu succes" };
   },
   async mentors(ctx: Context) {
     if (!ctx.state.user) {

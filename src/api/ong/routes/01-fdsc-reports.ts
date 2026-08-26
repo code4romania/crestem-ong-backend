@@ -12,5 +12,11 @@ export default {
       handler: "ong.createFdscReport",
       config: { policies: ["global::is-fdsc-staff"] },
     },
+    {
+      method: "DELETE",
+      path: "/ongs/:documentId/fdsc-reports/:reportDocumentId",
+      handler: "ong.deleteFdscReport",
+      config: { policies: ["global::is-fdsc-staff"] },
+    },
   ],
 };
