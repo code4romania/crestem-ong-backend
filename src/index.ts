@@ -189,6 +189,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.completeMeetingForMentor",
     "api::ong.ong.uploadMeetingReportForMentor",
     "api::activity-type.activity-type.list",
+    "api::mentor.mentor.me",
+    "api::mentor.mentor.updateMe",
+    "plugin::upload.content-api.upload",
   ],
   individual: [
     "api::auth.auth.me",
