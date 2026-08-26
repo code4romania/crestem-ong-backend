@@ -8,12 +8,14 @@ import { computeProgress } from "../../evaluation/utils/progress";
 import { computeReportScores } from "../../report/utils/scores";
 import { phaseOfSameProgram, programOfReport } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
-import { todayInBucharest } from "../../../utils/date";
+import { toDateString, todayInBucharest } from "../../../utils/date";
+import { computeProgramStatus } from "../../program/utils/status";
 import { pendingActivationTokens } from "../../../utils/activation";
 import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
   loadUserWithOngs,
+  mentorHasOng,
   requireOng,
 } from "../../../utils/ong-scope";
 import {
@@ -119,6 +121,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (ctx.state.user.role?.type === "ngo-admin") {
       const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
       if (!belongsToOng(user, ong.documentId)) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
         return ctx.forbidden("Nu ai acces la această organizație");
       }
     }
@@ -579,6 +591,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
     const reports = await strapi.documents("api::report.report").findMany({
       filters: { ong: { documentId: ong.documentId } },
       sort: { createdAt: "desc" },
@@ -645,6 +667,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
     const programParam = ctx.query.program;
     if (programParam !== undefined && typeof programParam !== "string") {
       return ctx.badRequest("Parametrul program este invalid");
@@ -707,6 +739,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
     }
     const reports = await strapi
       .documents("api::fdsc-report.fdsc-report")
@@ -901,6 +943,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async evaluationDetail(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ctx.params.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
     }
     const report = await strapi.documents("api::report.report").findOne({
       documentId: ctx.params.reportDocumentId,
@@ -1333,6 +1385,102 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       data: Array.from(ongsById.values()).sort((a, b) =>
         a.name.localeCompare(b.name),
       ),
+    };
+  },
+
+  /**
+   * The mentor's own programs (grouped from their `ngo-mentor` rows), each with
+   * the ONGs they specifically mentor within it — as opposed to `ongsForMentor`,
+   * which groups the same rows by ONG instead of by program.
+   */
+  async programsForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: { mentors: { documentId: ctx.state.user.documentId } },
+      populate: { ong: true, program: true },
+    });
+    const byOng = await membersByOng(strapi);
+    const today = todayInBucharest();
+    const programsById = new Map<
+      string,
+      {
+        documentId: string;
+        name: string;
+        startDate: string;
+        endDate: string;
+        programStatus: string;
+        ongs: {
+          documentId: string;
+          name: string;
+          memberCount: number;
+          admin: { nume: string; email: string } | null;
+        }[];
+      }
+    >();
+    for (const row of rows as any[]) {
+      const rowOngs = Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
+      const rowPrograms = Array.isArray(row.program)
+        ? row.program
+        : row.program
+          ? [row.program]
+          : [];
+      for (const program of rowPrograms) {
+        const existing = programsById.get(program.documentId) ?? {
+          documentId: program.documentId,
+          name: program.name,
+          startDate: program.startDate,
+          endDate: program.endDate,
+          programStatus: computeProgramStatus(
+            toDateString(program.startDate),
+            toDateString(program.endDate),
+            today,
+          ),
+          ongs: [] as {
+            documentId: string;
+            name: string;
+            memberCount: number;
+            admin: { nume: string; email: string } | null;
+          }[],
+        };
+        for (const ong of rowOngs) {
+          if (existing.ongs.some((entry) => entry.documentId === ong.documentId)) {
+            continue;
+          }
+          const members = byOng.get(ong.documentId);
+          existing.ongs.push({
+            documentId: ong.documentId,
+            name: ong.name,
+            memberCount: members?.memberCount ?? 0,
+            admin: members?.admin
+              ? { nume: members.admin.nume, email: members.admin.email }
+              : null,
+          });
+        }
+        programsById.set(program.documentId, existing);
+      }
+    }
+    const statusPriority: Record<string, number> = {
+      Active: 0,
+      Upcoming: 1,
+      Finished: 2,
+    };
+    return {
+      data: Array.from(programsById.values())
+        .map((program) => ({
+          ...program,
+          ongs: program.ongs.sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => {
+          const priorityDiff =
+            (statusPriority[a.programStatus] ?? 3) -
+            (statusPriority[b.programStatus] ?? 3);
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+          return `${b.startDate}`.localeCompare(`${a.startDate}`);
+        }),
     };
   },
 

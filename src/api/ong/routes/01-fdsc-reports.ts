@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/ongs/:documentId/fdsc-reports",
       handler: "ong.fdscReports",
-      config: { policies: ["global::is-fdsc-staff"] },
+      config: { policies: ["global::is-fdsc-staff-or-mentor"] },
     },
     {
       method: "POST",

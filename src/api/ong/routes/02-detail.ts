@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/ongs/:documentId",
       handler: "ong.detail",
-      config: { policies: ["global::is-fdsc-staff-or-ngo-admin"] },
+      config: { policies: ["global::is-fdsc-staff-or-ngo-admin-or-mentor"] },
     },
   ],
 };

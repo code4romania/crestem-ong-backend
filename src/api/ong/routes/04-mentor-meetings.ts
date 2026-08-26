@@ -8,6 +8,12 @@ export default {
     },
     {
       method: "GET",
+      path: "/mentor/programs",
+      handler: "ong.programsForMentor",
+      config: { policies: ["global::is-mentor"] },
+    },
+    {
+      method: "GET",
       path: "/mentor/meetings",
       handler: "ong.meetingsForMentor",
       config: { policies: ["global::is-mentor"] },
