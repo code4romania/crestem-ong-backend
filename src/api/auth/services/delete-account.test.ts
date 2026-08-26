@@ -4,13 +4,11 @@ import { performAccountDeletion } from "./delete-account";
 const membership = vi.hoisted(() => ({ removeOngMembership: vi.fn(async () => ({})) }));
 vi.mock("../../../utils/membership", () => membership);
 
-const mentors = vi.hoisted(() => ({ detachMentorAssignments: vi.fn(async () => {}) }));
-vi.mock("../../../utils/mentor-assignments", () => mentors);
-
 interface Harness {
   strapi: any;
   edits: Array<{ id: number; data: any; inTransaction: boolean }>;
   deletedJoinRequests: string[];
+  documentUpdates: Array<{ uid: string; data: any }>;
   revoked: number[];
   removedFiles: Array<{ file: any; inTransaction: boolean }>;
   deletedFileRows: Array<{ where: any; inTransaction: boolean }>;
@@ -32,6 +30,7 @@ function harness(user: any, options: HarnessOptions = {}): Harness {
   const { superAdminCount = 2, joinRequests = [] } = options;
   const edits: Array<{ id: number; data: any; inTransaction: boolean }> = [];
   const deletedJoinRequests: string[] = [];
+  const documentUpdates: Array<{ uid: string; data: any }> = [];
   const revoked: number[] = [];
   const removedFiles: Array<{ file: any; inTransaction: boolean }> = [];
   const deletedFileRows: Array<{ where: any; inTransaction: boolean }> = [];
@@ -85,6 +84,9 @@ function harness(user: any, options: HarnessOptions = {}): Harness {
       delete: vi.fn(async ({ documentId }: any) => {
         deletedJoinRequests.push(documentId);
       }),
+      update: vi.fn(async ({ data }: any) => {
+        documentUpdates.push({ uid, data });
+      }),
     }),
     plugin: (name: string) => ({
       service: (service: string) => ({
@@ -114,6 +116,7 @@ function harness(user: any, options: HarnessOptions = {}): Harness {
     strapi,
     edits,
     deletedJoinRequests,
+    documentUpdates,
     revoked,
     removedFiles,
     deletedFileRows,
@@ -134,7 +137,6 @@ const activeMember = {
 
 beforeEach(() => {
   membership.removeOngMembership.mockClear();
-  mentors.detachMentorAssignments.mockClear();
 });
 
 describe("performAccountDeletion", () => {
@@ -178,11 +180,19 @@ describe("performAccountDeletion", () => {
     expect(membership.removeOngMembership).toHaveBeenCalledWith(h.strapi, "user-7", "ong-2");
   });
 
-  it("detaches mentor assignments and revokes refresh tokens", async () => {
+  it("revokes refresh tokens", async () => {
     const h = harness(activeMember);
     await performAccountDeletion(h.strapi, 7, { currentPassword: "correct" });
-    expect(mentors.detachMentorAssignments).toHaveBeenCalledWith(h.strapi, "user-7");
     expect(h.revoked).toEqual([7]);
+  });
+
+  // BR-34: the mentoring assignment survives the deletion, so the organization
+  // keeps seeing the anonymized person's conversation, meetings and reports.
+  // Detaching invalidated the (program, mentor) pair and the chat disappeared.
+  it("leaves the program and ngo-mentor assignments in place", async () => {
+    const h = harness({ ...activeMember, role: { type: "mentor" }, ong: [] });
+    await performAccountDeletion(h.strapi, 7, { currentPassword: "correct" });
+    expect(h.documentUpdates).toHaveLength(0);
   });
 
   it("voids pending join requests", async () => {

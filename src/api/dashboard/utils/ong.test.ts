@@ -199,6 +199,7 @@ describe("buildOngDashboard", () => {
         nume: "Simona Vlad",
         mentorJobTitle: "Expert Advocacy & Politici publice",
         avatar: null,
+        isDeleted: false,
         program: {
           documentId: "p1",
           name: "În stare de bine",
@@ -207,6 +208,46 @@ describe("buildOngDashboard", () => {
         },
       },
     ]);
+  });
+
+  // BR-34: the collaboration happened, so it stays on the table — greyed out,
+  // with nothing left that could be mistaken for a way to reach the person.
+  it("keeps a mentor who deleted their account and strips their job title", async () => {
+    const strapi = mockStrapi({
+      programs: [
+        {
+          documentId: "p1",
+          name: "În stare de bine",
+          startDate: "2025-01-15",
+          endDate: "2026-12-31",
+          programStatus: "Active",
+          mentors: [{ documentId: "m1" }],
+        },
+      ],
+      ngoMentors: [
+        {
+          documentId: "nm1",
+          program: [{ documentId: "p1" }],
+          mentors: [
+            {
+              documentId: "m1",
+              nume: "Anonim m1",
+              mentorJobTitle: "Expert Advocacy & Politici publice",
+              avatar: { documentId: "f1", name: "a.png", url: "/uploads/a.png" },
+              accountStatus: "deleted",
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await buildOngDashboard(strapi, "ong-1", TODAY);
+
+    expect(result.mentors).toHaveLength(1);
+    expect(result.mentors[0].isDeleted).toBe(true);
+    expect(result.mentors[0].nume).toBe("Anonim m1");
+    expect(result.mentors[0].mentorJobTitle).toBeNull();
+    expect(result.mentors[0].avatar).toBeNull();
   });
 
   it("drops a mentor who is on the assignment row but no longer on the program", async () => {

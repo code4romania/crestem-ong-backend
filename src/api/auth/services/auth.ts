@@ -120,7 +120,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           data: {
             name: data.numeOng,
             cui: data.cui,
-            website: data.website,
             judet: docRef(data.judet),
             localitate: docRef(data.localitate),
             ngoStatus: "active",

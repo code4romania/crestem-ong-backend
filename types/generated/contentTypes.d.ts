@@ -1546,6 +1546,7 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     emailChangeToken: Schema.Attribute.String & Schema.Attribute.Private;
+    firstLoginAt: Schema.Attribute.DateTime;
     lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<

@@ -1,4 +1,5 @@
 import { Context } from "koa";
+import { isAnonymized } from "../../../utils/anonymize";
 import { getOngAdminNames, requireOng } from "../../../utils/ong-scope";
 import {
   pairKey,
@@ -7,21 +8,30 @@ import {
 } from "../utils/sync";
 import { sendMessageSchema } from "../validation/send-message";
 
-const mentorView = (mentor: any) =>
-  mentor
-    ? {
-        documentId: mentor.documentId,
-        nume: mentor.nume,
-        mentorOrganization: mentor.mentorOrganization ?? null,
-        avatar: mentor.avatar
-          ? {
-              documentId: mentor.avatar.documentId,
-              name: mentor.avatar.name,
-              url: mentor.avatar.url,
-            }
-          : null,
-      }
-    : null;
+/**
+ * A mentor who deleted their account keeps the conversation (BR-34): the
+ * organization still reads the whole history, under the `Anonim <documentId>`
+ * name (BR-27). `isDeleted` is what greys the thread out and disables the
+ * composer — `sendMessage` refuses the write regardless.
+ */
+const mentorView = (mentor: any) => {
+  if (!mentor) return null;
+  const deleted = isAnonymized(mentor);
+  return {
+    documentId: mentor.documentId,
+    nume: mentor.nume,
+    mentorOrganization: deleted ? null : (mentor.mentorOrganization ?? null),
+    avatar:
+      !deleted && mentor.avatar
+        ? {
+            documentId: mentor.avatar.documentId,
+            name: mentor.avatar.name,
+            url: mentor.avatar.url,
+          }
+        : null,
+    isDeleted: deleted,
+  };
+};
 
 const ongView = (ong: any, adminNume?: string | null) =>
   ong
@@ -56,7 +66,7 @@ const findOwnedConversation = async (
 ) => {
   const conversation = await strapi
     .documents("api::conversation.conversation")
-    .findOne({ documentId, populate: { ong: true } });
+    .findOne({ documentId, populate: { ong: true, mentor: true } });
   if (!conversation || conversation.ong?.documentId !== ongDocumentId) {
     return null;
   }
@@ -201,6 +211,14 @@ export default {
     );
     if (!conversation) {
       return ctx.badRequest("Conversația nu există");
+    }
+    // The thread stays readable after the mentor deletes their account
+    // (BR-34), but it is archived — nobody is left to answer. The frontend
+    // greys it out and disables the composer; this is the enforcement.
+    if (isAnonymized(conversation.mentor)) {
+      return ctx.badRequest(
+        "Persoana resursă și-a șters contul. Conversația este arhivată.",
+      );
     }
 
     const now = new Date().toISOString();

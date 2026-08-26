@@ -40,6 +40,36 @@ import { DIMENSIONS } from "../../../constants/dimensions";
 const VALID_DIMENSION_KEYS = new Set(
   DIMENSIONS.map((dimension) => dimension.key),
 );
+
+/**
+ * A mentor who deleted their account keeps their `ngo-mentor` assignment
+ * (BR-34), so the assignment check alone no longer proves they can be
+ * scheduled. Nothing new may be booked with them.
+ */
+const isDeletedMentor = async (
+  strapi: any,
+  mentorDocumentId: string,
+): Promise<boolean> => {
+  const mentor = await strapi
+    .documents("plugin::users-permissions.user")
+    .findOne({ documentId: mentorDocumentId });
+  return isAnonymized(mentor);
+};
+
+/**
+ * The mentor of a meeting, as the organization's side sees it. A mentor who
+ * deleted their account keeps their meetings (BR-34) under the `Anonim
+ * <documentId>` name (BR-27); `isDeleted` is what greys the row out and hides
+ * the actions that would target a person who is no longer there.
+ */
+const meetingMentorView = (mentor: any) =>
+  mentor
+    ? {
+        documentId: mentor.documentId,
+        nume: mentor.nume,
+        isDeleted: isAnonymized(mentor),
+      }
+    : null;
 import { performOngDeletion } from "../services/delete-ong";
 import { authorizeOngDeletion } from "../utils/delete-access";
 
@@ -344,8 +374,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           ? {
               $or: [
                 { name: { $containsi: q } },
-                { localitate: { nume: { $containsi: q } } },
-                { domeniuPrincipal: { name: { $containsi: q } } },
+                { cui: { $containsi: q } },
               ],
             }
           : {}),
@@ -360,6 +389,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         .map((ong) => ({
           documentId: ong.documentId,
           name: ong.name,
+          cui: ong.cui ?? null,
           domeniu: ong.domeniuPrincipal?.name ?? null,
           localitate: ong.localitate?.nume ?? null,
           memberCount: byOng.get(ong.documentId)?.memberCount ?? 0,
@@ -841,20 +871,25 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           }
           continue;
         }
+        const deleted = isAnonymized(mentor);
         mentorsById.set(mentor.documentId, {
           documentId: mentor.documentId,
           nume: mentor.nume,
-          email: mentor.email,
-          mentorJobTitle: mentor.mentorJobTitle ?? null,
-          mentorOrganization: mentor.mentorOrganization ?? null,
-          ariiDeExpertiza: mentor.ariiDeExpertiza ?? [],
-          avatar: mentor.avatar
-            ? {
-                documentId: mentor.avatar.documentId,
-                name: mentor.avatar.name,
-                url: mentor.avatar.url,
-              }
-            : null,
+          email: deleted ? null : mentor.email,
+          mentorJobTitle: deleted ? null : (mentor.mentorJobTitle ?? null),
+          mentorOrganization: deleted
+            ? null
+            : (mentor.mentorOrganization ?? null),
+          ariiDeExpertiza: deleted ? [] : (mentor.ariiDeExpertiza ?? []),
+          isDeleted: deleted,
+          avatar:
+            !deleted && mentor.avatar
+              ? {
+                  documentId: mentor.avatar.documentId,
+                  name: mentor.avatar.name,
+                  url: mentor.avatar.url,
+                }
+              : null,
           programs: rowPrograms.map((program: any) => ({
             documentId: program.documentId,
             name: program.name,
@@ -976,9 +1011,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         status: meeting.status,
         subiect: meeting.subiect,
         linkIntalnire: meeting.linkIntalnire ?? null,
-        mentor: meeting.mentor
-          ? { documentId: meeting.mentor.documentId, nume: meeting.mentor.nume }
-          : null,
+        mentor: meetingMentorView(meeting.mentor),
         program: meeting.program
           ? {
               documentId: meeting.program.documentId,
@@ -1039,6 +1072,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       );
     }
 
+    if (await isDeletedMentor(strapi, data.mentor)) {
+      return ctx.badRequest(
+        "Persoana resursă selectată și-a șters contul",
+      );
+    }
+
     if (data.program) {
       const program = await strapi.documents("api::program.program").findOne({
         documentId: data.program,
@@ -1096,9 +1135,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         subiect: created.subiect,
         linkIntalnire: created.linkIntalnire ?? null,
         comentarii: created.comentarii ?? null,
-        mentor: created.mentor
-          ? { documentId: created.mentor.documentId, nume: created.mentor.nume }
-          : null,
+        mentor: meetingMentorView(created.mentor),
         program: created.program
           ? {
               documentId: created.program.documentId,
@@ -1163,6 +1200,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       );
     }
 
+    if (await isDeletedMentor(strapi, data.mentor)) {
+      return ctx.badRequest(
+        "Persoana resursă selectată și-a șters contul",
+      );
+    }
+
     if (data.program) {
       const program = await strapi.documents("api::program.program").findOne({
         documentId: data.program,
@@ -1223,9 +1266,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         subiect: updated.subiect,
         linkIntalnire: updated.linkIntalnire ?? null,
         comentarii: updated.comentarii ?? null,
-        mentor: updated.mentor
-          ? { documentId: updated.mentor.documentId, nume: updated.mentor.nume }
-          : null,
+        mentor: meetingMentorView(updated.mentor),
         program: updated.program
           ? {
               documentId: updated.program.documentId,

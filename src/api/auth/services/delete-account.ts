@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import { buildAnonymizedUserData } from "../../../utils/anonymize";
 import { accountDeletionBlock } from "../../../utils/account-deletion";
-import { detachMentorAssignments } from "../../../utils/mentor-assignments";
 import { removeOngMembership } from "../../../utils/membership";
 import { deleteUploadedFile } from "../../../utils/media";
 import type { DeleteAccountPayload } from "../interfaces/auth";
@@ -16,7 +15,7 @@ const JOIN_REQUEST_UID = "api::ong-join-request.ong-join-request";
  * The whole cascade runs inside `strapi.db.transaction`, so it either lands
  * completely or not at all. Everything reached from here writes through
  * `strapi.db` / the document service and therefore joins that transaction via
- * the async-local context: `removeOngMembership`, `detachMentorAssignments`,
+ * the async-local context: `removeOngMembership`,
  * the join-request deletes, `revokeAllForUser`, the `plugin::upload.file` row
  * delete inside the upload service's `remove`, and the users-permissions
  * `user.edit` (which is a `strapi.db.query(...).update` underneath).
@@ -75,7 +74,13 @@ export async function performAccountDeletion(
       await removeOngMembership(strapi, user.documentId, ong.documentId);
     }
 
-    await detachMentorAssignments(strapi, user.documentId);
+    // Mentoring assignments are deliberately NOT ended here. BR-34 only
+    // requires the personal data to go; the `program.mentors` / `ngo-mentor`
+    // rows stay so the organization keeps seeing the conversation, the
+    // meetings and the reports of the person who worked with it — rendered
+    // read-only and greyed, under the `Anonim <documentId>` name of BR-27.
+    // Detaching instead invalidated the (program, mentor) pair that
+    // `conversation/utils/sync` filters on, and the chat vanished.
 
     const pendingRequests: any[] = await strapi.documents(JOIN_REQUEST_UID).findMany({
       filters: { user: { documentId: user.documentId }, status: "pending" },

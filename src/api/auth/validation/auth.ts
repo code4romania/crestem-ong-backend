@@ -3,7 +3,7 @@
  *
  * Fields are derived from:
  *  - users-permissions user content-type (account: nume, email, password, telefon)
- *  - ong content-type (organization: name, cui, website, judet, localitate, acordTermeniSiConditii)
+ *  - ong content-type (organization: name, cui, judet, localitate, acordTermeniSiConditii)
  */
 
 import { z } from "zod";
@@ -61,12 +61,6 @@ export const registerNgoSchema = z.object({
           .findOne({ where: { cui: { $eqi: cui } } })),
       "Există deja o organizație cu acest C.U.I.",
     ),
-  website: z
-    .string()
-    .trim()
-    .transform((v) => (/^https?:\/\//i.test(v) ? v : `https://${v}`))
-    .pipe(z.url({ protocol: /^https?$/, error: "Adresa website-ului este invalidă" }))
-    .optional(),
   judet: z
     .string({ message: "Județul este obligatoriu" })
     .trim()

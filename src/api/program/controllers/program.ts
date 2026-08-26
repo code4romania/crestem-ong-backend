@@ -36,6 +36,7 @@ import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
+import { isAnonymized } from "../../../utils/anonymize";
 
 const ongView = (ong: any) => ({
   documentId: ong.documentId,
@@ -462,7 +463,12 @@ export default factories.createCoreController(
       return {
         data: {
           ongsCount: ongIds.length,
-          mentorsCount: ((program.mentors ?? []) as any[]).length,
+          // Mentors who deleted their account stay assigned so their history
+          // stays readable (BR-34), but they are nobody's resource any more —
+          // counting them would show a program as staffed when it is not.
+          mentorsCount: ((program.mentors ?? []) as any[]).filter(
+            (mentor) => !isAnonymized(mentor),
+          ).length,
           inEvaluation,
           finalizedEvaluation,
         },
@@ -710,6 +716,19 @@ export default factories.createCoreController(
           outsider
             ? `Persoana ${outsider.email} nu este alocată acestui program`
             : "Persoana resursă nu există",
+        );
+      }
+      // A mentor who deleted their account stays in `program.mentors` (BR-34)
+      // so their history keeps rendering, which means membership no longer
+      // implies availability — they cannot take on a new organization.
+      const deletedMentors = await strapi
+        .documents("plugin::users-permissions.user")
+        .findMany({
+          filters: { documentId: { $in: mentorIds }, accountStatus: "deleted" },
+        });
+      if (deletedMentors.length > 0) {
+        return ctx.badRequest(
+          "Persoana resursă selectată și-a șters contul și nu mai poate fi alocată",
         );
       }
       const row = await findOrCreateNgoMentorRow(strapi, programId, ongId);
