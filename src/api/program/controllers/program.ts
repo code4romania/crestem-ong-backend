@@ -9,9 +9,12 @@ import {
 } from "../validation/assign-ongs";
 import {
   findPhaseReport,
+  phaseEndedForUnfinishedReport,
+  phaseEvaluationsView,
   phasesOfProgram,
   phaseOfSameProgram,
   reportsInProgram,
+  resolvePickPhase,
   targetEntryPhase,
 } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
@@ -525,7 +528,7 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: ctx.params.documentId,
-        populate: { ongs: true, mentors: true },
+        populate: { ongs: true, mentors: true, phases: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
@@ -574,6 +577,11 @@ export default factories.createCoreController(
                 ? { documentId: report.documentId, name: report.name }
                 : null,
               mentors: mentorsByOng.get(ong.documentId) ?? [],
+              phaseEvaluations: phaseEvaluationsView(
+                program,
+                ong.documentId,
+                reports,
+              ),
             };
           }),
         },
@@ -805,14 +813,20 @@ export default factories.createCoreController(
       }
       const ongByDocumentId = new Map(ongs.map((ong) => [ong.documentId, ong]));
       const picks = entries.filter((entry) => entry.report);
-      const entryPhase = targetEntryPhase(program, todayInBucharest());
-      if (picks.length > 0 && !entryPhase) {
-        return ctx.badRequest(
-          "Programul nu are o fază care să accepte evaluare",
-        );
-      }
+      const today = todayInBucharest();
+      const phaseByOng = new Map<string, any>();
       for (const pick of picks) {
         const ong = ongByDocumentId.get(pick.ong);
+        const resolved = resolvePickPhase(
+          program,
+          pick.phase,
+          today,
+          ong?.name ?? "",
+        );
+        if ("error" in resolved) {
+          return ctx.badRequest(resolved.error);
+        }
+        const phase = resolved.phase;
         const report = await strapi.documents("api::report.report").findOne({
           documentId: pick.report,
           populate: { ong: true, phases: { populate: { program: true } } },
@@ -822,22 +836,24 @@ export default factories.createCoreController(
             `Evaluarea nu aparține organizației ${ong?.name}`,
           );
         }
+        if (phaseEndedForUnfinishedReport(phase, report, today)) {
+          return ctx.badRequest(
+            `Faza ${phase.title} s-a încheiat; poți asocia doar evaluări finalizate`,
+          );
+        }
         const clash = phaseOfSameProgram(report, program.documentId);
         if (clash) {
           return ctx.badRequest(
             `Evaluarea este deja asociată fazei ${clash.title} din acest program`,
           );
         }
-        const taken = await findPhaseReport(
-          strapi,
-          entryPhase.documentId,
-          pick.ong,
-        );
+        const taken = await findPhaseReport(strapi, phase.documentId, pick.ong);
         if (taken) {
           return ctx.badRequest(
-            `Faza ${entryPhase.title} are deja o evaluare pentru organizația ${ong?.name}`,
+            `Faza ${phase.title} are deja o evaluare pentru organizația ${ong?.name}`,
           );
         }
+        phaseByOng.set(pick.ong, phase);
       }
       const updated = await strapi.documents("api::program.program").update({
         documentId: program.documentId,
@@ -845,9 +861,10 @@ export default factories.createCoreController(
         populate: { ongs: true },
       });
       for (const pick of picks) {
+        const phase = phaseByOng.get(pick.ong);
         await strapi.documents("api::report.report").update({
           documentId: pick.report,
-          data: { phases: { connect: [docRef(entryPhase.documentId)] } },
+          data: { phases: { connect: [docRef(phase.documentId)] } },
         });
       }
       let emailSent = true;
