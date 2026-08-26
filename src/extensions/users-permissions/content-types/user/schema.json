@@ -94,6 +94,9 @@
     "lastLoginAt": {
       "type": "datetime"
     },
+    "firstLoginAt": {
+      "type": "datetime"
+    },
     "mentorJobTitle": {
       "type": "string"
     },

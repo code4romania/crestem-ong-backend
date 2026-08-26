@@ -1554,6 +1554,7 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     emailChangeToken: Schema.Attribute.String & Schema.Attribute.Private;
+    firstLoginAt: Schema.Attribute.DateTime;
     judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
