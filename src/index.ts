@@ -206,6 +206,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.requestEmailChange",
     "api::ong.ong.joinable",
     "api::ong.ong.createJoinRequest",
+    "api::individual.individual.me",
+    "api::individual.individual.updateMe",
   ],
 };
 

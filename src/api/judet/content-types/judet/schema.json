@@ -27,6 +27,12 @@
       "relation": "oneToMany",
       "target": "api::localitate.localitate",
       "mappedBy": "judet"
+    },
+    "users": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "judet"
     }
   }
 }

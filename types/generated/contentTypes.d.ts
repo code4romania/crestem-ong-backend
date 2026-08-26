@@ -612,6 +612,10 @@ export interface ApiJudetJudet extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -642,6 +646,10 @@ export interface ApiLocalitateLocalitate extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -1546,8 +1554,13 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     emailChangeToken: Schema.Attribute.String & Schema.Attribute.Private;
+    judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localitate: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::localitate.localitate'
+    >;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'plugin::users-permissions.user'

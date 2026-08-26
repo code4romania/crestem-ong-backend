@@ -164,8 +164,19 @@ export const registerMentorSchema = inviteSchema.extend({
     .max(20, "Poți adăuga maxim 20 de arii de expertiză")
     .optional(),
 });
-/** Members belong to an organization, so they carry a role there. Mentors do not. */
-export const registerMemberSchema = inviteSchema.extend({ rol: ngoRoleSchema });
+/**
+ * Members belong to an organization, so they carry a role there. Mentors do not.
+ * Unlike the accept-join-request flow (which reuses `ngoRoleSchema` as required),
+ * the NGO admin can leave this blank when inviting a member directly.
+ */
+export const registerMemberSchema = inviteSchema.extend({
+  rol: z
+    .string()
+    .trim()
+    .max(100, "Rolul în organizație este prea lung")
+    .optional()
+    .transform((val) => (val ? val : undefined)),
+});
 /** FDSC staff accounts (super-admin / editor-fdsc) — nume + email only, no org. */
 export const registerStaffSchema = inviteSchema.extend({
   role: z.enum(["super-admin", "editor-fdsc"], { message: "Rol invalid" }),

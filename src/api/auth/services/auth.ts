@@ -300,12 +300,14 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           );
         }
 
-        await setNgoMemberRole(
-          strapi,
-          created.documentId,
-          ong.documentId,
-          data.rol,
-        );
+        if (data.rol) {
+          await setNgoMemberRole(
+            strapi,
+            created.documentId,
+            ong.documentId,
+            data.rol,
+          );
+        }
 
         const activationToken = signActivationToken(created.id);
 
