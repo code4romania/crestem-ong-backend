@@ -15,6 +15,22 @@ export const userOngs = (user: any): any[] =>
 export const belongsToOng = (user: any, ongDocumentId: string) =>
   userOngs(user).some((ong) => ong.documentId === ongDocumentId);
 
+/** Whether `mentorDocumentId` has an `ngo-mentor` row linking them to this ong. */
+export const mentorHasOng = async (
+  strapi: any,
+  mentorDocumentId: string,
+  ongDocumentId: string,
+): Promise<boolean> => {
+  const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+    filters: {
+      mentors: { documentId: mentorDocumentId },
+      ong: { documentId: ongDocumentId },
+    },
+    limit: 1,
+  });
+  return rows.length > 0;
+};
+
 export const resolveActingOng = (
   user: any,
   requested?: string,

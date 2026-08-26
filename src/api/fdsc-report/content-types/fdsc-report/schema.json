@@ -22,10 +22,10 @@
       "target": "api::ong.ong",
       "inversedBy": "fdscReports"
     },
-    "program": {
+    "evaluation": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "api::program.program"
+      "target": "api::report.report"
     },
     "file": {
       "type": "media",

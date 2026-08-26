@@ -6,14 +6,16 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { computeReportScores } from "../../report/utils/scores";
-import { phaseOfSameProgram } from "../../report/utils/association";
+import { phaseOfSameProgram, programOfReport } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
-import { todayInBucharest } from "../../../utils/date";
+import { toDateString, todayInBucharest } from "../../../utils/date";
+import { computeProgramStatus } from "../../program/utils/status";
 import { pendingActivationTokens } from "../../../utils/activation";
 import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
   loadUserWithOngs,
+  mentorHasOng,
   requireOng,
 } from "../../../utils/ong-scope";
 import {
@@ -72,6 +74,7 @@ const meetingMentorView = (mentor: any) =>
     : null;
 import { performOngDeletion } from "../services/delete-ong";
 import { authorizeOngDeletion } from "../utils/delete-access";
+import { deleteUploadedFile } from "../../../utils/media";
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
@@ -148,6 +151,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (ctx.state.user.role?.type === "ngo-admin") {
       const user = await loadUserWithOngs(strapi, ctx.state.user.documentId);
       if (!belongsToOng(user, ong.documentId)) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
         return ctx.forbidden("Nu ai acces la această organizație");
       }
     }
@@ -608,6 +621,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
     const reports = await strapi.documents("api::report.report").findMany({
       filters: { ong: { documentId: ong.documentId } },
       sort: { createdAt: "desc" },
@@ -674,6 +697,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
     const programParam = ctx.query.program;
     if (programParam !== undefined && typeof programParam !== "string") {
       return ctx.badRequest("Parametrul program este invalid");
@@ -697,7 +730,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     const eligible = programDocumentId
       ? reports.filter(
-          (report: any) => !phaseOfSameProgram(report, programDocumentId),
+          (report: any) => phaseOfSameProgram(report, programDocumentId),
         )
       : reports;
     const today = todayInBucharest();
@@ -737,20 +770,37 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!ong) {
       return ctx.badRequest("Organizația nu există");
     }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
     const reports = await strapi
       .documents("api::fdsc-report.fdsc-report")
       .findMany({
         filters: { ong: { documentId: ong.documentId } },
         sort: { uploadedAt: "desc" },
-        populate: { program: true, file: true },
+        populate: {
+          evaluation: { populate: { phases: { populate: { program: true } } } },
+          file: true,
+        },
       });
     return {
       data: (reports as any[]).map((report) => ({
         documentId: report.documentId,
         name: report.name,
         uploadedAt: report.uploadedAt,
-        program: report.program
-          ? { documentId: report.program.documentId, name: report.program.name }
+        evaluation: report.evaluation
+          ? {
+              documentId: report.evaluation.documentId,
+              name: report.evaluation.name,
+              program: programOfReport(report.evaluation),
+            }
           : null,
         file: report.file
           ? {
@@ -776,18 +826,15 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!parsed.success) {
       return ctx.badRequest("Date invalide: ", parsed.error.flatten());
     }
-    const program = await strapi.documents("api::program.program").findOne({
-      documentId: parsed.data.program,
-      populate: { ongs: true },
+    const evaluation = await strapi.documents("api::report.report").findOne({
+      documentId: parsed.data.evaluation,
+      populate: { ong: true, phases: { populate: { program: true } } },
     });
-    if (!program) {
-      return ctx.badRequest("Programul nu există");
+    if (!evaluation) {
+      return ctx.badRequest("Evaluarea nu există");
     }
-    const participates = ((program.ongs ?? []) as any[]).some(
-      (entry) => entry.documentId === ong.documentId,
-    );
-    if (!participates) {
-      return ctx.badRequest("Organizația nu participă la acest program");
+    if ((evaluation.ong as any)?.documentId !== ong.documentId) {
+      return ctx.badRequest("Evaluarea nu aparține acestei organizații");
     }
     const uploaded = await uploadSingleFile(ctx);
     if ("error" in uploaded) {
@@ -799,21 +846,25 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         data: {
           name: parsed.data.name,
           ong: docRef(ong.documentId),
-          program: docRef(program.documentId),
+          evaluation: docRef(evaluation.documentId),
           file: { id: uploaded.id },
           uploadedAt: new Date().toISOString(),
         },
-        populate: { program: true, file: true },
+        populate: {
+          evaluation: { populate: { phases: { populate: { program: true } } } },
+          file: true,
+        },
       });
     return {
       data: {
         documentId: created.documentId,
         name: created.name,
         uploadedAt: created.uploadedAt,
-        program: created.program
+        evaluation: created.evaluation
           ? {
-              documentId: created.program.documentId,
-              name: created.program.name,
+              documentId: created.evaluation.documentId,
+              name: created.evaluation.name,
+              program: programOfReport(created.evaluation),
             }
           : null,
         file: created.file
@@ -825,6 +876,31 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           : null,
       },
     };
+  },
+  async deleteFdscReport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    const report = await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .findOne({
+        documentId: ctx.params.reportDocumentId,
+        populate: { ong: true, file: true },
+      });
+    if (!report || (report.ong as any)?.documentId !== ong.documentId) {
+      return ctx.badRequest("Raportul nu există");
+    }
+    await deleteUploadedFile(strapi, report.file as any);
+    await strapi
+      .documents("api::fdsc-report.fdsc-report")
+      .delete({ documentId: report.documentId });
+    return { message: "Raportul a fost șters cu succes" };
   },
   async mentors(ctx: Context) {
     if (!ctx.state.user) {
@@ -902,6 +978,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async evaluationDetail(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ctx.params.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
     }
     const report = await strapi.documents("api::report.report").findOne({
       documentId: ctx.params.reportDocumentId,
@@ -1340,6 +1426,102 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       data: Array.from(ongsById.values()).sort((a, b) =>
         a.name.localeCompare(b.name),
       ),
+    };
+  },
+
+  /**
+   * The mentor's own programs (grouped from their `ngo-mentor` rows), each with
+   * the ONGs they specifically mentor within it — as opposed to `ongsForMentor`,
+   * which groups the same rows by ONG instead of by program.
+   */
+  async programsForMentor(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: { mentors: { documentId: ctx.state.user.documentId } },
+      populate: { ong: true, program: true },
+    });
+    const byOng = await membersByOng(strapi);
+    const today = todayInBucharest();
+    const programsById = new Map<
+      string,
+      {
+        documentId: string;
+        name: string;
+        startDate: string;
+        endDate: string;
+        programStatus: string;
+        ongs: {
+          documentId: string;
+          name: string;
+          memberCount: number;
+          admin: { nume: string; email: string } | null;
+        }[];
+      }
+    >();
+    for (const row of rows as any[]) {
+      const rowOngs = Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
+      const rowPrograms = Array.isArray(row.program)
+        ? row.program
+        : row.program
+          ? [row.program]
+          : [];
+      for (const program of rowPrograms) {
+        const existing = programsById.get(program.documentId) ?? {
+          documentId: program.documentId,
+          name: program.name,
+          startDate: program.startDate,
+          endDate: program.endDate,
+          programStatus: computeProgramStatus(
+            toDateString(program.startDate),
+            toDateString(program.endDate),
+            today,
+          ),
+          ongs: [] as {
+            documentId: string;
+            name: string;
+            memberCount: number;
+            admin: { nume: string; email: string } | null;
+          }[],
+        };
+        for (const ong of rowOngs) {
+          if (existing.ongs.some((entry) => entry.documentId === ong.documentId)) {
+            continue;
+          }
+          const members = byOng.get(ong.documentId);
+          existing.ongs.push({
+            documentId: ong.documentId,
+            name: ong.name,
+            memberCount: members?.memberCount ?? 0,
+            admin: members?.admin
+              ? { nume: members.admin.nume, email: members.admin.email }
+              : null,
+          });
+        }
+        programsById.set(program.documentId, existing);
+      }
+    }
+    const statusPriority: Record<string, number> = {
+      Active: 0,
+      Upcoming: 1,
+      Finished: 2,
+    };
+    return {
+      data: Array.from(programsById.values())
+        .map((program) => ({
+          ...program,
+          ongs: program.ongs.sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => {
+          const priorityDiff =
+            (statusPriority[a.programStatus] ?? 3) -
+            (statusPriority[b.programStatus] ?? 3);
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+          return `${b.startDate}`.localeCompare(`${a.startDate}`);
+        }),
     };
   },
 
