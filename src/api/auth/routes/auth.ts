@@ -22,6 +22,8 @@ export default {
       method: "POST",
       path: "/auth/register/mentor",
       handler: "auth.registerMentor",
+      // Creating a person, mentor or staff, is the administrator's. An
+      // `editor-fdsc` only reads "Persoane resursă".
       config: { policies: ["global::is-super-admin"] },
     },
     {

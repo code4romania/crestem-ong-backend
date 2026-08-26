@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/dashboard/fdsc",
       handler: "dashboard.fdsc",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-fdsc-staff"] },
     },
     {
       method: "GET",

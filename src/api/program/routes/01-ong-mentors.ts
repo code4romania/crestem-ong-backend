@@ -10,13 +10,13 @@ export default {
       method: "POST",
       path: "/programs/assign-ong-mentors",
       handler: "program.assignOngMentors",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-fdsc-staff"] },
     },
     {
       method: "POST",
       path: "/programs/remove-ong-mentors",
       handler: "program.removeOngMentors",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-fdsc-staff"] },
     },
   ],
 };

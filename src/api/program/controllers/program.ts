@@ -28,6 +28,7 @@ import {
   programFinishedError,
 } from "../utils/phase-locks";
 import { toDateString, todayInBucharest } from "../../../utils/date";
+import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
@@ -475,7 +476,7 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
-      if (ctx.state.user.role?.type !== "super-admin") {
+      if (!isFdscStaff(ctx.state.user.role?.type)) {
         const scope = await requireOng(strapi, ctx);
         if ("error" in scope) {
           return ctx.badRequest(scope.error);

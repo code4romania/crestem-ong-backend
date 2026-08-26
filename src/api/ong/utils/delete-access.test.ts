@@ -338,3 +338,31 @@ describe("authorizeOngDeletion", () => {
     });
   });
 });
+
+describe("decideOngDeletion — FDSC editor", () => {
+  it("lets an editor-fdsc delete an organization they do not belong to", () => {
+    expect(
+      decideOngDeletion({
+        roleType: "editor-fdsc",
+        ownsTarget: false,
+        targetExists: true,
+        targetDeleted: false,
+      }),
+    ).toEqual({ outcome: "allowed" });
+  });
+
+  it("tells an editor-fdsc when the organization does not exist", () => {
+    expect(
+      decideOngDeletion({
+        roleType: "editor-fdsc",
+        ownsTarget: false,
+        targetExists: false,
+        targetDeleted: false,
+      }),
+    ).toEqual({
+      outcome: "denied",
+      status: "badRequest",
+      message: ONG_NOT_FOUND_MESSAGE,
+    });
+  });
+});

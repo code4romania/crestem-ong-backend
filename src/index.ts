@@ -18,7 +18,7 @@ const APP_ROLES = [
     type: "editor-fdsc",
     name: "Editor FDSC",
     description:
-      "Cont de personal FDSC fără permisiuni suplimentare alocate încă.",
+      "Personal FDSC cu acces identic cu Admin FDSC, fără administrarea utilizatorilor.",
   },
   {
     type: "ngo-admin",
@@ -43,8 +43,11 @@ const APP_ROLES = [
   },
 ];
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  "super-admin": [
+/**
+ * Everything the administrator reaches. `editor-fdsc` is derived from it below:
+ * the two FDSC staff accounts differ by exactly one action.
+ */
+const SUPER_ADMIN_PERMISSIONS = [
     "api::dashboard.dashboard.fdsc",
     "api::auth.auth.me",
     "api::auth.auth.registerMentor",
@@ -86,8 +89,28 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::admin-user.admin-user.findOne",
     "api::admin-user.admin-user.update",
     "plugin::upload.content-api.upload",
-  ],
-  "editor-fdsc": ["api::auth.auth.me", "api::auth.auth.changePassword"],
+];
+
+/**
+ * User administration is what the editor does not get. It keeps the read-only
+ * `admin-user` actions because "Persoane resursă" lists mentors through them —
+ * narrowed to mentor targets by `api/admin-user/utils/access.ts` — but creating
+ * an account and editing one both stay with the administrator.
+ */
+const EDITOR_FDSC_DENIED_ACTIONS = [
+  "api::auth.auth.registerStaff",
+  "api::auth.auth.registerMentor",
+  "api::auth.auth.resendMentorInvite",
+  "api::admin-user.admin-user.update",
+];
+
+const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
+  (action) => !EDITOR_FDSC_DENIED_ACTIONS.includes(action),
+);
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  "super-admin": SUPER_ADMIN_PERMISSIONS,
+  "editor-fdsc": EDITOR_FDSC_PERMISSIONS,
   "ngo-admin": [
     "api::dashboard.dashboard.ong",
     "api::auth.auth.me",
