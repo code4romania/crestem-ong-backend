@@ -9,9 +9,12 @@ import {
 } from "../validation/assign-ongs";
 import {
   findPhaseReport,
+  phaseEndedForUnfinishedReport,
+  phaseEvaluationsView,
   phasesOfProgram,
   phaseOfSameProgram,
   reportsInProgram,
+  resolvePickPhase,
   targetEntryPhase,
 } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
@@ -28,10 +31,12 @@ import {
   programFinishedError,
 } from "../utils/phase-locks";
 import { toDateString, todayInBucharest } from "../../../utils/date";
+import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
+import { isAnonymized } from "../../../utils/anonymize";
 
 const ongView = (ong: any) => ({
   documentId: ong.documentId,
@@ -458,7 +463,12 @@ export default factories.createCoreController(
       return {
         data: {
           ongsCount: ongIds.length,
-          mentorsCount: ((program.mentors ?? []) as any[]).length,
+          // Mentors who deleted their account stay assigned so their history
+          // stays readable (BR-34), but they are nobody's resource any more —
+          // counting them would show a program as staffed when it is not.
+          mentorsCount: ((program.mentors ?? []) as any[]).filter(
+            (mentor) => !isAnonymized(mentor),
+          ).length,
           inEvaluation,
           finalizedEvaluation,
         },
@@ -475,7 +485,7 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
-      if (ctx.state.user.role?.type !== "super-admin") {
+      if (!isFdscStaff(ctx.state.user.role?.type)) {
         const scope = await requireOng(strapi, ctx);
         if ("error" in scope) {
           return ctx.badRequest(scope.error);
@@ -524,7 +534,7 @@ export default factories.createCoreController(
       }
       const program = await strapi.documents("api::program.program").findOne({
         documentId: ctx.params.documentId,
-        populate: { ongs: true, mentors: true },
+        populate: { ongs: true, mentors: true, phases: true },
       });
       if (!program) {
         return ctx.badRequest("Programul nu există");
@@ -573,6 +583,11 @@ export default factories.createCoreController(
                 ? { documentId: report.documentId, name: report.name }
                 : null,
               mentors: mentorsByOng.get(ong.documentId) ?? [],
+              phaseEvaluations: phaseEvaluationsView(
+                program,
+                ong.documentId,
+                reports,
+              ),
             };
           }),
         },
@@ -703,6 +718,19 @@ export default factories.createCoreController(
             : "Persoana resursă nu există",
         );
       }
+      // A mentor who deleted their account stays in `program.mentors` (BR-34)
+      // so their history keeps rendering, which means membership no longer
+      // implies availability — they cannot take on a new organization.
+      const deletedMentors = await strapi
+        .documents("plugin::users-permissions.user")
+        .findMany({
+          filters: { documentId: { $in: mentorIds }, accountStatus: "deleted" },
+        });
+      if (deletedMentors.length > 0) {
+        return ctx.badRequest(
+          "Persoana resursă selectată și-a șters contul și nu mai poate fi alocată",
+        );
+      }
       const row = await findOrCreateNgoMentorRow(strapi, programId, ongId);
       const updated = await strapi.documents("api::ngo-mentor.ngo-mentor").update({
         documentId: row.documentId,
@@ -804,14 +832,20 @@ export default factories.createCoreController(
       }
       const ongByDocumentId = new Map(ongs.map((ong) => [ong.documentId, ong]));
       const picks = entries.filter((entry) => entry.report);
-      const entryPhase = targetEntryPhase(program, todayInBucharest());
-      if (picks.length > 0 && !entryPhase) {
-        return ctx.badRequest(
-          "Programul nu are o fază care să accepte evaluare",
-        );
-      }
+      const today = todayInBucharest();
+      const phaseByOng = new Map<string, any>();
       for (const pick of picks) {
         const ong = ongByDocumentId.get(pick.ong);
+        const resolved = resolvePickPhase(
+          program,
+          pick.phase,
+          today,
+          ong?.name ?? "",
+        );
+        if ("error" in resolved) {
+          return ctx.badRequest(resolved.error);
+        }
+        const phase = resolved.phase;
         const report = await strapi.documents("api::report.report").findOne({
           documentId: pick.report,
           populate: { ong: true, phases: { populate: { program: true } } },
@@ -821,22 +855,24 @@ export default factories.createCoreController(
             `Evaluarea nu aparține organizației ${ong?.name}`,
           );
         }
+        if (phaseEndedForUnfinishedReport(phase, report, today)) {
+          return ctx.badRequest(
+            `Faza ${phase.title} s-a încheiat; poți asocia doar evaluări finalizate`,
+          );
+        }
         const clash = phaseOfSameProgram(report, program.documentId);
         if (clash) {
           return ctx.badRequest(
             `Evaluarea este deja asociată fazei ${clash.title} din acest program`,
           );
         }
-        const taken = await findPhaseReport(
-          strapi,
-          entryPhase.documentId,
-          pick.ong,
-        );
+        const taken = await findPhaseReport(strapi, phase.documentId, pick.ong);
         if (taken) {
           return ctx.badRequest(
-            `Faza ${entryPhase.title} are deja o evaluare pentru organizația ${ong?.name}`,
+            `Faza ${phase.title} are deja o evaluare pentru organizația ${ong?.name}`,
           );
         }
+        phaseByOng.set(pick.ong, phase);
       }
       const updated = await strapi.documents("api::program.program").update({
         documentId: program.documentId,
@@ -844,9 +880,10 @@ export default factories.createCoreController(
         populate: { ongs: true },
       });
       for (const pick of picks) {
+        const phase = phaseByOng.get(pick.ong);
         await strapi.documents("api::report.report").update({
           documentId: pick.report,
-          data: { phases: { connect: [docRef(entryPhase.documentId)] } },
+          data: { phases: { connect: [docRef(phase.documentId)] } },
         });
       }
       let emailSent = true;

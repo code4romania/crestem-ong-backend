@@ -18,7 +18,7 @@ const APP_ROLES = [
     type: "editor-fdsc",
     name: "Editor FDSC",
     description:
-      "Cont de personal FDSC fără permisiuni suplimentare alocate încă.",
+      "Personal FDSC cu acces identic cu Admin FDSC, fără administrarea utilizatorilor.",
   },
   {
     type: "ngo-admin",
@@ -43,8 +43,11 @@ const APP_ROLES = [
   },
 ];
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  "super-admin": [
+/**
+ * Everything the administrator reaches. `editor-fdsc` is derived from it below:
+ * the two FDSC staff accounts differ by exactly one action.
+ */
+const SUPER_ADMIN_PERMISSIONS = [
     "api::dashboard.dashboard.fdsc",
     "api::auth.auth.me",
     "api::auth.auth.registerMentor",
@@ -74,6 +77,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.evaluationDetail",
     "api::ong.ong.fdscReports",
     "api::ong.ong.createFdscReport",
+    "api::ong.ong.deleteFdscReport",
     "api::ong.ong.mentors",
     "api::ong.ong.meetings",
     "plugin::upload.content-api.upload",
@@ -86,8 +90,28 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::admin-user.admin-user.findOne",
     "api::admin-user.admin-user.update",
     "plugin::upload.content-api.upload",
-  ],
-  "editor-fdsc": ["api::auth.auth.me", "api::auth.auth.changePassword"],
+];
+
+/**
+ * User administration is what the editor does not get. It keeps the read-only
+ * `admin-user` actions because "Persoane resursă" lists mentors through them —
+ * narrowed to mentor targets by `api/admin-user/utils/access.ts` — but creating
+ * an account and editing one both stay with the administrator.
+ */
+const EDITOR_FDSC_DENIED_ACTIONS = [
+  "api::auth.auth.registerStaff",
+  "api::auth.auth.registerMentor",
+  "api::auth.auth.resendMentorInvite",
+  "api::admin-user.admin-user.update",
+];
+
+const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
+  (action) => !EDITOR_FDSC_DENIED_ACTIONS.includes(action),
+);
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  "super-admin": SUPER_ADMIN_PERMISSIONS,
+  "editor-fdsc": EDITOR_FDSC_PERMISSIONS,
   "ngo-admin": [
     "api::dashboard.dashboard.ong",
     "api::auth.auth.me",
@@ -120,6 +144,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.meetings",
     "api::report.report.list",
     "api::report.report.current",
+    "api::report.report.fdscReports",
     "api::report.report.start",
     "api::report.report.addMembers",
     "api::report.report.members",
@@ -157,6 +182,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.messagesForMentor",
     "api::conversation.conversation.sendMessageForMentor",
     "api::ong.ong.ongsForMentor",
+    "api::ong.ong.programsForMentor",
+    "api::ong.ong.detail",
+    "api::ong.ong.overview",
+    "api::ong.ong.evaluations",
+    "api::ong.ong.evaluationDetail",
+    "api::ong.ong.fdscReports",
     "api::ong.ong.meetingsForMentor",
     "api::ong.ong.createMeetingForMentor",
     "api::ong.ong.updateMeetingForMentor",
@@ -164,6 +195,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.completeMeetingForMentor",
     "api::ong.ong.uploadMeetingReportForMentor",
     "api::activity-type.activity-type.list",
+    "api::mentor.mentor.me",
+    "api::mentor.mentor.updateMe",
+    "plugin::upload.content-api.upload",
   ],
   individual: [
     "api::auth.auth.me",
@@ -172,6 +206,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::auth.auth.requestEmailChange",
     "api::ong.ong.joinable",
     "api::ong.ong.createJoinRequest",
+    "api::individual.individual.me",
+    "api::individual.individual.updateMe",
   ],
 };
 

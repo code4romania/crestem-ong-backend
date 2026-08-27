@@ -94,6 +94,9 @@
     "lastLoginAt": {
       "type": "datetime"
     },
+    "firstLoginAt": {
+      "type": "datetime"
+    },
     "mentorJobTitle": {
       "type": "string"
     },
@@ -121,6 +124,18 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::ong.ong",
+      "inversedBy": "users"
+    },
+    "judet": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::judet.judet",
+      "inversedBy": "users"
+    },
+    "localitate": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::localitate.localitate",
       "inversedBy": "users"
     }
   }

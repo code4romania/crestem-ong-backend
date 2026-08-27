@@ -36,3 +36,26 @@ export const updateStaffSchema = z.object({
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
 });
+
+/**
+ * Individual accounts: name plus an optional judet/localitate pair. If one of
+ * the two is provided the other must be too — the controller then checks the
+ * pair is a real county/city match via `checkCityBelongsToCounty`.
+ */
+export const updateIndividualSchema = z
+  .object({
+    nume: z
+      .string({ message: "Numele persoanei este obligatoriu" })
+      .trim()
+      .min(3, "Numele trebuie să aibă minim 3 caractere"),
+    judet: z.string().trim().min(1, "Județul selectat este invalid").optional(),
+    localitate: z
+      .string()
+      .trim()
+      .min(1, "Localitatea selectată este invalidă")
+      .optional(),
+  })
+  .refine((data) => !!data.judet === !!data.localitate, {
+    message: "Selectează atât județul cât și localitatea",
+    path: ["localitate"],
+  });

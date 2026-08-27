@@ -20,3 +20,12 @@ export const generateRawToken = () => crypto.randomBytes(48).toString("hex");
 
 export const refreshTtlMs = () =>
   parseDuration(process.env.REFRESH_TOKEN_TTL, 30 * DURATION_UNITS.d);
+
+/**
+ * How long after a token was rotated it may still be presented without being
+ * treated as reuse. Covers clients that had several requests in flight with the
+ * same cookie (a Link prefetch racing the click that follows it); a genuine
+ * replay lands far outside this window.
+ */
+export const reuseGraceMs = () =>
+  parseDuration(process.env.REFRESH_REUSE_GRACE, 30 * DURATION_UNITS.s);

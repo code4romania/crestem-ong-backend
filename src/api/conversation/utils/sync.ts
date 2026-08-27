@@ -1,3 +1,5 @@
+import { isAnonymized } from "../../../utils/anonymize";
+
 const collectOngEntries = (row: any) =>
   Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
 
@@ -14,7 +16,17 @@ const singleProgramId = (row: any): string | undefined => toArray(row.program)[0
 export const pairKey = (programDocumentId: string, otherDocumentId: string) =>
   `${programDocumentId}:${otherDocumentId}`;
 
-type OngMentorPair = { programDocumentId: string; mentorDocumentId: string };
+type OngMentorPair = {
+  programDocumentId: string;
+  mentorDocumentId: string;
+  /**
+   * A mentor who deleted their account keeps the assignment (BR-34), so the
+   * pair stays valid and the existing conversation keeps showing — greyed out
+   * and read-only. What must not happen is a *new*, empty conversation being
+   * conjured for someone who left before ever writing.
+   */
+  mentorDeleted: boolean;
+};
 type OngProgramPair = { programDocumentId: string; ongDocumentId: string };
 
 const getValidPairsForOng = async (
@@ -35,6 +47,7 @@ const getValidPairsForOng = async (
       pairs.set(pairKey(programDocumentId, mentor.documentId), {
         programDocumentId,
         mentorDocumentId: mentor.documentId,
+        mentorDeleted: isAnonymized(mentor),
       });
     }
   }
@@ -96,7 +109,7 @@ export const syncConversationsForOng = async (strapi: any, ong: any) => {
   );
 
   for (const [key, pair] of pairs) {
-    if (existingKeys.has(key)) {
+    if (existingKeys.has(key) || pair.mentorDeleted) {
       continue;
     }
     await strapi.documents("api::conversation.conversation").create({

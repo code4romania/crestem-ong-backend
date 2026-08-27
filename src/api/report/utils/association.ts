@@ -26,6 +26,62 @@ export const targetEntryPhase = (program: any, today: string) => {
   return phases.find((phase) => toDateString(phase.startDate) > today) ?? null;
 };
 
+export const resolvePickPhase = (
+  program: any,
+  phaseDocumentId: string | undefined,
+  today: string,
+  ongName: string,
+): { phase: any } | { error: string } => {
+  if (!phaseDocumentId) {
+    const phase = targetEntryPhase(program, today);
+    return phase
+      ? { phase }
+      : { error: "Programul nu are o fază care să accepte evaluare" };
+  }
+  const phase = ((program.phases ?? []) as any[]).find(
+    (candidate) => candidate.documentId === phaseDocumentId,
+  );
+  if (!phase) {
+    return {
+      error: `Faza selectată nu aparține acestui program pentru organizația ${ongName}`,
+    };
+  }
+  if (!phase.hasEvaluation) {
+    return {
+      error: `Faza ${phase.title} nu necesită evaluare pentru organizația ${ongName}`,
+    };
+  }
+  return { phase };
+};
+
+export const phaseEndedForUnfinishedReport = (
+  phase: any,
+  report: any,
+  today: string,
+): boolean => toDateString(phase.endDate) < today && !report.finished;
+
+export const phaseEvaluationsView = (
+  program: any,
+  ongDocumentId: string,
+  reportsInProgramList: any[],
+) =>
+  evaluationPhases(program).map((phase) => {
+    const report = reportsInProgramList.find(
+      (candidate) =>
+        candidate.ong?.documentId === ongDocumentId &&
+        phasesOfProgram(candidate, program.documentId).includes(
+          phase.documentId,
+        ),
+    );
+    return {
+      phaseDocumentId: phase.documentId,
+      phaseTitle: phase.title,
+      report: report
+        ? { documentId: report.documentId, name: report.name }
+        : null,
+    };
+  });
+
 export const findActivePhaseForOng = async (
   strapi: any,
   ongDocumentId: string,
@@ -106,3 +162,7 @@ export const phaseOfSameProgram = (report: any, programDocumentId: string) =>
   ((report.phases ?? []) as any[]).find(
     (phase) => phase.program?.documentId === programDocumentId,
   ) ?? null;
+
+export const programOfReport = (report: any) =>
+  ((report?.phases ?? []) as any[]).find((phase) => phase.program)?.program ??
+  null;

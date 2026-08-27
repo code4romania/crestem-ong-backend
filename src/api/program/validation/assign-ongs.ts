@@ -10,7 +10,11 @@ export const assignOngsSchema = z.object({
         z
           .string({ message: "Organizație invalidă" })
           .min(1, "Organizație invalidă")
-          .transform((ong) => ({ ong, report: undefined as string | undefined })),
+          .transform((ong) => ({
+            ong,
+            report: undefined as string | undefined,
+            phase: undefined as string | undefined,
+          })),
         z.object({
           ong: z
             .string({ message: "Organizație invalidă" })
@@ -18,6 +22,10 @@ export const assignOngsSchema = z.object({
           report: z
             .string({ message: "Evaluare invalidă" })
             .min(1, "Evaluare invalidă")
+            .optional(),
+          phase: z
+            .string({ message: "Faza invalidă" })
+            .min(1, "Faza invalidă")
             .optional(),
         }),
       ]),

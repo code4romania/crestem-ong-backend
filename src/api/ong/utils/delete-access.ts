@@ -1,4 +1,5 @@
 import { belongsToOng, loadUserWithOngs } from "../../../utils/ong-scope";
+import { isFdscStaff } from "../../../utils/fdsc-staff";
 
 const ONG_UID = "api::ong.ong";
 
@@ -40,7 +41,7 @@ export interface OngDeletionFacts {
 /**
  * Who may run `Șterge ONG`, as a pure function of server-loaded facts.
  *
- * - `super-admin` may delete any organization (unchanged).
+ * - FDSC staff (`super-admin`, `editor-fdsc`) may delete any organization.
  * - `ngo-admin` may delete only an organization they themselves belong to
  *   ("Business rules.txt": the option lives in the Admin ONG's own Acțiuni
  *   menu, with no approval step). BR-32 otherwise dead-ends them: they cannot
@@ -72,10 +73,10 @@ export interface OngDeletionFacts {
  */
 export function decideOngDeletion(facts: OngDeletionFacts): OngDeletionDecision {
   const { roleType, ownsTarget, targetExists, targetDeleted } = facts;
-  const isSuperAdmin = roleType === "super-admin";
+  const isStaff = isFdscStaff(roleType);
   const isNgoAdmin = roleType === "ngo-admin";
 
-  if (!isSuperAdmin && !isNgoAdmin) {
+  if (!isStaff && !isNgoAdmin) {
     return {
       outcome: "denied",
       status: "forbidden",
@@ -129,10 +130,10 @@ export async function authorizeOngDeletion(
   },
 ): Promise<OngDeletionDecision> {
   const { actorDocumentId, roleType, targetDocumentId } = input;
-  const isSuperAdmin = roleType === "super-admin";
+  const isStaff = isFdscStaff(roleType);
   const isNgoAdmin = roleType === "ngo-admin";
 
-  if (!isSuperAdmin && !isNgoAdmin) {
+  if (!isStaff && !isNgoAdmin) {
     // Refused on the role alone: no lookup is performed, so an unrelated role
     // cannot use this endpoint to probe anything at all.
     return decideOngDeletion({

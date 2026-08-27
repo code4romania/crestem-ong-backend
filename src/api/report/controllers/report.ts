@@ -18,6 +18,7 @@ import {
   findActivePhaseForOng,
   findOpenReport,
   findPhaseReport,
+  programOfReport,
 } from "../utils/association";
 import {
   toDateString,
@@ -263,6 +264,43 @@ export default factories.createCoreController(
           emailSent: invites ? invites.emailSent : null,
           emailFailed: invites ? invites.failed : [],
         },
+      };
+    },
+    async fdscReports(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const reports = await strapi
+        .documents("api::fdsc-report.fdsc-report")
+        .findMany({
+          filters: { ong: { documentId: ong.documentId } },
+          sort: { uploadedAt: "desc" },
+          populate: {
+            evaluation: { populate: { phases: { populate: { program: true } } } },
+            file: true,
+          },
+        });
+      return {
+        data: (reports as any[]).map((report) => ({
+          documentId: report.documentId,
+          name: report.name,
+          uploadedAt: report.uploadedAt,
+          evaluation: report.evaluation
+            ? {
+                documentId: report.evaluation.documentId,
+                name: report.evaluation.name,
+                program: programOfReport(report.evaluation),
+              }
+            : null,
+          file: report.file
+            ? { url: report.file.url, name: report.file.name, ext: report.file.ext }
+            : null,
+        })),
       };
     },
     async list(ctx: Context) {

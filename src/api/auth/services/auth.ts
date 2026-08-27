@@ -120,7 +120,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           data: {
             name: data.numeOng,
             cui: data.cui,
-            website: data.website,
             judet: docRef(data.judet),
             localitate: docRef(data.localitate),
             ngoStatus: "active",
@@ -300,12 +299,14 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           );
         }
 
-        await setNgoMemberRole(
-          strapi,
-          created.documentId,
-          ong.documentId,
-          data.rol,
-        );
+        if (data.rol) {
+          await setNgoMemberRole(
+            strapi,
+            created.documentId,
+            ong.documentId,
+            data.rol,
+          );
+        }
 
         const activationToken = signActivationToken(created.id);
 

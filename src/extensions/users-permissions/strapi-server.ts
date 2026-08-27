@@ -1,5 +1,6 @@
 import { errors } from "@strapi/utils";
 import type { RefreshTokenService } from "../../api/refresh-token/services/refresh-token";
+import { resolveLoginTimestamps } from "./utils/login-timestamps";
 
 const { ApplicationError } = errors;
 
@@ -20,7 +21,10 @@ export default (plugin: any) => {
 
       const user = await strapi.db
         .query("plugin::users-permissions.user")
-        .findOne({ where: { id: userId }, select: ["accountStatus"] });
+        .findOne({
+          where: { id: userId },
+          select: ["accountStatus", "firstLoginAt"],
+        });
 
       if (user && BLOCKED_STATUSES.includes(user.accountStatus)) {
         ctx.body = null;
@@ -29,12 +33,17 @@ export default (plugin: any) => {
         );
       }
 
+      const { isFirstLogin, data: loginTimestamps } = resolveLoginTimestamps(
+        user,
+        new Date(),
+      );
+
       try {
         await strapi.db
           .query("plugin::users-permissions.user")
-          .update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+          .update({ where: { id: userId }, data: loginTimestamps });
       } catch (error) {
-        strapi.log.error("Failed to record lastLoginAt", error);
+        strapi.log.error("Failed to record login timestamps", error);
       }
 
       const refreshToken = await (
@@ -43,7 +52,7 @@ export default (plugin: any) => {
         ) as RefreshTokenService
       ).issue(userId, ctx.request.header["user-agent"]);
 
-      ctx.body = { ...ctx.body, refreshToken };
+      ctx.body = { ...ctx.body, refreshToken, isFirstLogin };
     };
 
     return controller;

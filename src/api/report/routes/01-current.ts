@@ -20,6 +20,12 @@ export default {
     },
     {
       method: "GET",
+      path: "/reports/fdsc-reports",
+      handler: "report.fdscReports",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
+      method: "GET",
       path: "/reports/:documentId",
       handler: "report.detail",
       config: { policies: ["global::is-ngo-admin"] },

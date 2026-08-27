@@ -25,6 +25,12 @@
       "relation": "oneToMany",
       "target": "api::ong.ong",
       "mappedBy": "localitate"
+    },
+    "users": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "localitate"
     }
   }
 }

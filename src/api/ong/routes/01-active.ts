@@ -4,7 +4,7 @@ export default {
       method: "GET",
       path: "/ongs/active",
       handler: "ong.listActive",
-      config: { policies: ["global::is-super-admin"] },
+      config: { policies: ["global::is-fdsc-staff"] },
     },
   ],
 };

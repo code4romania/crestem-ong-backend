@@ -5,6 +5,7 @@ import {
   hashToken,
   generateRawToken,
   refreshTtlMs,
+  reuseGraceMs,
 } from "../utils/refresh-token";
 
 export type RotateResult = {
@@ -51,7 +52,23 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       throw new Error("Sesiune invalidă sau expirată. Autentifică-te din nou");
     }
 
+    // A Link prefetch and the click that follows it both carry whatever refresh
+    // cookie the browser held before either response came back, so the second
+    // call can arrive milliseconds after the token was legitimately rotated.
+    // Inside the grace window that is a concurrent refresh, not theft: issue
+    // another sibling and leave the successor the first call created alone.
+    // A live sibling must still exist — without one the family was already
+    // swept, and honouring the token would resurrect a revoked session.
+    let concurrentRefresh = false;
     if (record.revokedAt) {
+      const revokedAgeMs = Date.now() - new Date(record.revokedAt).getTime();
+      const liveSiblings = await strapi.db
+        .query("api::refresh-token.refresh-token")
+        .count({ where: { familyId: record.familyId, revokedAt: null } });
+      concurrentRefresh = revokedAgeMs <= reuseGraceMs() && liveSiblings > 0;
+    }
+
+    if (record.revokedAt && !concurrentRefresh) {
       await strapi.db.query("api::refresh-token.refresh-token").updateMany({
         where: { familyId: record.familyId, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -70,10 +87,16 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       throw new Error("Sesiune invalidă sau expirată. Autentifică-te din nou");
     }
 
-    await strapi.db.query("api::refresh-token.refresh-token").update({
-      where: { id: record.id },
-      data: { revokedAt: new Date() },
-    });
+    if (concurrentRefresh) {
+      strapi.log.info(
+        `[refresh-token] Concurrent refresh for family ${record.familyId}; issuing a sibling.`,
+      );
+    } else {
+      await strapi.db.query("api::refresh-token.refresh-token").update({
+        where: { id: record.id },
+        data: { revokedAt: new Date() },
+      });
+    }
 
     const raw = generateRawToken();
 
@@ -89,7 +112,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
 
     return { userId: record.user.id, refreshToken: raw };
   },
-
   async revoke(rawToken: string) {
     await strapi.db.query("api::refresh-token.refresh-token").updateMany({
       where: { tokenHash: hashToken(rawToken), revokedAt: null },

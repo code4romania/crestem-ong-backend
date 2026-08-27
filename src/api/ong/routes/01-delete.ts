@@ -8,7 +8,7 @@ export default {
       // organization* is theirs. `ong.deleteOne` decides ownership itself,
       // against memberships read from the database — see
       // `src/api/ong/utils/delete-access.ts`.
-      config: { policies: ["global::is-super-admin-or-ngo-admin"] },
+      config: { policies: ["global::is-fdsc-staff-or-ngo-admin"] },
     },
   ],
 };

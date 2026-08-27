@@ -1,47 +1,6 @@
 import { docRef } from "./relations";
 
-const PROGRAM_UID = "api::program.program";
 const NGO_MENTOR_UID = "api::ngo-mentor.ngo-mentor";
-
-const withoutUser = (entries: any[] | null | undefined, userDocumentId: string) =>
-  ((entries ?? []) as any[]).filter((entry) => entry?.documentId !== userDocumentId);
-
-const detachFrom = async (
-  strapi: any,
-  uid: string,
-  userDocumentId: string,
-): Promise<void> => {
-  const rows: any[] = await strapi.documents(uid).findMany({
-    filters: { mentors: { documentId: userDocumentId } },
-    populate: { mentors: true },
-  });
-  for (const row of rows) {
-    const current = (row.mentors ?? []) as any[];
-    if (!current.some((entry) => entry?.documentId === userDocumentId)) continue;
-    await strapi.documents(uid).update({
-      documentId: row.documentId,
-      data: {
-        mentors: withoutUser(current, userDocumentId).map((entry) =>
-          docRef(entry.documentId),
-        ),
-      },
-    });
-  }
-};
-
-/**
- * Ends every mentoring assignment of a deleted account (BR-34).
- *
- * Conversations, meetings and reports are deliberately left alone: their
- * content stays stored at organization level and simply renders as `Anonim`.
- */
-export async function detachMentorAssignments(
-  strapi: any,
-  userDocumentId: string,
-): Promise<void> {
-  await detachFrom(strapi, PROGRAM_UID, userDocumentId);
-  await detachFrom(strapi, NGO_MENTOR_UID, userDocumentId);
-}
 
 const withoutOng = (entries: any[] | null | undefined, ongDocumentId: string) =>
   ((entries ?? []) as any[]).filter((entry) => entry?.documentId !== ongDocumentId);
@@ -49,11 +8,17 @@ const withoutOng = (entries: any[] | null | undefined, ongDocumentId: string) =>
 /**
  * Ends every mentoring assignment of a deleted organization (BR-33).
  *
- * The mirror image of `detachMentorAssignments`, from the ONG side. Without it
- * the (ong, program, mentor) pair stays valid in `conversation/utils/sync`, so
- * the mentor keeps seeing the deleted organization's conversation in their list
- * after `Șterge ONG`. The mentor's own account is untouched; conversations,
- * meetings and reports stay stored against the anonymized organization.
+ * There is no mirror image on the account side: a mentor who deletes their own
+ * account (BR-34) keeps their `program.mentors` and `ngo-mentor.mentors` rows,
+ * so the organization still sees the conversation, meetings and reports of the
+ * person who worked with it — anonymized and read-only. Only the organization
+ * side detaches, because a deleted organization has nobody left to read them.
+ *
+ * Without this the (ong, program, mentor) pair stays valid in
+ * `conversation/utils/sync`, so the mentor keeps seeing the deleted
+ * organization's conversation in their list after `Șterge ONG`. The mentor's
+ * own account is untouched; conversations, meetings and reports stay stored
+ * against the anonymized organization.
  *
  * What this detach does *not* do is close the conversation. `listForMentor`
  * filters on the pair and so drops it from the list, but

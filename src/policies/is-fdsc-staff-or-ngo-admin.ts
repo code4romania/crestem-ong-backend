@@ -1,4 +1,5 @@
 import type { Core } from "@strapi/strapi";
+import { isFdscStaff } from "../utils/fdsc-staff";
 
 export default (
   policyContext: any,
@@ -9,5 +10,5 @@ export default (
 
   if (!user) return false;
 
-  return user.role?.type === "super-admin" || user.role?.type === "ngo-admin";
+  return isFdscStaff(user.role?.type) || user.role?.type === "ngo-admin";
 };

@@ -1,11 +1,18 @@
 import { computeReportScores, round1 } from "../../report/utils/scores";
 import { isClosed } from "../../report/utils/lifecycle";
+import { isAnonymized } from "../../../utils/anonymize";
 
 export interface OngDashboardMentor {
   documentId: string;
+  /** `Anonim <documentId>` once the account is deleted (BR-27). */
   nume: string;
   mentorJobTitle: string | null;
   avatar: { documentId: string; name: string; url: string } | null;
+  /**
+   * The person resource deleted their account. The collaboration stays listed
+   * (BR-34) — it happened — but renders greyed out.
+   */
+  isDeleted: boolean;
   program: {
     documentId: string;
     name: string;
@@ -145,17 +152,20 @@ export async function buildOngDashboard(
       if (!programMentorIds.has(mentor.documentId)) {
         continue;
       }
+      const deleted = isAnonymized(mentor);
       mentors.push({
         documentId: mentor.documentId,
         nume: mentor.nume,
-        mentorJobTitle: mentor.mentorJobTitle ?? null,
-        avatar: mentor.avatar
-          ? {
-              documentId: mentor.avatar.documentId,
-              name: mentor.avatar.name,
-              url: mentor.avatar.url,
-            }
-          : null,
+        mentorJobTitle: deleted ? null : (mentor.mentorJobTitle ?? null),
+        isDeleted: deleted,
+        avatar:
+          !deleted && mentor.avatar
+            ? {
+                documentId: mentor.avatar.documentId,
+                name: mentor.avatar.name,
+                url: mentor.avatar.url,
+              }
+            : null,
         program: {
           documentId: program.documentId,
           name: program.name,

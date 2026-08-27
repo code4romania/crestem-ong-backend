@@ -1,17 +1,31 @@
-export const mentorView = (mentor: any) => ({
-  documentId: mentor.documentId,
-  nume: mentor.nume,
-  email: mentor.email,
-  mentorJobTitle: mentor.mentorJobTitle ?? null,
-  mentorOrganization: mentor.mentorOrganization ?? null,
-  avatar: mentor.avatar
-    ? {
-        documentId: mentor.avatar.documentId,
-        name: mentor.avatar.name,
-        url: mentor.avatar.url,
-      }
-    : null,
-});
+import { isAnonymized } from "./anonymize";
+
+/**
+ * A mentor who deleted their account stays assigned (BR-34) so the
+ * organization keeps its history, but is rendered greyed out and inert. The
+ * name is already `Anonim <documentId>` (BR-27); `email` is the
+ * `deleted-…@anonim.local` placeholder and must never reach the client as if
+ * it were an address, so it is nulled here with the other contact fields.
+ */
+export const mentorView = (mentor: any) => {
+  const deleted = isAnonymized(mentor);
+  return {
+    documentId: mentor.documentId,
+    nume: mentor.nume,
+    email: deleted ? null : mentor.email,
+    mentorJobTitle: deleted ? null : (mentor.mentorJobTitle ?? null),
+    mentorOrganization: deleted ? null : (mentor.mentorOrganization ?? null),
+    avatar:
+      !deleted && mentor.avatar
+        ? {
+            documentId: mentor.avatar.documentId,
+            name: mentor.avatar.name,
+            url: mentor.avatar.url,
+          }
+        : null,
+    isDeleted: deleted,
+  };
+};
 
 /**
  * The persoane resursă assigned to one organization inside one program.

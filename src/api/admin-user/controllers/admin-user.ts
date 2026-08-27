@@ -6,6 +6,12 @@ import {
 } from "../../auth/utils/auth";
 import { pendingActivationTokens } from "../../../utils/activation";
 import { updateMentorSchema, updateStaffSchema } from "../validation/admin-user";
+import {
+  ADMIN_USER_FORBIDDEN_MESSAGE,
+  canActOnUser,
+  canEditUser,
+  resolveAdminUserRoleFilter,
+} from "../utils/access";
 
 const PAGE_SIZE = 20;
 const EDITABLE_ROLES = ["mentor", "super-admin", "editor-fdsc"] as const;
@@ -82,7 +88,10 @@ export default {
     const page =
       Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
     const searchTerm = typeof search === "string" ? search.trim() : "";
-    const roleType = typeof role === "string" ? role.trim() : "";
+    const roleType = resolveAdminUserRoleFilter(
+      ctx.state.user.role?.type,
+      typeof role === "string" ? role.trim() : "",
+    );
     const ongId = typeof ong === "string" ? ong.trim() : "";
     const accountStatus = typeof status === "string" ? status.trim() : "";
     const programId = typeof program === "string" ? program.trim() : "";
@@ -180,6 +189,10 @@ export default {
       return ctx.notFound("Utilizatorul nu a fost găsit");
     }
 
+    if (!canActOnUser(ctx.state.user.role?.type, user.role?.type)) {
+      return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
+    }
+
     const programsByMentor =
       user.role?.type === "mentor" ? await resolveProgramsByMentor([user.documentId]) : new Map();
 
@@ -211,6 +224,10 @@ export default {
     const roleType = user.role?.type as (typeof EDITABLE_ROLES)[number] | undefined;
     if (!roleType || !EDITABLE_ROLES.includes(roleType)) {
       return ctx.badRequest("Acest tip de cont nu poate fi editat din acest ecran.");
+    }
+
+    if (!canEditUser(ctx.state.user.role?.type)) {
+      return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
     }
 
     const schema = roleType === "mentor" ? updateMentorSchema : updateStaffSchema;

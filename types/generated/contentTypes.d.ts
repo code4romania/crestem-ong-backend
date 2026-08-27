@@ -566,6 +566,7 @@ export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    evaluation: Schema.Attribute.Relation<'manyToOne', 'api::report.report'>;
     file: Schema.Attribute.Media<'files'> & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -575,7 +576,6 @@ export interface ApiFdscReportFdscReport extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
-    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -612,6 +612,10 @@ export interface ApiJudetJudet extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -642,6 +646,10 @@ export interface ApiLocalitateLocalitate extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -1546,8 +1554,14 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     emailChangeToken: Schema.Attribute.String & Schema.Attribute.Private;
+    firstLoginAt: Schema.Attribute.DateTime;
+    judet: Schema.Attribute.Relation<'manyToOne', 'api::judet.judet'>;
     lastLoginAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localitate: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::localitate.localitate'
+    >;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'plugin::users-permissions.user'
