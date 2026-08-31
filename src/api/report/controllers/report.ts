@@ -1,6 +1,7 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
+import { collectAnonymousComments } from "../utils/comments";
 import { buildProgramRounds, reportView } from "../utils/rounds";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { hasResponses, isClosed, isProgramReport } from "../utils/lifecycle";
@@ -431,6 +432,7 @@ export default factories.createCoreController(
             (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
           ).length,
           scores: computeReportScores(evaluations),
+          comments: collectAnonymousComments(evaluations),
         },
       };
     },

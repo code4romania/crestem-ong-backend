@@ -5,7 +5,10 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeProgress } from "../../evaluation/utils/progress";
-import { computeReportScores } from "../../report/utils/scores";
+import {
+  computeEvaluationScores,
+  computeReportScores,
+} from "../../report/utils/scores";
 import { phaseOfSameProgram, programOfReport } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
 import { toDateString, todayInBucharest } from "../../../utils/date";
@@ -1044,6 +1047,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             evaluation.dimensions,
             isClosed(report, today),
           ),
+          scores: computeEvaluationScores(evaluation),
           dimensions: (evaluation.dimensions ?? []).map(decorateBlock),
         })),
       },
