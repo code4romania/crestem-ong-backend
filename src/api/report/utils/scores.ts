@@ -15,6 +15,8 @@ type ScoringBlock = EvaluationForScoring["dimensions"][number];
 
 export interface ReportScores {
   dimensions: Record<string, number | null>;
+  /** Per-question (sub-indicator) scores, keyed by question id. */
+  questions: Record<string, number | null>;
   overall: number | null;
 }
 
@@ -30,6 +32,19 @@ const isDimensionComplete = (dimension: Dimension, block?: ScoringBlock) => {
   }
   const answered = answeredIds(block);
   return dimension.quiz.every((question) => answered.has(question.id));
+};
+
+const questionPercentage = (
+  question: Dimension["quiz"][number],
+  block: ScoringBlock,
+) => {
+  const answer =
+    (block.quiz ?? []).find((item) => item.questionId === question.id)?.answer ??
+    0;
+  const values = question.options.map((option) => option.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return max === min ? 0 : ((answer - min) / (max - min)) * 100;
 };
 
 const dimensionPercentage = (dimension: Dimension, block: ScoringBlock) => {
@@ -75,11 +90,18 @@ export const computeEvaluationScores = (
 ): ReportScores => {
   const blocks = evaluation.dimensions ?? [];
   const dimensions: Record<string, number | null> = {};
+  const questions: Record<string, number | null> = {};
   for (const dimension of DIMENSIONS) {
     const block = blocks.find((b) => b.dimensionKey === dimension.key);
-    dimensions[dimension.key] = isDimensionComplete(dimension, block)
+    const complete = isDimensionComplete(dimension, block);
+    dimensions[dimension.key] = complete
       ? round1(dimensionPercentage(dimension, block))
       : null;
+    for (const question of dimension.quiz) {
+      questions[question.id] = complete
+        ? round1(questionPercentage(question, block))
+        : null;
+    }
   }
   const values = Object.values(dimensions);
   const overall = values.some((value) => value === null)
@@ -88,7 +110,7 @@ export const computeEvaluationScores = (
         (values as number[]).reduce((sum, value) => sum + value, 0) /
           values.length,
       );
-  return { dimensions, overall };
+  return { dimensions, questions, overall };
 };
 
 export const computeReportScores = (
@@ -96,20 +118,28 @@ export const computeReportScores = (
 ): ReportScores => {
   const complete = evaluations.filter(isComplete);
   const dimensions: Record<string, number | null> = {};
+  const questions: Record<string, number | null> = {};
+  const average = (values: number[]) =>
+    round1(values.reduce((sum, value) => sum + value, 0) / values.length);
   for (const dimension of DIMENSIONS) {
     if (complete.length === 0) {
       dimensions[dimension.key] = null;
+      for (const question of dimension.quiz) {
+        questions[question.id] = null;
+      }
       continue;
     }
-    const percentages = complete.map((evaluation) =>
-      dimensionPercentage(
-        dimension,
-        evaluation.dimensions.find((b) => b.dimensionKey === dimension.key),
-      ),
+    const blocks = complete.map((evaluation) =>
+      evaluation.dimensions.find((b) => b.dimensionKey === dimension.key),
     );
-    dimensions[dimension.key] = round1(
-      percentages.reduce((sum, p) => sum + p, 0) / percentages.length,
+    dimensions[dimension.key] = average(
+      blocks.map((block) => dimensionPercentage(dimension, block)),
     );
+    for (const question of dimension.quiz) {
+      questions[question.id] = average(
+        blocks.map((block) => questionPercentage(question, block)),
+      );
+    }
   }
   const values = Object.values(dimensions);
   const overall = values.some((v) => v === null)
@@ -117,5 +147,5 @@ export const computeReportScores = (
     : round1(
         (values as number[]).reduce((sum, v) => sum + v, 0) / values.length,
       );
-  return { dimensions, overall };
+  return { dimensions, questions, overall };
 };
