@@ -1047,6 +1047,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             evaluation.dimensions,
             isClosed(report, today),
           ),
+          completedAt: evaluation.completedAt ?? null,
           scores: computeEvaluationScores(evaluation),
           dimensions: (evaluation.dimensions ?? []).map(decorateBlock),
         })),
