@@ -86,6 +86,8 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::ong.ong.detail",
     "api::ong.ong.deleteOne",
     "api::mentor.mentor.listActive",
+    "api::public-person.public-person.list",
+    "api::public-person.public-person.programs",
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
     "api::admin-user.admin-user.update",
