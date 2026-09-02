@@ -91,6 +91,13 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
     "api::admin-user.admin-user.update",
+    // The platform-wide "Evaluări" screen, one action per tab: responses and
+    // rounds. Read-only, so the editor keeps them too.
+    "api::evaluation.admin-evaluation.list",
+    "api::report.admin-report.list",
+    // The options behind that screen's multi-select filters.
+    "api::ong.filter-options.ongs",
+    "api::ong.filter-options.programs",
     "plugin::upload.content-api.upload",
 ];
 
