@@ -8,27 +8,40 @@ export default ({ env }) => ({
   },
   email: {
     config: {
-      provider: "nodemailer",
+      provider: "amazon-ses",
       providerOptions: {
-        host: env("SMTP_HOST", "localhost"),
-        port: env.int("SMTP_PORT", 1025),
-        secure: false,
-        ignoreTLS: true,
-        // Authenticate only when credentials are present. Mailpit (local dev)
-        // accepts unauthenticated mail and rejects an AUTH handshake, so the
-        // `auth` block must be absent rather than empty.
-        ...(env("SMTP_USERNAME")
-          ? {
-              auth: {
-                user: env("SMTP_USERNAME"),
-                pass: env("SMTP_PASSWORD"),
-              },
-            }
-          : {}),
+        region: env("AWS_REGION", "eu-central-1"),
+        credentials: {
+          accessKeyId: env("AWS_ACCESS_KEY"),
+          secretAccessKey: env("AWS_ACCESS_SECRET"),
+        },
       },
       settings: {
         defaultFrom: env("EMAIL_FROM"),
         defaultReplyTo: env("EMAIL_REPLY_TO"),
+      },
+    },
+  },
+  upload: {
+    config: {
+      provider: "aws-s3",
+      providerOptions: {
+        s3Options: {
+          credentials: {
+            accessKeyId: env("AWS_ACCESS_KEY"),
+            secretAccessKey: env("AWS_ACCESS_SECRET"),
+          },
+          region: env("AWS_REGION"),
+          params: {
+            ACL: env("AWS_ACL", "private"),
+            Bucket: env("AWS_BUCKET"),
+          },
+        },
+      },
+      actionOptions: {
+        upload: {},
+        uploadStream: {},
+        delete: {},
       },
     },
   },
