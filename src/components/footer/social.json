@@ -1,0 +1,32 @@
+{
+  "collectionName": "components_footer_socials",
+  "info": {
+    "displayName": "Social Link",
+    "description": "One social profile. Built-in platforms render their own icon; `other` names itself through `label`."
+  },
+  "options": {},
+  "attributes": {
+    "platform": {
+      "type": "enumeration",
+      "enum": [
+        "facebook",
+        "twitter",
+        "instagram",
+        "linkedin",
+        "youtube",
+        "tiktok",
+        "github",
+        "other"
+      ],
+      "required": true
+    },
+    "label": {
+      "type": "string",
+      "required": false
+    },
+    "url": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

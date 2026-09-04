@@ -1,0 +1,23 @@
+{
+  "collectionName": "components_menu_items",
+  "info": {
+    "displayName": "Menu Item",
+    "description": "Top-level menu entry. `url` is optional because a footer parent is a column heading that never redirects."
+  },
+  "options": {},
+  "attributes": {
+    "label": {
+      "type": "string",
+      "required": true
+    },
+    "url": {
+      "type": "string",
+      "required": false
+    },
+    "children": {
+      "type": "component",
+      "repeatable": true,
+      "component": "menu.sub-item"
+    }
+  }
+}

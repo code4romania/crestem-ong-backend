@@ -1,0 +1,18 @@
+{
+  "collectionName": "components_menu_sub_items",
+  "info": {
+    "displayName": "Menu Sub Item",
+    "description": "Second-level menu link. Declares no children, so the tree cannot go deeper than two levels."
+  },
+  "options": {},
+  "attributes": {
+    "label": {
+      "type": "string",
+      "required": true
+    },
+    "url": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

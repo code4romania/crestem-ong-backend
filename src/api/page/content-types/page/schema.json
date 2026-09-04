@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pages",
+  "info": {
+    "singularName": "page",
+    "pluralName": "pages",
+    "displayName": "Page",
+    "description": "A public site page. Blocks are stored as JSON; `registry.ts` in the frontend owns their shapes."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "titlu": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "titlu",
+      "required": true
+    },
+    "vizibilitate": {
+      "type": "json",
+      "default": ["public"]
+    },
+    "blocuri": {
+      "type": "json",
+      "default": []
+    },
+    "fisiere": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": ["images", "videos", "files"]
+    }
+  }
+}

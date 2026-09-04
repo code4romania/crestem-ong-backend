@@ -2,6 +2,8 @@ import type { Core } from "@strapi/strapi";
 
 import { seedLocalities } from "./utils/seed-localities";
 import { seedDomains } from "./utils/seed-domains";
+import { seedMenus } from "./utils/seed-menus";
+import { seedFooter } from "./utils/seed-footer";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -87,6 +89,17 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::ong.ong.deleteOne",
     "api::mentor.mentor.listActive",
     "api::public-person.public-person.list",
+    // Reading the menus is public (the routes set `auth: false`); only the
+    // rewrite needs granting, and the editor keeps it.
+    "api::menu.menu.updateItems",
+    "api::footer.footer.updateOne",
+    "api::page.page.list",
+    "api::page.page.detail",
+    "api::page.page.createOne",
+    "api::page.page.updateOne",
+    "api::page.page.deleteOne",
+    "api::page.page.publishOne",
+    "api::page.page.unpublishOne",
     "api::public-person.public-person.programs",
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
@@ -220,6 +233,18 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 };
 
+/**
+ * Actions everyone may call, anonymous included. Appended to every role rather
+ * than granted to `public` alone: a permission on the Public role does not
+ * carry over to authenticated ones, so a signed-in user would be refused a page
+ * an anonymous visitor can read.
+ */
+const PUBLIC_READ_ACTIONS = ["api::page.page.bySlug"];
+
+for (const actions of Object.values(ROLE_PERMISSIONS)) {
+  actions.push(...PUBLIC_READ_ACTIONS);
+}
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -247,9 +272,12 @@ export default {
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
+    await ensurePublicPermissions(strapi);
     await backfillAccountStatus(strapi);
     await seedLocalities(strapi);
     await seedDomains(strapi);
+    await seedMenus(strapi);
+    await seedFooter(strapi);
   },
 };
 
@@ -347,6 +375,42 @@ async function ensureRolePermissions(strapi: Core.Strapi) {
       strapi.log.warn(
         `[bootstrap] Role "${roleType}" not found; skipping permission grants.`,
       );
+    }
+  }
+}
+
+/**
+ * Both built-in users-permissions roles: an anonymous visitor sits on
+ * `public`, but any signed-in user without an app role (or whose token simply
+ * resolves to Strapi's default) sits on `authenticated`. Granting only
+ * `public` leaves the latter with a 403 on a route meant to be readable by
+ * everyone.
+ */
+const PUBLICLY_GRANTED_ROLE_TYPES = ["public", "authenticated"] as const;
+
+async function ensurePublicPermissions(strapi: Core.Strapi) {
+  for (const roleType of PUBLICLY_GRANTED_ROLE_TYPES) {
+    const role = await strapi.db
+      .query("plugin::users-permissions.role")
+      .findOne({ where: { type: roleType } });
+
+    if (!role) {
+      strapi.log.warn(`[bootstrap] Role "${roleType}" not found; skipping public grants.`);
+      continue;
+    }
+
+    for (const action of PUBLIC_READ_ACTIONS) {
+      const existing = await strapi.db
+        .query("plugin::users-permissions.permission")
+        .findOne({ where: { action, role: role.id } });
+
+      if (existing) continue;
+
+      await strapi.db
+        .query("plugin::users-permissions.permission")
+        .create({ data: { action, role: role.id } });
+
+      strapi.log.info(`[bootstrap] Granted "${action}" to role "${roleType}".`);
     }
   }
 }
