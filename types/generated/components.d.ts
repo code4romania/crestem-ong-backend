@@ -36,11 +36,64 @@ export interface EvaluationQuestion extends Struct.ComponentSchema {
   };
 }
 
+export interface FooterSocial extends Struct.ComponentSchema {
+  collectionName: 'components_footer_socials';
+  info: {
+    description: 'One social profile. Built-in platforms render their own icon; `other` names itself through `label`.';
+    displayName: 'Social Link';
+  };
+  attributes: {
+    label: Schema.Attribute.String;
+    platform: Schema.Attribute.Enumeration<
+      [
+        'facebook',
+        'twitter',
+        'instagram',
+        'linkedin',
+        'youtube',
+        'tiktok',
+        'github',
+        'other',
+      ]
+    > &
+      Schema.Attribute.Required;
+    url: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
+export interface MenuItem extends Struct.ComponentSchema {
+  collectionName: 'components_menu_items';
+  info: {
+    description: 'Top-level menu entry. `url` is optional because a footer parent is a column heading that never redirects.';
+    displayName: 'Menu Item';
+  };
+  attributes: {
+    children: Schema.Attribute.Component<'menu.sub-item', true>;
+    label: Schema.Attribute.String & Schema.Attribute.Required;
+    url: Schema.Attribute.String;
+  };
+}
+
+export interface MenuSubItem extends Struct.ComponentSchema {
+  collectionName: 'components_menu_sub_items';
+  info: {
+    description: 'Second-level menu link. Declares no children, so the tree cannot go deeper than two levels.';
+    displayName: 'Menu Sub Item';
+  };
+  attributes: {
+    label: Schema.Attribute.String & Schema.Attribute.Required;
+    url: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
       'evaluation.dimension': EvaluationDimension;
       'evaluation.question': EvaluationQuestion;
+      'footer.social': FooterSocial;
+      'menu.item': MenuItem;
+      'menu.sub-item': MenuSubItem;
     }
   }
 }
