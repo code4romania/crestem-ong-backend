@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { canView } from "./visibility";
 
-const draft = { publishedAt: null, vizibilitate: ["public"] };
+const draft = { stare: "schita" as const, vizibilitate: ["public"] };
 const published = (vizibilitate: string[]) => ({
-  publishedAt: "2026-09-01T10:00:00.000Z",
+  stare: "publicat" as const,
   vizibilitate,
 });
 

@@ -105,7 +105,9 @@ export function buildProgramMap(
 
 export interface DirectoryUser {
   documentId: string;
-  nume: string;
+  /** Nullable in practice — rows seeded before `nume` existed carry none. */
+  nume?: string | null;
+  username?: string | null;
   mentorJobTitle?: string | null;
   mentorOrganization?: string | null;
   createdAt: string;
@@ -121,7 +123,8 @@ export function toDirectoryPerson(
   const roleType = user.role?.type ?? null;
   return {
     documentId: user.documentId,
-    nume: user.nume,
+    // Always a string downstream — the block derives avatar initials from it.
+    nume: user.nume?.trim() || user.username?.trim() || "",
     functie: user.mentorJobTitle ?? "",
     organizatie: user.mentorOrganization ?? "",
     tip: personTypeFor(roleType),

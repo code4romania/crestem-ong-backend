@@ -7,46 +7,67 @@ import { Context } from "koa";
 import { createPageSchema, updatePageSchema } from "../validation/page";
 import { canView } from "../utils/visibility";
 import { collectFileIds } from "../utils/media";
+import { applyPageLinks, collectChildRequests, collectPageLinkIds } from "../utils/links";
+import { loadPageIndex, type PageIndex } from "../utils/page-index";
+import { checkParent, findByPath } from "../utils/tree";
 
 /**
- * `publicat` cannot come from the row itself: with draft & publish, the draft
- * version always carries `publishedAt: null`, whether or not a published
- * version of the same document exists. It is passed in by the caller, which
- * knows which documentIds have one.
+ * `publicat` is derived, not stored: the API keeps the boolean it has always
+ * returned, while the row carries the `stare` enum that replaced Strapi's
+ * draft & publish. `cale` is derived too — the page's full path, ancestors
+ * included.
  */
-const listView = (page: any, publicat: boolean) => ({
+const listView = (page: any, index: PageIndex) => ({
   documentId: page.documentId,
   titlu: page.titlu,
   slug: page.slug,
-  publicat,
+  cale: index.pathOf(page),
+  parinte: index.parentOf(page.documentId),
+  publicat: page.stare === "publicat",
   vizibilitate: page.vizibilitate ?? [],
   actualizat: page.updatedAt,
 });
 
-const detailView = (page: any, publicat: boolean) => ({
-  ...listView(page, publicat),
-  blocuri: page.blocuri ?? [],
+const detailView = (page: any, index: PageIndex, blocuri?: unknown) => ({
+  ...listView(page, index),
+  blocuri: blocuri ?? page.blocuri ?? [],
 });
 
-/** documentIds that currently have a published version. */
-async function publishedIds(strapi: any, documentIds: string[]): Promise<Set<string>> {
-  if (documentIds.length === 0) return new Set();
+/**
+ * Applies the "put this page under the current one" ticks a page's buttons
+ * carry: each linked page that is still top-level moves under this one, so its
+ * address becomes `/aceasta-pagina/tinta` everywhere at once.
+ *
+ * A target that already has a parent is left alone — someone filed it there on
+ * purpose, and a save here must not drag it back. A move the tree rules refuse
+ * (a cycle, or one segment too deep) is logged and skipped rather than failing
+ * the save: the page's own content was already written.
+ */
+async function adoptRequestedChildren(strapi: any, hostId: string, blocuri: unknown) {
+  const requested = collectChildRequests(blocuri);
+  if (requested.length === 0) return;
 
-  const published = await strapi.documents("api::page.page").findMany({
-    filters: { documentId: { $in: documentIds } },
-    status: "published",
-    limit: -1,
-  });
+  let index = await loadPageIndex(strapi);
+  for (const targetId of requested) {
+    if (targetId === hostId) continue;
 
-  return new Set(published.map((entry: any) => entry.documentId));
-}
+    const target = index.rowById(targetId);
+    if (!target || target.parinte) continue;
 
-async function isPublished(strapi: any, documentId: string): Promise<boolean> {
-  const published = await strapi.documents("api::page.page").findOne({
-    documentId,
-    status: "published",
-  });
-  return Boolean(published);
+    const error = checkParent({ pageId: targetId, parentId: hostId, rows: index.rows });
+    if (error) {
+      strapi.log.warn(`[page] Nu am mutat ${targetId} sub ${hostId}: ${error}`);
+      continue;
+    }
+
+    await strapi.documents("api::page.page").update({
+      documentId: targetId,
+      data: { parinte: { set: [hostId] } } as any,
+    });
+
+    // Every following check has to see the tree as it now stands.
+    index = await loadPageIndex(strapi);
+  }
 }
 
 export default factories.createCoreController("api::page.page", ({ strapi }) => ({
@@ -64,41 +85,56 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
         }
       : {};
 
-    // `status: "draft"` returns each document's working version, published or
-    // not — the list has to show drafts, which the default published-only read
-    // would hide entirely.
-    const [pages, total] = await Promise.all([
+    const [pages, total, index] = await Promise.all([
       strapi.documents("api::page.page").findMany({
         filters,
-        status: "draft",
         sort: { updatedAt: "desc" },
         limit: pageSize,
         start: (page - 1) * pageSize,
       }),
-      strapi.documents("api::page.page").count({ filters, status: "draft" }),
+      strapi.documents("api::page.page").count({ filters }),
+      loadPageIndex(strapi),
     ]);
 
-    const published = await publishedIds(
-      strapi,
-      pages.map((entry) => entry.documentId),
-    );
-
     return {
-      data: pages.map((entry) => listView(entry, published.has(entry.documentId))),
+      data: pages.map((entry: any) => listView(entry, index)),
       meta: {
         pagination: { page, pageSize, total, pageCount: Math.ceil(total / pageSize) },
       },
     };
   },
 
+  /**
+   * Every page, trimmed to what a picker needs. Unpaginated on purpose: the
+   * menu editor has to offer all of them at once, and a site's page count stays
+   * in the hundreds at most.
+   */
+  async options() {
+    const [pages, index] = await Promise.all([
+      strapi.documents("api::page.page").findMany({ sort: { titlu: "asc" }, limit: -1 }),
+      loadPageIndex(strapi),
+    ]);
+
+    return {
+      data: pages.map((entry: any) => ({
+        documentId: entry.documentId,
+        titlu: entry.titlu,
+        slug: entry.slug,
+        cale: index.pathOf(entry),
+        parinte: index.parentOf(entry.documentId),
+        publicat: entry.stare === "publicat",
+      })),
+    };
+  },
+
   async detail(ctx: Context) {
-    const page = await strapi.documents("api::page.page").findOne({
-      documentId: ctx.params.documentId,
-      status: "draft",
-    });
+    const [page, index] = await Promise.all([
+      strapi.documents("api::page.page").findOne({ documentId: ctx.params.documentId }),
+      loadPageIndex(strapi),
+    ]);
     if (!page) return ctx.notFound("Pagina nu există");
 
-    return { data: detailView(page, await isPublished(strapi, page.documentId)) };
+    return { data: detailView(page, index) };
   },
 
   async createOne(ctx: Context) {
@@ -109,18 +145,27 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
 
     const duplicate = await strapi.documents("api::page.page").findFirst({
       filters: { slug: parsed.data.slug },
-      status: "draft",
     });
     if (duplicate) return ctx.badRequest("Există deja o pagină cu acest slug");
 
+    const { parinte = null, ...fields } = parsed.data;
+    const before = await loadPageIndex(strapi);
+    const parentError = checkParent({ pageId: null, parentId: parinte, rows: before.rows });
+    if (parentError) return ctx.badRequest(parentError);
+
+    // A new page always starts as a draft; publishing it is a second call.
     const created = await strapi.documents("api::page.page").create({
       data: {
-        ...parsed.data,
-        fisiere: collectFileIds(parsed.data.blocuri),
+        ...fields,
+        parinte: parinte ? { set: [parinte] } : null,
+        stare: "schita",
+        fisiere: collectFileIds(fields.blocuri),
       } as any,
     });
 
-    return { data: detailView(created, false) };
+    await adoptRequestedChildren(strapi, created.documentId, fields.blocuri);
+
+    return { data: detailView(created, await loadPageIndex(strapi)) };
   },
 
   async updateOne(ctx: Context) {
@@ -131,26 +176,37 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
 
     const existing = await strapi.documents("api::page.page").findOne({
       documentId: ctx.params.documentId,
-      status: "draft",
     });
     if (!existing) return ctx.notFound("Pagina nu există");
 
     if (parsed.data.slug && parsed.data.slug !== existing.slug) {
       const duplicate = await strapi.documents("api::page.page").findFirst({
         filters: { slug: parsed.data.slug },
-        status: "draft",
       });
       if (duplicate) return ctx.badRequest("Există deja o pagină cu acest slug");
     }
 
-    // The update itself never changes publish state — captured before writing
-    // so a page that was already live gets republished after, instead of
-    // leaving its published row stuck on the pre-edit content.
-    const wasPublished = await isPublished(strapi, existing.documentId);
-
+    // `stare` is not part of the update payload — publishing and withdrawing
+    // go through their own endpoints, so an edit never changes what the public
+    // can see.
     const data: Record<string, unknown> = { ...parsed.data };
     if (parsed.data.blocuri) {
       data.fisiere = collectFileIds(parsed.data.blocuri);
+    }
+
+    // An absent `parinte` leaves the page where it is; an explicit null moves
+    // it back to the top level.
+    if ("parinte" in parsed.data) {
+      const parinte = parsed.data.parinte ?? null;
+      const before = await loadPageIndex(strapi);
+      const parentError = checkParent({
+        pageId: ctx.params.documentId,
+        parentId: parinte,
+        rows: before.rows,
+      });
+      if (parentError) return ctx.badRequest(parentError);
+
+      data.parinte = parinte ? { set: [parinte] } : null;
     }
 
     const updated = await strapi.documents("api::page.page").update({
@@ -158,21 +214,18 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
       data: data as any,
     });
 
-    if (wasPublished) {
-      await strapi.documents("api::page.page").publish({
-        documentId: ctx.params.documentId,
-      });
-    }
+    await adoptRequestedChildren(
+      strapi,
+      ctx.params.documentId,
+      parsed.data.blocuri ?? updated.blocuri,
+    );
 
-    return {
-      data: detailView(updated, wasPublished),
-    };
+    return { data: detailView(updated, await loadPageIndex(strapi)) };
   },
 
   async deleteOne(ctx: Context) {
     const existing = await strapi.documents("api::page.page").findOne({
       documentId: ctx.params.documentId,
-      status: "draft",
     });
     if (!existing) return ctx.notFound("Pagina nu există");
 
@@ -186,58 +239,61 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
   async publishOne(ctx: Context) {
     const existing = await strapi.documents("api::page.page").findOne({
       documentId: ctx.params.documentId,
-      status: "draft",
     });
     if (!existing) return ctx.notFound("Pagina nu există");
 
-    const published = await strapi.documents("api::page.page").publish({
+    await strapi.documents("api::page.page").update({
       documentId: ctx.params.documentId,
+      data: { stare: "publicat" } as any,
     });
 
-    return { data: { documentId: ctx.params.documentId, publicat: Boolean(published) } };
+    return { data: { documentId: ctx.params.documentId, publicat: true } };
   },
 
   async unpublishOne(ctx: Context) {
     const existing = await strapi.documents("api::page.page").findOne({
       documentId: ctx.params.documentId,
-      status: "draft",
     });
     if (!existing) return ctx.notFound("Pagina nu există");
 
-    await strapi.documents("api::page.page").unpublish({
+    await strapi.documents("api::page.page").update({
       documentId: ctx.params.documentId,
+      data: { stare: "schita" } as any,
     });
 
     return { data: { documentId: ctx.params.documentId, publicat: false } };
   },
 
   /**
-   * The public read. A page the requester may not see returns 404 rather than
-   * 403 — a restricted page should not confirm its own existence.
+   * The public read, addressed by full path. A page the requester may not see
+   * returns 404 rather than 403 — a restricted page should not confirm its own
+   * existence — and so does a page asked for at anything but its own path,
+   * which is what keeps one page at exactly one URL.
    */
-  async bySlug(ctx: Context) {
-    const slug = ctx.params.slug;
+  async byPath(ctx: Context) {
+    const requested = typeof ctx.query.path === "string" ? ctx.query.path : "";
     const roleType = ctx.state.user?.role?.type ?? null;
+    const index = await loadPageIndex(strapi);
 
-    // The published version first — that is what a visitor should see, and its
-    // `publishedAt` is what `canView` reads. Only when there is none does the
-    // draft matter, and then only for staff, which `canView` decides.
-    const published = await strapi.documents("api::page.page").findFirst({
-      filters: { slug },
-      status: "published",
-    });
+    const documentId = findByPath(index.rows, requested);
+    if (!documentId) return ctx.notFound("Pagina nu există");
 
-    const page =
-      published ??
-      (await strapi.documents("api::page.page").findFirst({
-        filters: { slug },
-        status: "draft",
-      }));
-
+    const page = await strapi.documents("api::page.page").findOne({ documentId });
     if (!page || !canView(page as any, roleType)) {
       return ctx.notFound("Pagina nu există");
     }
 
-    return { data: detailView(page, Boolean(published)) };
+    // A CTA pointing at a page this visitor cannot open would be a link into a
+    // 404, so an unreachable target resolves to nothing and the block's own
+    // "label and href go together" guard drops the button.
+    const paths: Record<string, string> = {};
+    for (const id of collectPageLinkIds(page.blocuri)) {
+      const target = index.rowById(id);
+      const targetPath = index.pathById(id);
+      if (!target || !targetPath || !canView(target, roleType)) continue;
+      paths[id] = targetPath;
+    }
+
+    return { data: detailView(page, index, applyPageLinks(page.blocuri, paths)) };
   },
 }));

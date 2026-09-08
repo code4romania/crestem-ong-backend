@@ -3,7 +3,7 @@ import { VISIBILITY_AUDIENCES } from "../utils/visibility";
 
 /**
  * Every block the frontend can place, from `registry.ts`. Names, not shapes:
- * the 26 leaf payloads are validated there, and mirroring them here would give
+ * the 27 leaf payloads are validated there, and mirroring them here would give
  * the same block two definitions that drift apart silently. A stale name fails
  * loudly at save instead.
  */
@@ -24,8 +24,10 @@ export const BLOCK_TYPES = [
   "image-caption",
   "image-text",
   "numbered-process",
+  "partner-collection",
   "people-collection",
   "people-grid",
+  "program-header",
   "programme-grid",
   "quote",
   "rich-text",
@@ -151,10 +153,23 @@ const vizibilitate = z
     message: "Fiecare audiență poate apărea o singură dată",
   });
 
+/**
+ * The parent page, by documentId. `null` moves a page back to the top level;
+ * omitting the field leaves the current parent untouched. Whether the parent
+ * exists, and whether the resulting nesting is legal, is judged in the
+ * controller — both need to read the other pages.
+ */
+const parinte = z
+  .string({ message: "Pagina părinte este invalidă" })
+  .trim()
+  .min(1, "Pagina părinte este invalidă")
+  .nullable();
+
 export const createPageSchema = z.strictObject({
   titlu,
   slug,
   vizibilitate,
+  parinte: parinte.optional(),
   blocuri: blocks,
 });
 
@@ -162,6 +177,7 @@ export const updatePageSchema = z.strictObject({
   titlu: titlu.optional(),
   slug: slug.optional(),
   vizibilitate: vizibilitate.optional(),
+  parinte: parinte.optional(),
   blocuri: blocks.optional(),
 });
 

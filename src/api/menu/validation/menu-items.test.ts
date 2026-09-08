@@ -10,32 +10,37 @@ describe("menuItemsSchema — shared rules", () => {
   });
 
   it("rejects a blank label", () => {
-    const parsed = header().safeParse([{ label: "   ", url: "/acasa" }]);
+    const parsed = header().safeParse([{ label: "   ", pagina: "p1" }]);
     expect(parsed.success).toBe(false);
   });
 
-  it("rejects a url that is neither a path nor an absolute address", () => {
-    const parsed = header().safeParse([{ label: "Acasă", url: "acasa" }]);
+  it("rejects a hand-written address — a menu points at pages only", () => {
+    const parsed = header().safeParse([{ label: "Contact", url: "/contact" }]);
     expect(parsed.success).toBe(false);
   });
 
-  it("accepts an absolute external url", () => {
+  it("rejects an external address", () => {
     const parsed = header().safeParse([
       { label: "Donează", url: "https://example.org/doneaza" },
     ]);
-    expect(parsed.success).toBe(true);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects a blank page reference", () => {
+    const parsed = header().safeParse([{ label: "Despre", pagina: "  " }]);
+    expect(parsed.success).toBe(false);
   });
 
   it("rejects a third level of nesting", () => {
     const parsed = header().safeParse([
       {
         label: "Programe",
-        url: "/programe",
+        pagina: "p1",
         children: [
           {
             label: "Evaluare ONG",
-            url: "/evaluare-ong",
-            children: [{ label: "Prea adânc", url: "/prea-adanc" }],
+            pagina: "p2",
+            children: [{ label: "Prea adânc", pagina: "p3" }],
           },
         ],
       },
@@ -45,74 +50,54 @@ describe("menuItemsSchema — shared rules", () => {
 });
 
 describe("menuItemsSchema — header", () => {
-  it("accepts a parent that links and carries children", () => {
+  it("accepts an entry left without a page — the tree saves, the entry does not render", () => {
+    const parsed = header().safeParse([{ label: "Programe" }]);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts a parent that points at a page and carries children", () => {
     const parsed = header().safeParse([
       {
         label: "Programe",
-        url: "/programe",
-        children: [{ label: "Evaluare ONG", url: "/evaluare-ong" }],
+        pagina: "p1",
+        children: [{ label: "Evaluare ONG", pagina: "p2" }],
       },
     ]);
     expect(parsed.success).toBe(true);
   });
 
-  it("accepts a parent with children and no url — it only opens a dropdown", () => {
+  it("accepts a parent with children and no page — it only opens a dropdown", () => {
     const parsed = header().safeParse([
       {
         label: "Despre noi",
         children: [
-          { label: "Despre noi", url: "/despre" },
-          { label: "Echipă", url: "/echipa" },
+          { label: "Despre noi", pagina: "p1" },
+          { label: "Echipă", pagina: "p2" },
         ],
       },
     ]);
     expect(parsed.success).toBe(true);
   });
 
-  it("rejects an item with neither children nor a url", () => {
-    const parsed = header().safeParse([{ label: "Programe" }]);
-    expect(parsed.success).toBe(false);
-  });
-
-  it("rejects an item whose only child list is empty and has no url", () => {
-    const parsed = header().safeParse([{ label: "Programe", children: [] }]);
-    expect(parsed.success).toBe(false);
-  });
-
-  it("rejects a child without a url", () => {
-    const parsed = header().safeParse([
-      { label: "Programe", url: "/programe", children: [{ label: "Evaluare ONG" }] },
-    ]);
-    expect(parsed.success).toBe(false);
-  });
 });
 
 describe("menuItemsSchema — footer", () => {
-  it("accepts a column heading that carries no url", () => {
+  it("accepts a column heading that points at nothing", () => {
     const parsed = footer().safeParse([
-      {
-        label: "Platformă",
-        children: [{ label: "Despre noi", url: "/despre" }],
-      },
+      { label: "Platformă", children: [{ label: "Despre noi", pagina: "p1" }] },
     ]);
     expect(parsed.success).toBe(true);
   });
 
-  it("rejects a column heading that carries a url", () => {
+  it("rejects a column heading that points at a page", () => {
     const parsed = footer().safeParse([
       {
         label: "Platformă",
-        url: "/platforma",
-        children: [{ label: "Despre noi", url: "/despre" }],
+        pagina: "p1",
+        children: [{ label: "Despre noi", pagina: "p2" }],
       },
     ]);
     expect(parsed.success).toBe(false);
   });
 
-  it("rejects a column link without a url", () => {
-    const parsed = footer().safeParse([
-      { label: "Platformă", children: [{ label: "Despre noi" }] },
-    ]);
-    expect(parsed.success).toBe(false);
-  });
 });

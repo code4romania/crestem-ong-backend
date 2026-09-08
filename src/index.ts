@@ -4,6 +4,7 @@ import { seedLocalities } from "./utils/seed-localities";
 import { seedDomains } from "./utils/seed-domains";
 import { seedMenus } from "./utils/seed-menus";
 import { seedFooter } from "./utils/seed-footer";
+import { migratePageStare } from "./utils/migrate-page-stare";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -94,6 +95,7 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::menu.menu.updateItems",
     "api::footer.footer.updateOne",
     "api::page.page.list",
+    "api::page.page.options",
     "api::page.page.detail",
     "api::page.page.createOne",
     "api::page.page.updateOne",
@@ -239,7 +241,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
  * carry over to authenticated ones, so a signed-in user would be refused a page
  * an anonymous visitor can read.
  */
-const PUBLIC_READ_ACTIONS = ["api::page.page.bySlug"];
+const PUBLIC_READ_ACTIONS = ["api::page.page.byPath"];
 
 for (const actions of Object.values(ROLE_PERMISSIONS)) {
   actions.push(...PUBLIC_READ_ACTIONS);
@@ -250,19 +252,10 @@ export default {
    * An asynchronous register function that runs before
    * your application is initialized.
    */
-  register(/* { strapi }: { strapi: Core.Strapi } */) {
-    if (process.env.DEV_EXPOSE_ACTIVATION_LINK !== "true") return;
-    const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
-    if (appEnv === "production") {
-      throw new Error(
-        "DEV_EXPOSE_ACTIVATION_LINK nu poate fi activat în producție. " +
-          "Pe staging setează APP_ENV=staging.",
-      );
-    }
-    console.warn(
-      `[register] DEV_EXPOSE_ACTIVATION_LINK activ (APP_ENV=${appEnv}). ` +
-        "Linkurile de activare sunt expuse prin API. Dezactivează înainte de producție.",
-    );
+  async register({ strapi }: { strapi: Core.Strapi }) {
+    assertActivationLinkGuard();
+    // Has to happen here: `bootstrap()` is already too late, see the file.
+    await migratePageStare(strapi);
   },
 
   /**
@@ -280,6 +273,25 @@ export default {
     await seedFooter(strapi);
   },
 };
+
+/**
+ * Refuses to start with activation links exposed on a production deployment.
+ * A no-op unless the flag is on.
+ */
+function assertActivationLinkGuard() {
+  if (process.env.DEV_EXPOSE_ACTIVATION_LINK !== "true") return;
+  const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
+  if (appEnv === "production") {
+    throw new Error(
+      "DEV_EXPOSE_ACTIVATION_LINK nu poate fi activat în producție. " +
+        "Pe staging setează APP_ENV=staging.",
+    );
+  }
+  console.warn(
+    `[register] DEV_EXPOSE_ACTIVATION_LINK activ (APP_ENV=${appEnv}). ` +
+      "Linkurile de activare sunt expuse prin API. Dezactivează înainte de producție.",
+  );
+}
 
 /**
  * Accounts created before `accountStatus` was added to the user schema kept a
