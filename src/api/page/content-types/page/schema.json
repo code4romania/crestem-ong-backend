@@ -8,7 +8,7 @@
     "description": "A public site page. Blocks are stored as JSON; `registry.ts` in the frontend owns their shapes."
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {
@@ -19,6 +19,24 @@
     "slug": {
       "type": "uid",
       "targetField": "titlu",
+      "required": true
+    },
+    "parinte": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::page.page",
+      "inversedBy": "copii"
+    },
+    "copii": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::page.page",
+      "mappedBy": "parinte"
+    },
+    "stare": {
+      "type": "enumeration",
+      "enum": ["schita", "publicat"],
+      "default": "schita",
       "required": true
     },
     "vizibilitate": {

@@ -12,7 +12,12 @@
     },
     "url": {
       "type": "string",
-      "required": true
+      "required": false
+    },
+    "pagina": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::page.page"
     }
   }
 }

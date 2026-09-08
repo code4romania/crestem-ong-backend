@@ -10,44 +10,38 @@ const label = z
   .min(1, "Eticheta este obligatorie");
 
 /**
- * A menu link is either an internal path (`/despre`) or an absolute address.
- * A bare `despre` would render an href relative to whatever page the visitor is
- * on, which is never what the editor meant.
+ * The documentId of a CMS page. A menu entry names a page and nothing else — no
+ * hand-written addresses — so an entry's address is derived from that page's
+ * slug at read time and renaming the page follows through to every menu
+ * pointing at it.
  */
-const url = z
-  .string({ message: "Adresa este obligatorie" })
+const pagina = z
+  .string({ message: "Pagina este obligatorie" })
   .trim()
-  .min(1, "Adresa este obligatorie")
-  .regex(
-    /^(\/|https?:\/\/)/,
-    "Adresa trebuie să înceapă cu „/” sau cu http:// ori https://",
-  );
+  .min(1, "Pagina este obligatorie");
 
 /**
  * Second-level items declare no `children`, so the strict object rejects a third
  * level. Depth is a schema rule here and in `menu.sub-item`, not a UI courtesy.
  */
-const subItem = z.strictObject({ label, url });
+const subItem = z.strictObject({ label, pagina: pagina.optional() });
 
 /**
- * A header parent that carries children only opens a dropdown — "Despre noi" has
- * never been a link. One without children has nowhere to send the visitor unless
- * it names an address, so there `url` is required.
+ * `pagina` is optional at every level, and deliberately so. The whole tree is
+ * saved in one request, so requiring it would make a menu holding one unfinished
+ * entry impossible to save at all — including impossible to fix, since the fix
+ * is itself a save. The editor requires a page when adding or editing an entry;
+ * an entry that ends up without one is simply skipped by the public renderer.
  */
-const headerItem = z
-  .strictObject({
-    label,
-    url: url.optional(),
-    children: z.array(subItem).optional(),
-  })
-  .refine((item) => Boolean(item.url) || (item.children?.length ?? 0) > 0, {
-    message: "Adresa este obligatorie pentru un element fără sub-elemente",
-    path: ["url"],
-  });
+const headerItem = z.strictObject({
+  label,
+  pagina: pagina.optional(),
+  children: z.array(subItem).optional(),
+});
 
 /**
  * Footer parents are column headings — they name a group and never redirect, so
- * `url` is not part of their shape and a submitted one is refused.
+ * `pagina` is not part of their shape and a submitted one is refused.
  */
 const footerItem = z.strictObject({
   label,

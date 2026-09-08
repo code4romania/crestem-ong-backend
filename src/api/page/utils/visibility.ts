@@ -12,8 +12,16 @@ export const VISIBILITY_AUDIENCES = [
 
 export type VisibilityAudience = (typeof VISIBILITY_AUDIENCES)[number];
 
+/**
+ * The two states a page can be in. Replaces Strapi's draft & publish, which
+ * kept a second row per page and made every read specify which one it wanted.
+ */
+export const PAGE_STARI = ["schita", "publicat"] as const;
+
+export type PageStare = (typeof PAGE_STARI)[number];
+
 export interface ViewablePage {
-  publishedAt?: string | null;
+  stare?: PageStare | null;
   vizibilitate?: string[] | null;
 }
 
@@ -38,7 +46,7 @@ export function canView(
   roleType: string | null | undefined,
 ): boolean {
   // A draft exists only for the people who edit it.
-  if (!page.publishedAt) return isFdscStaff(roleType);
+  if (page.stare !== "publicat") return isFdscStaff(roleType);
 
   const audiences = page.vizibilitate ?? [];
   if (audiences.includes("public")) return true;

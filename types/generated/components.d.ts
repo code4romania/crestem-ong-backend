@@ -70,6 +70,7 @@ export interface MenuItem extends Struct.ComponentSchema {
   attributes: {
     children: Schema.Attribute.Component<'menu.sub-item', true>;
     label: Schema.Attribute.String & Schema.Attribute.Required;
+    pagina: Schema.Attribute.Relation<'oneToOne', 'api::page.page'>;
     url: Schema.Attribute.String;
   };
 }
@@ -82,7 +83,8 @@ export interface MenuSubItem extends Struct.ComponentSchema {
   };
   attributes: {
     label: Schema.Attribute.String & Schema.Attribute.Required;
-    url: Schema.Attribute.String & Schema.Attribute.Required;
+    pagina: Schema.Attribute.Relation<'oneToOne', 'api::page.page'>;
+    url: Schema.Attribute.String;
   };
 }
 

@@ -5,21 +5,43 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { MENU_LOCATIONS, MenuLocation, menuItemsSchema } from "../validation/menu-items";
+import { loadPageIndex, type PageIndex } from "../../page/utils/page-index";
 
-const POPULATE = { items: { populate: { children: true } } } as const;
+const POPULATE = {
+  items: { populate: { pagina: true, children: { populate: { pagina: true } } } },
+} as const;
 
-const menuView = (menu: any) => ({
+/**
+ * An item's address comes from the page it points at, resolved at read time, so
+ * renaming a page — or moving it under a different parent, which changes its
+ * whole path — follows through to every menu. A hand-written `url` is used only
+ * when there is no page.
+ *
+ * An item with neither is not a mistake in every case — a footer column heading
+ * deliberately has no address — but it is also what a deleted page leaves
+ * behind, since the relation goes null. The editor shows that state; the public
+ * renderer skips it.
+ */
+const linkView = (entry: any, index: PageIndex) => {
+  if (entry.pagina) {
+    return {
+      url: index.pathById(entry.pagina.documentId) ?? `/${entry.pagina.slug}`,
+      pagina: entry.pagina.documentId,
+    };
+  }
+  return entry.url ? { url: entry.url } : {};
+};
+
+const menuView = (menu: any, index: PageIndex) => ({
   documentId: menu.documentId,
   location: menu.location,
   name: menu.name,
   items: (menu.items ?? []).map((item: any) => ({
     label: item.label,
-    // Absent rather than null: a footer column heading has no address at all,
-    // and the frontend distinguishes "no link" from "empty link".
-    ...(item.url ? { url: item.url } : {}),
+    ...linkView(item, index),
     children: (item.children ?? []).map((child: any) => ({
       label: child.label,
-      url: child.url,
+      ...linkView(child, index),
     })),
   })),
 });
@@ -44,7 +66,8 @@ export default factories.createCoreController("api::menu.menu", ({ strapi }) => 
         MENU_LOCATIONS.indexOf(b.location as MenuLocation),
     );
 
-    return { data: sorted.map(menuView) };
+    const index = await loadPageIndex(strapi);
+    return { data: sorted.map((menu: any) => menuView(menu, index)) };
   },
 
   async detail(ctx: Context) {
@@ -57,7 +80,7 @@ export default factories.createCoreController("api::menu.menu", ({ strapi }) => 
     });
     if (!menu) return ctx.notFound("Meniul cerut nu există");
 
-    return { data: menuView(menu) };
+    return { data: menuView(menu, await loadPageIndex(strapi)) };
   },
 
   /**
@@ -80,12 +103,25 @@ export default factories.createCoreController("api::menu.menu", ({ strapi }) => 
     });
     if (!menu) return ctx.notFound("Meniul cerut nu există");
 
+    // `set` with the page's documentId, rather than the bare string the payload
+    // carries: the shorthand is easy to get wrong for a relation nested inside a
+    // component, and a silently ignored relation looks exactly like an item the
+    // editor never filled in.
+    const withRelations = parsed.data.map((item: any) => ({
+      label: item.label,
+      pagina: item.pagina ? { set: [item.pagina] } : null,
+      children: (item.children ?? []).map((child: any) => ({
+        label: child.label,
+        pagina: child.pagina ? { set: [child.pagina] } : null,
+      })),
+    }));
+
     const updated = await strapi.documents("api::menu.menu").update({
       documentId: menu.documentId,
-      data: { items: parsed.data } as any,
+      data: { items: withRelations } as any,
       populate: POPULATE,
     });
 
-    return { data: menuView(updated) };
+    return { data: menuView(updated, await loadPageIndex(strapi)) };
   },
 }));

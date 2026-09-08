@@ -147,6 +147,23 @@ describe("toDirectoryPerson", () => {
     expect(shaped.organizatie).toBe("");
     expect(shaped.avatar).toBeNull();
   });
+
+  it("falls back to the username when the row has no nume", () => {
+    const map = buildProgramMap([]);
+    expect(
+      toDirectoryPerson(
+        { ...baseUser, nume: null, username: "admin.fdsc" },
+        map,
+      ).nume,
+    ).toBe("admin.fdsc");
+  });
+
+  it("shapes a nameless row as an empty string, never null", () => {
+    const map = buildProgramMap([]);
+    expect(
+      toDirectoryPerson({ ...baseUser, nume: "  ", username: null }, map).nume,
+    ).toBe("");
+  });
 });
 
 describe("applyProgrammeAndLimit", () => {

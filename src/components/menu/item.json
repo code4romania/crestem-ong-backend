@@ -14,6 +14,11 @@
       "type": "string",
       "required": false
     },
+    "pagina": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::page.page"
+    },
     "children": {
       "type": "component",
       "repeatable": true,

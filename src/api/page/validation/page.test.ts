@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPageSchema } from "./page";
+import { createPageSchema, updatePageSchema } from "./page";
 
 const valid = {
   titlu: "Despre noi",
@@ -115,5 +115,23 @@ describe("createPageSchema", () => {
       ],
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("parinte", () => {
+  it("accepts a page created under a parent", () => {
+    expect(createPageSchema.safeParse({ ...valid, parinte: "abc123" }).success).toBe(true);
+  });
+
+  it("accepts a page created without one", () => {
+    expect(createPageSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("accepts null as an explicit move back to the top level", () => {
+    expect(updatePageSchema.safeParse({ parinte: null }).success).toBe(true);
+  });
+
+  it("rejects a blank parent reference", () => {
+    expect(createPageSchema.safeParse({ ...valid, parinte: "   " }).success).toBe(false);
   });
 });

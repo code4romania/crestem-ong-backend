@@ -983,10 +983,11 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
     singularName: 'page';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     blocuri: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
+    copii: Schema.Attribute.Relation<'oneToMany', 'api::page.page'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -994,8 +995,12 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::page.page'> &
       Schema.Attribute.Private;
+    parinte: Schema.Attribute.Relation<'manyToOne', 'api::page.page'>;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'titlu'> & Schema.Attribute.Required;
+    stare: Schema.Attribute.Enumeration<['schita', 'publicat']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'schita'>;
     titlu: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
