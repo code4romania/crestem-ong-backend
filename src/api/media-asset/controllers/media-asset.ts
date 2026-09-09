@@ -185,10 +185,12 @@ export default factories.createCoreController(
         });
       }
 
-      await strapi.documents("api::media-asset.media-asset").delete({
-        documentId: ctx.params.documentId,
+      await strapi.db.transaction(async () => {
+        await strapi.documents("api::media-asset.media-asset").delete({
+          documentId: ctx.params.documentId,
+        });
+        await deleteUploadedFile(strapi, file);
       });
-      await deleteUploadedFile(strapi, file);
 
       return { data: { documentId: ctx.params.documentId } };
     },
