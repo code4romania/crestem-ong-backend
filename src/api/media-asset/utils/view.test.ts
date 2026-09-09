@@ -36,13 +36,14 @@ describe("assetCard", () => {
         mime: "image/png",
         ext: ".png",
         size: 12.34,
+        alternativeText: "Sigla FDSC",
         width: 800,
         height: 240,
       },
       tip: "image",
       etichete: [
-        { id: 1, nume: "logo", slug: "logo" },
-        { id: 2, nume: "brand", slug: "brand" },
+        { id: 1, documentId: "t1", nume: "logo", slug: "logo" },
+        { id: 2, documentId: "t2", nume: "brand", slug: "brand" },
       ],
       utilizariCount: 3,
     });
@@ -66,8 +67,8 @@ describe("assetDetail", () => {
     expect(detail.utilizariCount).toBe(1);
   });
 
-  it("falls back to email then '—' for the uploader", () => {
-    expect(assetDetail({ ...row, createdBy: { email: "x@fdsc.ro" } }, []).adaugatDe).toBe("x@fdsc.ro");
+  it("falls back to '—' when the uploader has no name", () => {
+    expect(assetDetail({ ...row, createdBy: {} }, []).adaugatDe).toBe("—");
     expect(assetDetail({ ...row, createdBy: null }, []).adaugatDe).toBe("—");
   });
 });

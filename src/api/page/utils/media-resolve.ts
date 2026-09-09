@@ -10,6 +10,14 @@
  *
  * The stored `url` stays in the JSON on save (the editor shows it optimistically);
  * this makes the read-time value authoritative without a migration.
+ *
+ * WARNING: `isFileNode` is a heuristic (`typeof id === "number" && typeof url ===
+ * "string"`) shared with `collectFileIds`, but a false positive here is worse.
+ * This function DROPS any matching node whose `id` is not present in
+ * `plugin::upload.file`, so a non-upload block field that happens to be shaped
+ * `{ id: number, url: string }` would be silently removed from every served
+ * page. Every current block schema was checked and is safe; a new block that
+ * stores a field of that shape MUST be excluded from this walk.
  */
 
 export interface ResolvedFile {

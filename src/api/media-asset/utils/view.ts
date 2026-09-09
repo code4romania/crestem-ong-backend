@@ -8,6 +8,7 @@ export interface AssetFileDTO {
   mime: string | null;
   ext: string | null;
   size: number | null;
+  alternativeText: string | null;
   width: number | null;
   height: number | null;
 }
@@ -17,7 +18,7 @@ export interface MediaAssetCardDTO {
   titlu: string;
   fisier: AssetFileDTO;
   tip: "image" | "video" | "file";
-  etichete: { id: number; nume: string; slug: string }[];
+  etichete: { id: number; documentId: string; nume: string; slug: string }[];
   utilizariCount: number;
 }
 
@@ -36,17 +37,20 @@ const fileDto = (f: any): AssetFileDTO => ({
   mime: f?.mime ?? null,
   ext: f?.ext ?? null,
   size: f?.size ?? null,
+  alternativeText: f?.alternativeText ?? null,
   width: f?.width ?? null,
   height: f?.height ?? null,
 });
 
-const tagDtos = (tags: any): { id: number; nume: string; slug: string }[] =>
-  Array.isArray(tags) ? tags.map((t) => ({ id: t.id, nume: t.nume, slug: t.slug })) : [];
+const tagDtos = (tags: any): { id: number; documentId: string; nume: string; slug: string }[] =>
+  Array.isArray(tags)
+    ? tags.map((t) => ({ id: t.id, documentId: t.documentId, nume: t.nume, slug: t.slug }))
+    : [];
 
 const uploaderName = (createdBy: any): string => {
   if (!createdBy) return "—";
   const full = [createdBy.firstname, createdBy.lastname].filter(Boolean).join(" ").trim();
-  return full || createdBy.email || "—";
+  return full || "—";
 };
 
 export function assetCard(row: any): MediaAssetCardDTO {
