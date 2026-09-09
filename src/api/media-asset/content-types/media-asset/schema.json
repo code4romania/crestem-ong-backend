@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "media_assets",
+  "info": {
+    "singularName": "media-asset",
+    "pluralName": "media-assets",
+    "displayName": "Media Asset",
+    "description": "One curated file in the FDSC media library. Presence of a row is what marks a file as 'in the library'; incidental uploads (avatars, reports) have none."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "fisier": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": ["images", "videos", "files"]
+    },
+    "titlu": {
+      "type": "string",
+      "required": true
+    },
+    "descriere": {
+      "type": "text"
+    },
+    "etichete": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::media-tag.media-tag",
+      "inversedBy": "assete"
+    }
+  }
+}
