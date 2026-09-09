@@ -3,7 +3,8 @@ import { Context } from "koa";
 import { textParam, csvParam, pageParam } from "../../../utils/query-params";
 import { createMediaAssetSchema } from "../validation/media-asset";
 import { assetCard, assetDetail } from "../utils/view";
-import { findPagesUsingFile } from "../utils/usage";
+import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
+import { buildAssetFilters } from "../utils/list-query";
 
 const PAGE_SIZE = 24;
 
@@ -12,19 +13,6 @@ const POPULATE = {
   etichete: { fields: ["nume", "slug"] },
   createdBy: { fields: ["firstname", "lastname", "email"] },
 } as any;
-
-const tipFilter = (tip: string) => {
-  if (tip === "image") return { fisier: { mime: { $startsWith: "image/" } } };
-  if (tip === "video") return { fisier: { mime: { $startsWith: "video/" } } };
-  if (tip === "file")
-    return {
-      $and: [
-        { fisier: { mime: { $notContains: "image/" } } },
-        { fisier: { mime: { $notContains: "video/" } } },
-      ],
-    };
-  return {};
-};
 
 export default factories.createCoreController(
   "api::media-asset.media-asset",
@@ -35,19 +23,7 @@ export default factories.createCoreController(
       const slugs = csvParam(ctx.query.etichete);
       const page = pageParam(ctx.query.page);
 
-      const filters: Record<string, unknown> = { $and: [] as unknown[] };
-      const and = filters.$and as unknown[];
-      if (search) {
-        and.push({
-          $or: [
-            { titlu: { $containsi: search } },
-            { fisier: { name: { $containsi: search } } },
-          ],
-        });
-      }
-      if (tip) and.push(tipFilter(tip));
-      if (slugs.length) and.push({ etichete: { slug: { $in: slugs } } });
-      if (and.length === 0) delete filters.$and;
+      const filters = buildAssetFilters({ search, tip, slugs });
 
       const [rows, total] = await Promise.all([
         strapi.documents("api::media-asset.media-asset").findMany({
@@ -60,12 +36,20 @@ export default factories.createCoreController(
         strapi.documents("api::media-asset.media-asset").count({ filters }),
       ]);
 
-      // One usage count per card. The page table is small; N short queries are
-      // acceptable at library scale (hundreds of assets, 24 per page).
-      const cards = await Promise.all(
-        rows.map(async (row: any) => {
-          const usage = await findPagesUsingFile(strapi, row.fisier?.id);
-          return assetCard({ ...row, utilizariCount: usage.length });
+      // Two queries for the whole page: one batched page lookup keyed by file id,
+      // then a count per card from the map.
+      const fileIds = [
+        ...new Set(
+          rows
+            .map((row: any) => row.fisier?.id)
+            .filter((id: unknown): id is number => typeof id === "number"),
+        ),
+      ];
+      const usageByFile = await findPagesUsingFiles(strapi, fileIds);
+      const cards = rows.map((row: any) =>
+        assetCard({
+          ...row,
+          utilizariCount: usageByFile.get(row.fisier?.id)?.length ?? 0,
         }),
       );
 

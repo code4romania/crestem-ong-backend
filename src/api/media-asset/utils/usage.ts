@@ -31,3 +31,44 @@ export async function findPagesUsingFile(
     cale: index.pathOf(page),
   }));
 }
+
+/**
+ * The list screen needs a usage count for every card at once. This is the batch
+ * form of `findPagesUsingFile`: one page query and one page index for the whole
+ * set, grouped into a `fileId -> pages` map. Files used by no page are simply
+ * absent from the map. An empty input runs no queries.
+ */
+export async function findPagesUsingFiles(
+  strapi: any,
+  fileIds: number[],
+): Promise<Map<number, PageUsage[]>> {
+  const byFile = new Map<number, PageUsage[]>();
+  if (fileIds.length === 0) return byFile;
+
+  const [pages, index] = await Promise.all([
+    strapi.documents("api::page.page").findMany({
+      filters: { fisiere: { id: { $in: fileIds } } },
+      fields: ["slug", "titlu"],
+      populate: { fisiere: { fields: ["id"] } },
+      limit: -1,
+    }),
+    loadPageIndex(strapi),
+  ]);
+
+  const wanted = new Set(fileIds);
+  for (const page of pages) {
+    const usage: PageUsage = {
+      documentId: page.documentId,
+      titlu: page.titlu,
+      cale: index.pathOf(page),
+    };
+    for (const file of page.fisiere ?? []) {
+      if (!wanted.has(file.id)) continue;
+      const existing = byFile.get(file.id);
+      if (existing) existing.push(usage);
+      else byFile.set(file.id, [usage]);
+    }
+  }
+
+  return byFile;
+}
