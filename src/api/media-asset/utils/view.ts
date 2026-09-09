@@ -16,7 +16,7 @@ export interface MediaAssetCardDTO {
   titlu: string;
   fisier: AssetFileDTO;
   tip: "image" | "video" | "file";
-  etichete: { nume: string; slug: string }[];
+  etichete: { id: number; nume: string; slug: string }[];
   utilizariCount: number;
 }
 
@@ -38,8 +38,8 @@ const fileDto = (f: any): AssetFileDTO => ({
   height: f?.height ?? null,
 });
 
-const tagDtos = (tags: any): { nume: string; slug: string }[] =>
-  Array.isArray(tags) ? tags.map((t) => ({ nume: t.nume, slug: t.slug })) : [];
+const tagDtos = (tags: any): { id: number; nume: string; slug: string }[] =>
+  Array.isArray(tags) ? tags.map((t) => ({ id: t.id, nume: t.nume, slug: t.slug })) : [];
 
 const uploaderName = (createdBy: any): string => {
   if (!createdBy) return "—";

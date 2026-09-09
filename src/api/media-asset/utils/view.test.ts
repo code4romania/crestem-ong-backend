@@ -17,8 +17,8 @@ const row = {
     alternativeText: "Sigla FDSC",
   },
   etichete: [
-    { documentId: "t1", nume: "logo", slug: "logo" },
-    { documentId: "t2", nume: "brand", slug: "brand" },
+    { id: 1, documentId: "t1", nume: "logo", slug: "logo" },
+    { id: 2, documentId: "t2", nume: "brand", slug: "brand" },
   ],
   createdBy: { firstname: "Ana", lastname: "Pop", email: "ana@fdsc.ro" },
 };
@@ -39,8 +39,8 @@ describe("assetCard", () => {
       },
       tip: "image",
       etichete: [
-        { nume: "logo", slug: "logo" },
-        { nume: "brand", slug: "brand" },
+        { id: 1, nume: "logo", slug: "logo" },
+        { id: 2, nume: "brand", slug: "brand" },
       ],
       utilizariCount: 3,
     });

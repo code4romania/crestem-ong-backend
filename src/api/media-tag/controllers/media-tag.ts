@@ -3,6 +3,7 @@ import { Context } from "koa";
 import { createMediaTagSchema } from "../validation/media-tag";
 
 const view = (row: any) => ({
+  id: row.id,
   documentId: row.documentId,
   nume: row.nume,
   slug: row.slug,
