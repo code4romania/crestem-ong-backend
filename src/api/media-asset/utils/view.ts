@@ -7,6 +7,7 @@ export interface AssetFileDTO {
   name: string;
   mime: string | null;
   ext: string | null;
+  size: number | null;
   width: number | null;
   height: number | null;
 }
@@ -34,6 +35,7 @@ const fileDto = (f: any): AssetFileDTO => ({
   name: f?.name ?? "",
   mime: f?.mime ?? null,
   ext: f?.ext ?? null,
+  size: f?.size ?? null,
   width: f?.width ?? null,
   height: f?.height ?? null,
 });
