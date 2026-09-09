@@ -5,6 +5,7 @@ import { createMediaAssetSchema, updateMediaAssetSchema } from "../validation/me
 import { assetCard, assetDetail } from "../utils/view";
 import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
 import { buildAssetFilters } from "../utils/list-query";
+import { deleteUploadedFile } from "../../../utils/media";
 
 const PAGE_SIZE = 24;
 
@@ -164,6 +165,32 @@ export default factories.createCoreController(
       });
       const usage = await findPagesUsingFile(strapi, (updated as any).fisier?.id);
       return { data: assetDetail(updated, usage) };
+    },
+
+    async deleteOne(ctx: Context) {
+      const force = textParam(ctx.query.force) === "true";
+
+      const existing = await strapi.documents("api::media-asset.media-asset").findOne({
+        documentId: ctx.params.documentId,
+        populate: { fisier: true },
+      });
+      if (!existing) return ctx.notFound("Fișierul nu există în bibliotecă");
+
+      const file = (existing as any).fisier;
+      const usage = file?.id ? await findPagesUsingFile(strapi, file.id) : [];
+
+      if (usage.length > 0 && !force) {
+        return ctx.conflict("Fișierul este folosit pe una sau mai multe pagini", {
+          utilizari: usage,
+        });
+      }
+
+      await strapi.documents("api::media-asset.media-asset").delete({
+        documentId: ctx.params.documentId,
+      });
+      await deleteUploadedFile(strapi, file);
+
+      return { data: { documentId: ctx.params.documentId } };
     },
   }),
 );
