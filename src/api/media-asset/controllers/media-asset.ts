@@ -1,7 +1,7 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { textParam, csvParam, pageParam } from "../../../utils/query-params";
-import { createMediaAssetSchema } from "../validation/media-asset";
+import { createMediaAssetSchema, updateMediaAssetSchema } from "../validation/media-asset";
 import { assetCard, assetDetail } from "../utils/view";
 import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
 import { buildAssetFilters } from "../utils/list-query";
@@ -114,6 +114,56 @@ export default factories.createCoreController(
       });
 
       return { data: assetDetail(created, []) };
+    },
+
+    async updateOne(ctx: Context) {
+      const parsed = updateMediaAssetSchema.safeParse(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const existing = await strapi.documents("api::media-asset.media-asset").findOne({
+        documentId: ctx.params.documentId,
+        populate: { fisier: { fields: ["id"] } },
+      });
+      if (!existing) return ctx.notFound("Fișierul nu există în bibliotecă");
+
+      const { titlu, descriere, eticheteIds, altText } = parsed.data;
+
+      if (eticheteIds?.length) {
+        const found = await strapi.db
+          .query("api::media-tag.media-tag")
+          .findMany({ where: { id: { $in: eticheteIds } }, select: ["id"] });
+        if (found.length !== eticheteIds.length) {
+          return ctx.badRequest("Una sau mai multe etichete nu există");
+        }
+      }
+
+      const data: Record<string, unknown> = {};
+      if (titlu !== undefined) data.titlu = titlu;
+      if (descriere !== undefined) data.descriere = descriere;
+      if (eticheteIds !== undefined) data.etichete = eticheteIds;
+
+      if (Object.keys(data).length) {
+        await strapi.documents("api::media-asset.media-asset").update({
+          documentId: ctx.params.documentId,
+          data: data as any,
+        });
+      }
+
+      if (altText !== undefined && (existing as any).fisier?.id) {
+        await strapi.db.query("plugin::upload.file").update({
+          where: { id: (existing as any).fisier.id },
+          data: { alternativeText: altText },
+        });
+      }
+
+      const updated = await strapi.documents("api::media-asset.media-asset").findOne({
+        documentId: ctx.params.documentId,
+        populate: POPULATE,
+      });
+      const usage = await findPagesUsingFile(strapi, (updated as any).fisier?.id);
+      return { data: assetDetail(updated, usage) };
     },
   }),
 );
