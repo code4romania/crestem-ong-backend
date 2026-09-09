@@ -1,4 +1,5 @@
 import { fileTypeCategory } from "./file-type";
+import { slugify } from "../../media-tag/utils/slug";
 import type { PageUsage } from "./usage";
 
 export interface AssetFileDTO {
@@ -44,7 +45,14 @@ const fileDto = (f: any): AssetFileDTO => ({
 
 const tagDtos = (tags: any): { id: number; documentId: string; nume: string; slug: string }[] =>
   Array.isArray(tags)
-    ? tags.map((t) => ({ id: t.id, documentId: t.documentId, nume: t.nume, slug: t.slug }))
+    ? tags.map((t) => ({
+        id: t.id,
+        documentId: t.documentId,
+        nume: t.nume,
+        // `slug` is a `uid` field the document service leaves null on create;
+        // fall back to a derived slug so it is never null on the wire.
+        slug: t.slug || slugify(t.nume),
+      }))
     : [];
 
 const uploaderName = (createdBy: any): string => {
