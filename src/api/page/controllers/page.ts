@@ -7,9 +7,34 @@ import { Context } from "koa";
 import { createPageSchema, updatePageSchema } from "../validation/page";
 import { canView } from "../utils/visibility";
 import { collectFileIds } from "../utils/media";
+import { applyResolvedMedia, type ResolvedFile } from "../utils/media-resolve";
 import { applyPageLinks, collectChildRequests, collectPageLinkIds } from "../utils/links";
 import { loadPageIndex, type PageIndex } from "../utils/page-index";
 import { checkParent, findByPath } from "../utils/tree";
+
+/**
+ * Swap every block file reference for the file's current url/name/alt. Kept
+ * next to `applyPageLinks` in the read path: the stored block JSON is a
+ * write-time snapshot, this makes the served page reflect the live file.
+ */
+async function resolveBlocksMedia(strapi: any, blocuri: unknown): Promise<unknown> {
+  const ids = collectFileIds(blocuri);
+  if (ids.length === 0) return blocuri ?? [];
+
+  const rows = await strapi.db.query("plugin::upload.file").findMany({
+    where: { id: { $in: ids } },
+    select: ["id", "url", "name", "alternativeText"],
+  });
+
+  const byId = new Map<number, ResolvedFile>(
+    rows.map((r: any) => [
+      r.id,
+      { url: r.url, name: r.name ?? "", alternativeText: r.alternativeText ?? null },
+    ]),
+  );
+
+  return applyResolvedMedia(blocuri, byId);
+}
 
 /**
  * `publicat` is derived, not stored: the API keeps the boolean it has always
@@ -134,7 +159,8 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
     ]);
     if (!page) return ctx.notFound("Pagina nu există");
 
-    return { data: detailView(page, index) };
+    const blocuri = await resolveBlocksMedia(strapi, page.blocuri);
+    return { data: detailView(page, index, blocuri) };
   },
 
   async createOne(ctx: Context) {
@@ -165,7 +191,8 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
 
     await adoptRequestedChildren(strapi, created.documentId, fields.blocuri);
 
-    return { data: detailView(created, await loadPageIndex(strapi)) };
+    const blocuri = await resolveBlocksMedia(strapi, created.blocuri);
+    return { data: detailView(created, await loadPageIndex(strapi), blocuri) };
   },
 
   async updateOne(ctx: Context) {
@@ -220,7 +247,8 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
       parsed.data.blocuri ?? updated.blocuri,
     );
 
-    return { data: detailView(updated, await loadPageIndex(strapi)) };
+    const blocuri = await resolveBlocksMedia(strapi, updated.blocuri);
+    return { data: detailView(updated, await loadPageIndex(strapi), blocuri) };
   },
 
   async deleteOne(ctx: Context) {
@@ -294,6 +322,7 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
       paths[id] = targetPath;
     }
 
-    return { data: detailView(page, index, applyPageLinks(page.blocuri, paths)) };
+    const withMedia = await resolveBlocksMedia(strapi, page.blocuri);
+    return { data: detailView(page, index, applyPageLinks(withMedia, paths)) };
   },
 }));
