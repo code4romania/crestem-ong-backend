@@ -13,7 +13,7 @@ const PAGE_SIZE = 24;
 const POPULATE = {
   fisier: true,
   etichete: { fields: ["nume", "slug"] },
-  createdBy: { fields: ["firstname", "lastname", "email"] },
+  createdBy: { fields: ["firstname", "lastname"] },
 } as any;
 
 export default factories.createCoreController(
