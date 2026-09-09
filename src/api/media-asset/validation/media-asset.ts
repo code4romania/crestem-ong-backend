@@ -32,5 +32,10 @@ export const updateMediaAssetSchema = z.strictObject({
   altText: altText.optional(),
 });
 
+export const cleanupOrphanFileSchema = z.strictObject({
+  fisierId: z.number().int().positive(),
+});
+
 export type CreateMediaAssetInput = z.infer<typeof createMediaAssetSchema>;
 export type UpdateMediaAssetInput = z.infer<typeof updateMediaAssetSchema>;
+export type CleanupOrphanFileInput = z.infer<typeof cleanupOrphanFileSchema>;

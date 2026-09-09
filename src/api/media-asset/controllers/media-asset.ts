@@ -1,7 +1,11 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { textParam, csvParam, pageParam } from "../../../utils/query-params";
-import { createMediaAssetSchema, updateMediaAssetSchema } from "../validation/media-asset";
+import {
+  createMediaAssetSchema,
+  updateMediaAssetSchema,
+  cleanupOrphanFileSchema,
+} from "../validation/media-asset";
 import { assetCard, assetDetail } from "../utils/view";
 import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
 import { buildAssetFilters } from "../utils/list-query";
@@ -75,7 +79,8 @@ export default factories.createCoreController(
       });
       if (!row) return ctx.notFound("Fișierul nu există în bibliotecă");
 
-      const usage = await findPagesUsingFile(strapi, (row as any).fisier?.id);
+      const fileId = (row as any).fisier?.id;
+      const usage = fileId ? await findPagesUsingFile(strapi, fileId) : [];
       return { data: assetDetail(row, usage) };
     },
 
@@ -164,7 +169,10 @@ export default factories.createCoreController(
         documentId: ctx.params.documentId,
         populate: POPULATE,
       });
-      const usage = await findPagesUsingFile(strapi, (updated as any).fisier?.id);
+      const updatedFileId = (updated as any).fisier?.id;
+      const usage = updatedFileId
+        ? await findPagesUsingFile(strapi, updatedFileId)
+        : [];
       return { data: assetDetail(updated, usage) };
     },
 
@@ -206,7 +214,7 @@ export default factories.createCoreController(
       if (!existing) return ctx.notFound("Fișierul nu există în bibliotecă");
 
       const current = (existing as any).fisier;
-      if (!current?.id) return ctx.badRequest("Asset-ul nu are un fișier asociat");
+      if (!current?.id) return ctx.badRequest("Elementul nu are un fișier asociat");
 
       const uploaded = (ctx.request as any).files?.files;
       const incoming = Array.isArray(uploaded) ? uploaded[0] : uploaded;
@@ -243,6 +251,30 @@ export default factories.createCoreController(
         data: assetDetail(updated, usage),
         meta: { revalidate: usage.map((u) => u.cale) },
       };
+    },
+
+    async cleanupOrphanFile(ctx: Context) {
+      const parsed = cleanupOrphanFileSchema.safeParse(ctx.request.body);
+      if (!parsed.success) {
+        return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+      }
+
+      const inUse = await strapi.db.query("api::media-asset.media-asset").findOne({
+        where: { fisier: parsed.data.fisierId },
+        select: ["id"],
+      });
+      if (inUse) return { data: { deleted: false } };
+
+      const deleted = await strapi.db.transaction(async () => {
+        const fileRow = await strapi.db
+          .query("plugin::upload.file")
+          .findOne({ where: { id: parsed.data.fisierId } });
+        if (!fileRow) return false;
+        await deleteUploadedFile(strapi, fileRow);
+        return true;
+      });
+
+      return { data: { deleted } };
     },
   }),
 );
