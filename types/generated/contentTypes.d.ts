@@ -758,6 +758,42 @@ export interface ApiLocalitateLocalitate extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiMediaAssetMediaAsset extends Struct.CollectionTypeSchema {
+  collectionName: 'media_assets';
+  info: {
+    description: "One curated file in the FDSC media library. Presence of a row is what marks a file as 'in the library'; incidental uploads (avatars, reports) have none.";
+    displayName: 'Media Asset';
+    pluralName: 'media-assets';
+    singularName: 'media-asset';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    descriere: Schema.Attribute.Text;
+    etichete: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::media-tag.media-tag'
+    >;
+    fisier: Schema.Attribute.Media<'images' | 'videos' | 'files'> &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::media-asset.media-asset'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    titlu: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMediaTagMediaTag extends Struct.CollectionTypeSchema {
   collectionName: 'media_tags';
   info: {
@@ -1827,6 +1863,7 @@ declare module '@strapi/strapi' {
       'api::footer.footer': ApiFooterFooter;
       'api::judet.judet': ApiJudetJudet;
       'api::localitate.localitate': ApiLocalitateLocalitate;
+      'api::media-asset.media-asset': ApiMediaAssetMediaAsset;
       'api::media-tag.media-tag': ApiMediaTagMediaTag;
       'api::meeting.meeting': ApiMeetingMeeting;
       'api::menu.menu': ApiMenuMenu;
