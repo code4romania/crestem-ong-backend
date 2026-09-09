@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "media_tags",
+  "info": {
+    "singularName": "media-tag",
+    "pluralName": "media-tags",
+    "displayName": "Media Tag",
+    "description": "A label for grouping media library assets. Managed only through the FDSC media library screen."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "nume": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "nume"
+    },
+    "assete": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::media-asset.media-asset",
+      "mappedBy": "etichete"
+    }
+  }
+}
