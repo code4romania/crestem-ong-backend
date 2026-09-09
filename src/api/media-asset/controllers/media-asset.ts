@@ -6,6 +6,7 @@ import { assetCard, assetDetail } from "../utils/view";
 import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
 import { buildAssetFilters } from "../utils/list-query";
 import { deleteUploadedFile } from "../../../utils/media";
+import { isTypeCategoryMismatch } from "../utils/file-type";
 
 const PAGE_SIZE = 24;
 
@@ -193,6 +194,55 @@ export default factories.createCoreController(
       });
 
       return { data: { documentId: ctx.params.documentId } };
+    },
+
+    async replaceFile(ctx: Context) {
+      const force = textParam(ctx.query.force) === "true";
+
+      const existing = await strapi.documents("api::media-asset.media-asset").findOne({
+        documentId: ctx.params.documentId,
+        populate: { fisier: true },
+      });
+      if (!existing) return ctx.notFound("Fișierul nu există în bibliotecă");
+
+      const current = (existing as any).fisier;
+      if (!current?.id) return ctx.badRequest("Asset-ul nu are un fișier asociat");
+
+      const uploaded = (ctx.request as any).files?.files;
+      const incoming = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+      if (!incoming) return ctx.badRequest("Niciun fișier încărcat");
+
+      if (
+        isTypeCategoryMismatch(
+          current.mime ?? null,
+          incoming.type ?? incoming.mimetype ?? null,
+        ) &&
+        !force
+      ) {
+        return ctx.conflict(
+          "Noul fișier are alt tip decât cel înlocuit (imagine vs. non-imagine)",
+        );
+      }
+
+      // In-place replace — same plugin::upload.file row id, new bytes.
+      // Signature confirmed against @strapi/upload 5.52.3
+      // (dist/server/services/upload.js → `async function replace(id, { data, file }, opts)`).
+      await strapi
+        .plugin("upload")
+        .service("upload")
+        .replace(current.id, { data: {}, file: incoming });
+
+      const usage = await findPagesUsingFile(strapi, current.id);
+
+      const updated = await strapi.documents("api::media-asset.media-asset").findOne({
+        documentId: ctx.params.documentId,
+        populate: POPULATE,
+      });
+
+      return {
+        data: assetDetail(updated, usage),
+        meta: { revalidate: usage.map((u) => u.cale) },
+      };
     },
   }),
 );

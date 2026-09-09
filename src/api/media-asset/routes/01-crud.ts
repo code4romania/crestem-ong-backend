@@ -7,5 +7,6 @@ export default {
     { method: "POST", path: "/media-assets", handler: "media-asset.createOne", config: staff },
     { method: "PUT", path: "/media-assets/:documentId", handler: "media-asset.updateOne", config: staff },
     { method: "DELETE", path: "/media-assets/:documentId", handler: "media-asset.deleteOne", config: staff },
+    { method: "POST", path: "/media-assets/:documentId/replace", handler: "media-asset.replaceFile", config: staff },
   ],
 };
