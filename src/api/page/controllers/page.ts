@@ -10,6 +10,7 @@ import { collectFileIds } from "../utils/media";
 import { applyPageLinks, collectChildRequests, collectPageLinkIds } from "../utils/links";
 import { loadPageIndex, type PageIndex } from "../utils/page-index";
 import { checkParent, findByPath } from "../utils/tree";
+import { resolveCategoryBlocks } from "../../library-category/utils/blocks";
 
 /**
  * `publicat` is derived, not stored: the API keeps the boolean it has always
@@ -190,7 +191,9 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
     // go through their own endpoints, so an edit never changes what the public
     // can see.
     const data: Record<string, unknown> = { ...parsed.data };
-    if (parsed.data.blocuri) {
+    // Presence, not truthiness: an explicitly-sent empty list clears the
+    // attachments, while an absent one leaves both content and files alone.
+    if (parsed.data.blocuri !== undefined) {
       data.fisiere = collectFileIds(parsed.data.blocuri);
     }
 
@@ -294,6 +297,9 @@ export default factories.createCoreController("api::page.page", ({ strapi }) => 
       paths[id] = targetPath;
     }
 
-    return { data: detailView(page, index, applyPageLinks(page.blocuri, paths)) };
+    const withLinks = applyPageLinks(page.blocuri, paths);
+    const withArticles = await resolveCategoryBlocks(strapi, withLinks, roleType);
+
+    return { data: detailView(page, index, withArticles) };
   },
 }));

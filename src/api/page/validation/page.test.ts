@@ -19,6 +19,16 @@ describe("createPageSchema", () => {
     expect(createPageSchema.safeParse({ ...valid, blocuri: [] }).success).toBe(true);
   });
 
+  it("defaults an unsent block list to empty", () => {
+    const parsed = createPageSchema.safeParse({
+      titlu: valid.titlu,
+      slug: valid.slug,
+      vizibilitate: valid.vizibilitate,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.blocuri).toEqual([]);
+  });
+
   it("rejects a blank title", () => {
     expect(createPageSchema.safeParse({ ...valid, titlu: "  " }).success).toBe(false);
   });
@@ -113,6 +123,27 @@ describe("createPageSchema", () => {
       blocuri: [
         { id: "a1", type: "rich-text", data: { continut: "x".repeat(1_100_000) } },
       ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("updatePageSchema", () => {
+  it("leaves an unsent blocuri key absent from the parsed output", () => {
+    const parsed = updatePageSchema.safeParse({ titlu: "Titlu nou" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && "blocuri" in parsed.data).toBe(false);
+  });
+
+  it("keeps an explicitly-sent empty list as an empty list", () => {
+    const parsed = updatePageSchema.safeParse({ blocuri: [] });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.blocuri).toEqual([]);
+  });
+
+  it("still rejects an unknown block type", () => {
+    const parsed = updatePageSchema.safeParse({
+      blocuri: [{ id: "a1", type: "teleporter", data: {} }],
     });
     expect(parsed.success).toBe(false);
   });
