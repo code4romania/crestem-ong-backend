@@ -447,6 +447,53 @@ export interface ApiActivityActivity extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
+  collectionName: 'articles';
+  info: {
+    description: 'A library article. Blocks are stored as JSON exactly as on `page`; the category is derived from `subcategorie.parinte` and never stored twice.';
+    displayName: 'Article';
+    pluralName: 'articles';
+    singularName: 'article';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    autor: Schema.Attribute.String;
+    blocuri: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dataPublicarii: Schema.Attribute.DateTime;
+    etichete: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
+    fisiere: Schema.Attribute.Media<'images' | 'videos' | 'files', true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::article.article'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    rezumat: Schema.Attribute.Text;
+    slug: Schema.Attribute.UID<'titlu'> & Schema.Attribute.Required;
+    stare: Schema.Attribute.Enumeration<['schita', 'publicat']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'schita'>;
+    subcategorie: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::library-category.library-category'
+    > &
+      Schema.Attribute.Required;
+    tip: Schema.Attribute.String;
+    titlu: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    vizibilitate: Schema.Attribute.JSON &
+      Schema.Attribute.DefaultTo<['public']>;
+  };
+}
+
 export interface ApiConversationConversation
   extends Struct.CollectionTypeSchema {
   collectionName: 'conversations';
@@ -647,6 +694,64 @@ export interface ApiJudetJudet extends Struct.CollectionTypeSchema {
       'oneToMany',
       'plugin::users-permissions.user'
     >;
+  };
+}
+
+export interface ApiLibraryCategoryLibraryCategory
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'library_categories';
+  info: {
+    description: 'One collection holding both taxonomy levels: no parent means a category, a parent means a subcategory. Articles attach to subcategories only.';
+    displayName: 'Library Category';
+    pluralName: 'library-categories';
+    singularName: 'library-category';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    articole: Schema.Attribute.Relation<'oneToMany', 'api::article.article'>;
+    copii: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::library-category.library-category'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    descriere: Schema.Attribute.Text;
+    icon: Schema.Attribute.Enumeration<
+      [
+        'folder',
+        'settings',
+        'scale',
+        'message',
+        'trending',
+        'users',
+        'award',
+        'book',
+        'globe',
+        'heart',
+        'briefcase',
+        'calendar',
+      ]
+    > &
+      Schema.Attribute.DefaultTo<'folder'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::library-category.library-category'
+    > &
+      Schema.Attribute.Private;
+    nume: Schema.Attribute.String & Schema.Attribute.Required;
+    parinte: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::library-category.library-category'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'nume'> & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -1708,12 +1813,14 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::activity-type.activity-type': ApiActivityTypeActivityType;
       'api::activity.activity': ApiActivityActivity;
+      'api::article.article': ApiArticleArticle;
       'api::conversation.conversation': ApiConversationConversation;
       'api::domain.domain': ApiDomainDomain;
       'api::evaluation.evaluation': ApiEvaluationEvaluation;
       'api::fdsc-report.fdsc-report': ApiFdscReportFdscReport;
       'api::footer.footer': ApiFooterFooter;
       'api::judet.judet': ApiJudetJudet;
+      'api::library-category.library-category': ApiLibraryCategoryLibraryCategory;
       'api::localitate.localitate': ApiLocalitateLocalitate;
       'api::meeting.meeting': ApiMeetingMeeting;
       'api::menu.menu': ApiMenuMenu;

@@ -1,0 +1,51 @@
+{
+  "kind": "collectionType",
+  "collectionName": "library_categories",
+  "info": {
+    "singularName": "library-category",
+    "pluralName": "library-categories",
+    "displayName": "Library Category",
+    "description": "One collection holding both taxonomy levels: no parent means a category, a parent means a subcategory. Articles attach to subcategories only."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "nume": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "nume",
+      "required": true
+    },
+    "parinte": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::library-category.library-category",
+      "inversedBy": "copii"
+    },
+    "copii": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::library-category.library-category",
+      "mappedBy": "parinte"
+    },
+    "articole": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::article.article",
+      "mappedBy": "subcategorie"
+    },
+    "descriere": {
+      "type": "text"
+    },
+    "icon": {
+      "type": "enumeration",
+      "enum": ["folder", "settings", "scale", "message", "trending", "users", "award", "book", "globe", "heart", "briefcase", "calendar"],
+      "default": "folder"
+    }
+  }
+}

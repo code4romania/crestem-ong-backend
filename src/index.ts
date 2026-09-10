@@ -102,6 +102,18 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::page.page.deleteOne",
     "api::page.page.publishOne",
     "api::page.page.unpublishOne",
+    "api::library-category.library-category.tree",
+    "api::library-category.library-category.createOne",
+    "api::library-category.library-category.updateOne",
+    "api::library-category.library-category.deleteOne",
+    "api::article.article.list",
+    "api::article.article.options",
+    "api::article.article.detail",
+    "api::article.article.createOne",
+    "api::article.article.updateOne",
+    "api::article.article.deleteOne",
+    "api::article.article.publishOne",
+    "api::article.article.unpublishOne",
     "api::public-person.public-person.programs",
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
@@ -241,7 +253,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
  * carry over to authenticated ones, so a signed-in user would be refused a page
  * an anonymous visitor can read.
  */
-const PUBLIC_READ_ACTIONS = ["api::page.page.byPath"];
+const PUBLIC_READ_ACTIONS = [
+  "api::page.page.byPath",
+  "api::article.article.publicList",
+  "api::article.article.publicByPath",
+  "api::library-category.library-category.publicTree",
+];
 
 for (const actions of Object.values(ROLE_PERMISSIONS)) {
   actions.push(...PUBLIC_READ_ACTIONS);
