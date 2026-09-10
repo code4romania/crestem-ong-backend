@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileTypeCategory, isTypeCategoryMismatch } from "./file-type";
+import { fileTypeCategory, formatToken, isFileFormatMismatch } from "./file-type";
 
 describe("fileTypeCategory", () => {
   it("classifies images", () => {
@@ -17,25 +17,58 @@ describe("fileTypeCategory", () => {
   });
 });
 
-describe("isTypeCategoryMismatch", () => {
-  it("flags image replaced by pdf", () => {
-    expect(isTypeCategoryMismatch("image/png", "application/pdf")).toBe(true);
+describe("formatToken", () => {
+  it("reads a stored extension", () => {
+    expect(formatToken(".png", "application/pdf")).toBe("png");
   });
-  it("flags pdf replaced by image", () => {
-    expect(isTypeCategoryMismatch("application/pdf", "image/jpeg")).toBe(true);
+  it("reads an extension off a filename or path", () => {
+    expect(formatToken("Screenshot 2026-09-10.PNG", null)).toBe("png");
+    expect(formatToken("/uploads/a.b.webp", null)).toBe("webp");
   });
-  it("allows jpg replaced by png", () => {
-    expect(isTypeCategoryMismatch("image/jpeg", "image/png")).toBe(false);
+  it("collapses jpeg to jpg", () => {
+    expect(formatToken(".jpeg", null)).toBe("jpg");
+    expect(formatToken("photo.JPG", null)).toBe("jpg");
   });
-  it("allows pdf replaced by docx", () => {
+  it("falls back to the mime when there is no extension", () => {
+    expect(formatToken(null, "image/png")).toBe("png");
+    expect(formatToken("noextension", "application/pdf")).toBe("pdf");
+  });
+  it("is empty when nothing is knowable", () => {
+    expect(formatToken(null, null)).toBe("");
+    expect(formatToken("", "application/octet-stream")).toBe("");
+  });
+});
+
+describe("isFileFormatMismatch", () => {
+  it("flags png replaced by pdf", () => {
+    expect(isFileFormatMismatch("png", "pdf")).toBe(true);
+  });
+  it("flags png replaced by jpg", () => {
+    expect(isFileFormatMismatch("png", "jpg")).toBe(true);
+  });
+  it("allows the same format", () => {
+    expect(isFileFormatMismatch("png", "png")).toBe(false);
+  });
+  it("allows a same-extension replace even if the current mime is stale", () => {
+    // Corrupt row: ext .png but mime application/pdf from an earlier bad replace.
+    // Comparing the extension token lets a real PNG replace heal it.
     expect(
-      isTypeCategoryMismatch(
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      isFileFormatMismatch(
+        formatToken(".png", "application/pdf"),
+        formatToken("new-screenshot.png", "image/png"),
       ),
     ).toBe(false);
   });
-  it("allows video replaced by file", () => {
-    expect(isTypeCategoryMismatch("video/mp4", "application/pdf")).toBe(false);
+  it("still blocks a format change on a corrupt row", () => {
+    expect(
+      isFileFormatMismatch(
+        formatToken(".png", "application/pdf"),
+        formatToken("Contract.pdf", "application/pdf"),
+      ),
+    ).toBe(true);
+  });
+  it("does not block when a side is unknown", () => {
+    expect(isFileFormatMismatch("", "png")).toBe(false);
+    expect(isFileFormatMismatch("png", "")).toBe(false);
   });
 });

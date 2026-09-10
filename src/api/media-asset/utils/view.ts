@@ -1,5 +1,6 @@
 import { fileTypeCategory } from "./file-type";
 import { slugify } from "../../media-tag/utils/slug";
+import { mediaUrlWithVersion } from "../../../utils/media";
 import type { PageUsage } from "./usage";
 
 export interface AssetFileDTO {
@@ -33,7 +34,8 @@ export interface MediaAssetDetailDTO extends MediaAssetCardDTO {
 
 const fileDto = (f: any): AssetFileDTO => ({
   id: f?.id ?? 0,
-  url: f?.url ?? "",
+  // Cache-bust on replace: same row, same URL, new bytes — see mediaUrlWithVersion.
+  url: mediaUrlWithVersion(f?.url ?? "", f?.updatedAt),
   name: f?.name ?? "",
   mime: f?.mime ?? null,
   ext: f?.ext ?? null,

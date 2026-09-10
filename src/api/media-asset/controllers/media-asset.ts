@@ -10,7 +10,7 @@ import { assetCard, assetDetail } from "../utils/view";
 import { findPagesUsingFile, findPagesUsingFiles } from "../utils/usage";
 import { buildAssetFilters } from "../utils/list-query";
 import { deleteUploadedFile } from "../../../utils/media";
-import { isTypeCategoryMismatch } from "../utils/file-type";
+import { formatToken, isFileFormatMismatch } from "../utils/file-type";
 
 const PAGE_SIZE = 24;
 
@@ -205,8 +205,6 @@ export default factories.createCoreController(
     },
 
     async replaceFile(ctx: Context) {
-      const force = textParam(ctx.query.force) === "true";
-
       const existing = await strapi.documents("api::media-asset.media-asset").findOne({
         documentId: ctx.params.documentId,
         populate: { fisier: true },
@@ -220,15 +218,24 @@ export default factories.createCoreController(
       const incoming = Array.isArray(uploaded) ? uploaded[0] : uploaded;
       if (!incoming) return ctx.badRequest("Niciun fișier încărcat");
 
-      if (
-        isTypeCategoryMismatch(
-          current.mime ?? null,
-          incoming.type ?? incoming.mimetype ?? null,
-        ) &&
-        !force
-      ) {
+      // A replace reuses the same upload row and URL (Strapi pins the new bytes
+      // to the old hash + extension), so a different format would leave the URL
+      // serving contents its extension denies and break every block using the
+      // asset. Require the same format — compared by extension, since that is
+      // what's pinned; `mime` can be left stale by an earlier bad replace.
+      const currentFormat = formatToken(current.ext, current.mime);
+      const declaredMime =
+        incoming.detectedMimeType ??
+        (incoming.mimetype && incoming.mimetype !== "application/octet-stream"
+          ? incoming.mimetype
+          : incoming.type ?? null);
+      const incomingFormat = formatToken(
+        incoming.originalFilename ?? incoming.name ?? null,
+        declaredMime,
+      );
+      if (isFileFormatMismatch(currentFormat, incomingFormat)) {
         return ctx.conflict(
-          "Noul fișier are alt tip decât cel înlocuit (imagine vs. non-imagine)",
+          `Fișierul nou trebuie să aibă același format ca fișierul curent (${currentFormat.toUpperCase()}). Încarcă un fișier nou în bibliotecă dacă ai nevoie de alt format.`,
         );
       }
 

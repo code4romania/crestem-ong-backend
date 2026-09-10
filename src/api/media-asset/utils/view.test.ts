@@ -54,6 +54,15 @@ describe("assetCard", () => {
     expect(card.utilizariCount).toBe(0);
     expect(card.etichete).toEqual([]);
   });
+
+  it("cache-busts the file url with the file's updatedAt", () => {
+    const ts = Date.parse("2026-09-10T12:00:00.000Z");
+    const card = assetCard({
+      ...row,
+      fisier: { ...row.fisier, updatedAt: "2026-09-10T12:00:00.000Z" },
+    });
+    expect(card.fisier.url).toBe(`/uploads/logo_fdsc.png?v=${ts}`);
+  });
 });
 
 describe("assetDetail", () => {

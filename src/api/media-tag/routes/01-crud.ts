@@ -12,5 +12,11 @@ export default {
       handler: "media-tag.createOne",
       config: { policies: ["global::is-fdsc-staff"] },
     },
+    {
+      method: "DELETE",
+      path: "/media-tags/:documentId",
+      handler: "media-tag.deleteOne",
+      config: { policies: ["global::is-fdsc-staff"] },
+    },
   ],
 };

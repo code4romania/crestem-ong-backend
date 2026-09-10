@@ -46,5 +46,20 @@ export default factories.createCoreController(
       });
       return { data: view(created) };
     },
+
+    async deleteOne(ctx: Context) {
+      const { documentId } = ctx.params;
+
+      const existing = await strapi
+        .documents("api::media-tag.media-tag")
+        .findOne({ documentId });
+      if (!existing) return ctx.notFound("Eticheta nu există");
+
+      // `assete` is a manyToMany relation — deleting the tag drops the join-table
+      // rows, so any images carrying this tag simply lose it. Nothing else changes.
+      await strapi.documents("api::media-tag.media-tag").delete({ documentId });
+
+      return { data: { documentId } };
+    },
   }),
 );

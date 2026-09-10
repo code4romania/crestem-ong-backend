@@ -112,6 +112,7 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::media-asset.media-asset.cleanupOrphanFile",
     "api::media-tag.media-tag.list",
     "api::media-tag.media-tag.createOne",
+    "api::media-tag.media-tag.deleteOne",
     "api::public-person.public-person.programs",
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
