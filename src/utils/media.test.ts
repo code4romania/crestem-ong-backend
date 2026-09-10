@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deleteUploadedFile } from "./media";
+import { deleteUploadedFile, mediaUrlWithVersion } from "./media";
 
 const FILE_MODEL_UID = "plugin::upload.file";
 
@@ -45,6 +45,38 @@ function harness(options: HarnessOptions = {}) {
 
   return { strapi, providerDeletes, rowDeletes };
 }
+
+describe("mediaUrlWithVersion", () => {
+  it("appends v= from an ISO updatedAt", () => {
+    const ts = Date.parse("2026-09-10T12:00:00.000Z");
+    expect(mediaUrlWithVersion("/uploads/x.png", "2026-09-10T12:00:00.000Z")).toBe(
+      `/uploads/x.png?v=${ts}`,
+    );
+  });
+
+  it("accepts a number or Date", () => {
+    expect(mediaUrlWithVersion("/uploads/x.png", 1234)).toBe("/uploads/x.png?v=1234");
+    const d = new Date("2026-01-01T00:00:00.000Z");
+    expect(mediaUrlWithVersion("/uploads/x.png", d)).toBe(`/uploads/x.png?v=${d.getTime()}`);
+  });
+
+  it("uses & when the url already has a query string", () => {
+    expect(mediaUrlWithVersion("https://cdn/x.png?w=200", 99)).toBe(
+      "https://cdn/x.png?w=200&v=99",
+    );
+  });
+
+  it("returns the url unchanged when the timestamp is missing or unparseable", () => {
+    expect(mediaUrlWithVersion("/uploads/x.png", null)).toBe("/uploads/x.png");
+    expect(mediaUrlWithVersion("/uploads/x.png", undefined)).toBe("/uploads/x.png");
+    expect(mediaUrlWithVersion("/uploads/x.png", "not a date")).toBe("/uploads/x.png");
+  });
+
+  it("returns an empty string for an empty url", () => {
+    expect(mediaUrlWithVersion("", 123)).toBe("");
+    expect(mediaUrlWithVersion(null, 123)).toBe("");
+  });
+});
 
 describe("deleteUploadedFile", () => {
   it("does nothing at all when there is no file", async () => {

@@ -9,6 +9,33 @@
 
 const FILE_MODEL_UID = "plugin::upload.file";
 
+/**
+ * Appends `?v=<updatedAt>` to a media URL.
+ *
+ * A Media Library replace reuses the same `plugin::upload.file` row and keeps
+ * its URL (Strapi pins the new bytes to the old hash + extension), so browsers
+ * and the CDN would keep serving the previous image. Keying a query param to
+ * the row's `updatedAt` busts those caches on a replace while leaving an
+ * untouched file a stable, cacheable URL. Unknown/invalid timestamps return the
+ * URL unchanged.
+ */
+export function mediaUrlWithVersion(
+  url: string | null | undefined,
+  updatedAt: string | number | Date | null | undefined,
+): string {
+  if (!url) return url ?? "";
+  const ts =
+    updatedAt instanceof Date
+      ? updatedAt.getTime()
+      : typeof updatedAt === "number"
+        ? updatedAt
+        : updatedAt
+          ? Date.parse(updatedAt)
+          : NaN;
+  if (!Number.isFinite(ts)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}v=${ts}`;
+}
+
 export interface UploadedFileRef {
   id?: number | string;
   provider?: string;

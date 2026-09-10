@@ -5,6 +5,7 @@ import { seedDomains } from "./utils/seed-domains";
 import { seedMenus } from "./utils/seed-menus";
 import { seedFooter } from "./utils/seed-footer";
 import { migratePageStare } from "./utils/migrate-page-stare";
+import { slugify } from "./api/media-tag/utils/slug";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -114,6 +115,16 @@ const SUPER_ADMIN_PERMISSIONS = [
     "api::article.article.deleteOne",
     "api::article.article.publishOne",
     "api::article.article.unpublishOne",
+    "api::media-asset.media-asset.list",
+    "api::media-asset.media-asset.detail",
+    "api::media-asset.media-asset.createOne",
+    "api::media-asset.media-asset.updateOne",
+    "api::media-asset.media-asset.deleteOne",
+    "api::media-asset.media-asset.replaceFile",
+    "api::media-asset.media-asset.cleanupOrphanFile",
+    "api::media-tag.media-tag.list",
+    "api::media-tag.media-tag.createOne",
+    "api::media-tag.media-tag.deleteOne",
     "api::public-person.public-person.programs",
     "api::admin-user.admin-user.list",
     "api::admin-user.admin-user.findOne",
@@ -284,6 +295,7 @@ export default {
     await ensureRolePermissions(strapi);
     await ensurePublicPermissions(strapi);
     await backfillAccountStatus(strapi);
+    await backfillMediaTagSlugs(strapi);
     await seedLocalities(strapi);
     await seedDomains(strapi);
     await seedMenus(strapi);
@@ -331,6 +343,33 @@ async function backfillAccountStatus(strapi: Core.Strapi) {
   strapi.log.info(
     `[bootstrap] Backfilled accountStatus="active" for ${legacy.length} legacy user(s).`,
   );
+}
+
+/**
+ * `media-tag.slug` is a Strapi `uid` field, which the document service does not
+ * populate on `create()` (only the admin Content Manager does). Tags made
+ * through the media library therefore persisted with a NULL slug, which breaks
+ * the slug-based tag filter and the React key on the filter chips. Derive and
+ * store the slug for any such rows. Idempotent.
+ */
+async function backfillMediaTagSlugs(strapi: Core.Strapi) {
+  const rows = await strapi.db
+    .query("api::media-tag.media-tag")
+    .findMany({ where: { $or: [{ slug: null }, { slug: "" }] }, select: ["id", "nume"] });
+
+  if (!rows.length) return;
+
+  let fixed = 0;
+  for (const row of rows as { id: number; nume: string }[]) {
+    const slug = slugify(row.nume);
+    if (!slug) continue;
+    await strapi.db
+      .query("api::media-tag.media-tag")
+      .update({ where: { id: row.id }, data: { slug } });
+    fixed += 1;
+  }
+
+  strapi.log.info(`[bootstrap] Backfilled slug for ${fixed} media tag(s).`);
 }
 
 /**
