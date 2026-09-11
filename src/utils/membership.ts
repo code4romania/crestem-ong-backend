@@ -116,11 +116,13 @@ export async function addOngMembership(
   strapi: any,
   userDocumentId: string,
   ongDocumentId: string,
-  role: string,
+  role?: string,
 ) {
   const user = await loadUserWithMemberships(strapi, userDocumentId);
   if (!user) return;
-  await setNgoMemberRole(strapi, user.documentId, ongDocumentId, role);
+  if (role) {
+    await setNgoMemberRole(strapi, user.documentId, ongDocumentId, role);
+  }
   const ongs = (user.ong ?? []) as any[];
   if (ongs.some((entry) => entry.documentId === ongDocumentId)) {
     return;
