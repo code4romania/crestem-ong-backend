@@ -1,8 +1,20 @@
 import { z } from "zod";
 
 import { DIMENSIONS } from "../../../constants/dimensions";
+import { stripHtml } from "../../../utils/rich-text";
 
 const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
+
+/** Bio is rich-text HTML from the TipTap editor — markup doesn't count
+ * against the visible-character limit. */
+const bioSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => stripHtml(value).length <= 1000,
+    "Bio-ul poate avea maxim 1000 de caractere",
+  )
+  .optional();
 
 /** Mentor accounts: everything from the invite form except email, which never changes here. */
 export const updateMentorSchema = z.object({
@@ -10,11 +22,7 @@ export const updateMentorSchema = z.object({
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
-  bio: z
-    .string()
-    .trim()
-    .max(1000, "Bio-ul poate avea maxim 1000 de caractere")
-    .optional(),
+  bio: bioSchema,
   avatar: z.number().int().positive().nullable().optional(),
   dimensiuni: z
     .array(z.string())

@@ -22,24 +22,38 @@ const SORT_OPTIONS: Record<string, Record<string, "asc" | "desc">> = {
 };
 const DEFAULT_SORT = SORT_OPTIONS["nume:asc"];
 
+type OrgRef = { documentId: string; name: string };
+type ProgramWithOngs = { documentId: string; name: string; ongs: OrgRef[] };
+
 // Mentor <-> program assignment lives on the ngo-mentor join content-type — the
 // user model has no direct relation to filter or populate — so resolve it separately.
-async function resolveProgramsByMentor(mentorIds: string[]) {
-  const programsByMentor = new Map<string, { documentId: string; name: string }[]>();
+// Each ngo-mentor row also carries the ong the mentor was assigned within that
+// program, so a mentor mentoring the same program for two ongs shows up as two
+// rows here; they're grouped back into one program entry with both ongs listed.
+export async function resolveProgramsByMentor(mentorIds: string[]) {
+  const programsByMentor = new Map<string, ProgramWithOngs[]>();
   if (mentorIds.length === 0) return programsByMentor;
 
   const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
     filters: { mentors: { documentId: { $in: mentorIds } } },
-    populate: { program: true, mentors: true },
+    populate: { program: true, ong: true, mentors: true },
   });
   for (const row of rows as any[]) {
     const rowPrograms = Array.isArray(row.program) ? row.program : row.program ? [row.program] : [];
+    const rowOngs: OrgRef[] = Array.isArray(row.ong) ? row.ong : row.ong ? [row.ong] : [];
     for (const mentor of (row.mentors ?? []) as any[]) {
       if (!mentorIds.includes(mentor.documentId)) continue;
       const existing = programsByMentor.get(mentor.documentId) ?? [];
       for (const program of rowPrograms) {
-        if (!existing.some((p) => p.documentId === program.documentId)) {
-          existing.push({ documentId: program.documentId, name: program.name });
+        let entry = existing.find((p) => p.documentId === program.documentId);
+        if (!entry) {
+          entry = { documentId: program.documentId, name: program.name, ongs: [] };
+          existing.push(entry);
+        }
+        for (const ong of rowOngs) {
+          if (!entry.ongs.some((o) => o.documentId === ong.documentId)) {
+            entry.ongs.push({ documentId: ong.documentId, name: ong.name });
+          }
         }
       }
       programsByMentor.set(mentor.documentId, existing);
@@ -50,7 +64,7 @@ async function resolveProgramsByMentor(mentorIds: string[]) {
 
 function mapUser(
   user: any,
-  programs: { documentId: string; name: string }[],
+  programs: ProgramWithOngs[],
   activationToken: string | undefined,
 ) {
   return {

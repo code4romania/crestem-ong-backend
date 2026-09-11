@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { ngoRoleSchema } from "../../../utils/ngo-role";
 import { DIMENSIONS } from "../../../constants/dimensions";
+import { stripHtml } from "../../../utils/rich-text";
 
 const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
 
@@ -141,10 +142,15 @@ const inviteSchema = z.object({
 });
 
 export const registerMentorSchema = inviteSchema.extend({
+  // Rich-text HTML from the TipTap editor — markup doesn't count against the
+  // visible-character limit.
   bio: z
     .string()
     .trim()
-    .max(1000, "Bio-ul poate avea maxim 1000 de caractere")
+    .refine(
+      (value) => stripHtml(value).length <= 1000,
+      "Bio-ul poate avea maxim 1000 de caractere",
+    )
     .optional(),
   avatar: z.number().int().positive().optional(),
   dimensiuni: z

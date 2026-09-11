@@ -267,6 +267,49 @@ describe("buildMentorDashboard — programs and organizations", () => {
 
     expect(result.mentoredOngCount).toBe(1);
   });
+
+  it("lists the ong+program pairs behind the mentored-ong count", async () => {
+    const strapi = mockStrapi({
+      programs: [
+        { documentId: "p1", name: "Impact Lab", startDate: "2025-01-01", endDate: "2026-12-31", programStatus: "Active" },
+      ],
+      ngoMentors: [
+        {
+          documentId: "nm1",
+          program: [{ documentId: "p1", name: "Impact Lab" }],
+          ong: [{ documentId: "o1", name: "CivicHub România" }],
+        },
+      ],
+    });
+
+    const result = await buildMentorDashboard(strapi, "me", TODAY);
+
+    expect(result.mentoredOngs).toEqual([
+      {
+        ong: { documentId: "o1", name: "CivicHub România" },
+        program: { documentId: "p1", name: "Impact Lab" },
+      },
+    ]);
+  });
+
+  it("excludes ong+program pairs belonging to a finished program from the list", async () => {
+    const strapi = mockStrapi({
+      programs: [
+        { documentId: "p1", name: "A", startDate: "2024-01-01", endDate: "2025-12-31", programStatus: "Finished" },
+      ],
+      ngoMentors: [
+        {
+          documentId: "nm1",
+          program: [{ documentId: "p1", name: "A" }],
+          ong: [{ documentId: "o1", name: "Org" }],
+        },
+      ],
+    });
+
+    const result = await buildMentorDashboard(strapi, "me", TODAY);
+
+    expect(result.mentoredOngs).toEqual([]);
+  });
 });
 
 describe("buildMentorDashboard — empty account", () => {
@@ -283,6 +326,7 @@ describe("buildMentorDashboard — empty account", () => {
       missingReports: [],
       nextMeeting: null,
       currentPrograms: [],
+      mentoredOngs: [],
     });
   });
 });

@@ -21,6 +21,10 @@ export interface MentorDashboard {
     endDate: string;
     programStatus: string;
   }[];
+  mentoredOngs: {
+    ong: { documentId: string; name: string };
+    program: { documentId: string; name: string };
+  }[];
 }
 
 /** `ngo-mentor.program` and `.ong` are list relations even though a row always
@@ -102,11 +106,16 @@ export async function buildMentorDashboard(
   );
 
   const mentoredOngIds = new Set<string>();
+  const mentoredOngs: MentorDashboard["mentoredOngs"] = [];
   for (const row of (ngoMentors ?? []) as any[]) {
-    const programDocumentId = firstOf(row.program)?.documentId;
-    const ongDocumentId = firstOf(row.ong)?.documentId;
-    if (ongDocumentId && activeProgramIds.has(programDocumentId)) {
-      mentoredOngIds.add(ongDocumentId);
+    const program = firstOf(row.program);
+    const ong = firstOf(row.ong);
+    if (ong?.documentId && activeProgramIds.has(program?.documentId)) {
+      mentoredOngIds.add(ong.documentId);
+      mentoredOngs.push({
+        ong: { documentId: ong.documentId, name: ong.name },
+        program: { documentId: program.documentId, name: program.name },
+      });
     }
   }
 
@@ -126,5 +135,6 @@ export async function buildMentorDashboard(
       endDate: program.endDate,
       programStatus: program.programStatus,
     })),
+    mentoredOngs,
   };
 }
