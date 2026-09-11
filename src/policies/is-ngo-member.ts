@@ -9,5 +9,7 @@ export default (
 
   if (!user) return false;
 
-  return user.role?.type === "ngo-member";
+  // An ngo-admin can also respond to their own ONG's evaluation — see
+  // resolveMembers in api/report/utils/members.ts, which allows the same pair.
+  return user.role?.type === "ngo-member" || user.role?.type === "ngo-admin";
 };

@@ -69,6 +69,7 @@ export default {
     return {
       data: {
         id: user.id,
+        documentId: user.documentId,
         nume: user.nume,
         email: user.email,
         createdAt: user.createdAt,

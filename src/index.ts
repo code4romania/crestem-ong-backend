@@ -168,6 +168,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // explanation of the steps available to them, not a bare 403.
     "api::auth.auth.deleteAccount",
     "api::evaluation.evaluation.myOngs",
+    // The admin can also be invited as a respondent on their own ONG's round
+    // (see resolveMembers / is-ngo-member) — same evaluation-filling actions
+    // ngo-member has, granted here too.
+    "api::evaluation.evaluation.current",
+    "api::evaluation.evaluation.detail",
+    "api::evaluation.evaluation.updateOne",
+    "api::evaluation.evaluation.finish",
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
