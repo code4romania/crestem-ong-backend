@@ -5,6 +5,7 @@ import { seedDomains } from "./utils/seed-domains";
 import { seedMenus } from "./utils/seed-menus";
 import { seedFooter } from "./utils/seed-footer";
 import { migratePageStare } from "./utils/migrate-page-stare";
+import { slugify } from "./api/media-tag/utils/slug";
 
 /**
  * Application-level users-permissions roles, beyond the built-in
@@ -51,81 +52,91 @@ const APP_ROLES = [
  * the two FDSC staff accounts differ by exactly one action.
  */
 const SUPER_ADMIN_PERMISSIONS = [
-    "api::dashboard.dashboard.fdsc",
-    "api::auth.auth.me",
-    "api::auth.auth.registerMentor",
-    "api::auth.auth.resendMentorInvite",
-    "api::auth.auth.registerStaff",
-    "api::auth.auth.changePassword",
-    "api::auth.auth.deleteAccount",
-    "api::auth.auth.requestEmailChange",
-    "api::program.program.list",
-    "api::program.program.detail",
-    "api::program.program.stats",
-    "api::program.program.createOne",
-    "api::program.program.updateOne",
-    "api::program.program.deleteOne",
-    "api::program.program.assignMentors",
-    "api::program.program.removeMentors",
-    "api::program.program.mentors",
-    "api::program.program.ongs",
-    "api::program.program.assignOngs",
-    "api::program.program.removeOngs",
-    "api::program.program.assignOngMentors",
-    "api::program.program.removeOngMentors",
-    "api::program.program.assignPhaseEvaluation",
-    "api::program.program.removePhaseEvaluation",
-    "api::ong.ong.overview",
-    "api::ong.ong.evaluations",
-    "api::ong.ong.evaluationDetail",
-    "api::ong.ong.fdscReports",
-    "api::ong.ong.createFdscReport",
-    "api::ong.ong.deleteFdscReport",
-    "api::ong.ong.mentors",
-    "api::ong.ong.meetings",
-    "plugin::upload.content-api.upload",
-    "api::ong.ong.list",
-    "api::ong.ong.listActive",
-    "api::ong.ong.detail",
-    "api::ong.ong.deleteOne",
-    "api::mentor.mentor.listActive",
-    "api::public-person.public-person.list",
-    // Reading the menus is public (the routes set `auth: false`); only the
-    // rewrite needs granting, and the editor keeps it.
-    "api::menu.menu.updateItems",
-    "api::footer.footer.updateOne",
-    "api::page.page.list",
-    "api::page.page.options",
-    "api::page.page.detail",
-    "api::page.page.createOne",
-    "api::page.page.updateOne",
-    "api::page.page.deleteOne",
-    "api::page.page.publishOne",
-    "api::page.page.unpublishOne",
-    "api::library-category.library-category.tree",
-    "api::library-category.library-category.createOne",
-    "api::library-category.library-category.updateOne",
-    "api::library-category.library-category.deleteOne",
-    "api::article.article.list",
-    "api::article.article.options",
-    "api::article.article.detail",
-    "api::article.article.createOne",
-    "api::article.article.updateOne",
-    "api::article.article.deleteOne",
-    "api::article.article.publishOne",
-    "api::article.article.unpublishOne",
-    "api::public-person.public-person.programs",
-    "api::admin-user.admin-user.list",
-    "api::admin-user.admin-user.findOne",
-    "api::admin-user.admin-user.update",
-    // The platform-wide "Evaluări" screen, one action per tab: responses and
-    // rounds. Read-only, so the editor keeps them too.
-    "api::evaluation.admin-evaluation.list",
-    "api::report.admin-report.list",
-    // The options behind that screen's multi-select filters.
-    "api::ong.filter-options.ongs",
-    "api::ong.filter-options.programs",
-    "plugin::upload.content-api.upload",
+  "api::dashboard.dashboard.fdsc",
+  "api::auth.auth.me",
+  "api::auth.auth.registerMentor",
+  "api::auth.auth.resendMentorInvite",
+  "api::auth.auth.registerStaff",
+  "api::auth.auth.changePassword",
+  "api::auth.auth.deleteAccount",
+  "api::auth.auth.requestEmailChange",
+  "api::program.program.list",
+  "api::program.program.detail",
+  "api::program.program.stats",
+  "api::program.program.createOne",
+  "api::program.program.updateOne",
+  "api::program.program.deleteOne",
+  "api::program.program.assignMentors",
+  "api::program.program.removeMentors",
+  "api::program.program.mentors",
+  "api::program.program.ongs",
+  "api::program.program.assignOngs",
+  "api::program.program.removeOngs",
+  "api::program.program.assignOngMentors",
+  "api::program.program.removeOngMentors",
+  "api::program.program.assignPhaseEvaluation",
+  "api::program.program.removePhaseEvaluation",
+  "api::ong.ong.overview",
+  "api::ong.ong.evaluations",
+  "api::ong.ong.evaluationDetail",
+  "api::ong.ong.fdscReports",
+  "api::ong.ong.createFdscReport",
+  "api::ong.ong.deleteFdscReport",
+  "api::ong.ong.mentors",
+  "api::ong.ong.meetings",
+  "plugin::upload.content-api.upload",
+  "api::ong.ong.list",
+  "api::ong.ong.listActive",
+  "api::ong.ong.detail",
+  "api::ong.ong.deleteOne",
+  "api::mentor.mentor.listActive",
+  "api::public-person.public-person.list",
+  // Reading the menus is public (the routes set `auth: false`); only the
+  // rewrite needs granting, and the editor keeps it.
+  "api::menu.menu.updateItems",
+  "api::footer.footer.updateOne",
+  "api::page.page.list",
+  "api::page.page.options",
+  "api::page.page.detail",
+  "api::page.page.createOne",
+  "api::page.page.updateOne",
+  "api::page.page.deleteOne",
+  "api::page.page.publishOne",
+  "api::page.page.unpublishOne",
+  "api::library-category.library-category.tree",
+  "api::library-category.library-category.createOne",
+  "api::library-category.library-category.updateOne",
+  "api::library-category.library-category.deleteOne",
+  "api::article.article.list",
+  "api::article.article.options",
+  "api::article.article.detail",
+  "api::article.article.createOne",
+  "api::article.article.updateOne",
+  "api::article.article.deleteOne",
+  "api::article.article.publishOne",
+  "api::article.article.unpublishOne",
+  "api::media-asset.media-asset.list",
+  "api::media-asset.media-asset.detail",
+  "api::media-asset.media-asset.createOne",
+  "api::media-asset.media-asset.updateOne",
+  "api::media-asset.media-asset.deleteOne",
+  "api::media-asset.media-asset.replaceFile",
+  "api::media-asset.media-asset.cleanupOrphanFile",
+  "api::media-tag.media-tag.list",
+  "api::media-tag.media-tag.createOne",
+  "api::media-tag.media-tag.deleteOne",
+  "api::public-person.public-person.programs",
+  "api::admin-user.admin-user.list",
+  "api::admin-user.admin-user.findOne",
+  "api::admin-user.admin-user.update",
+  // The platform-wide "Evaluări" screen, one action per tab: responses and
+  // rounds. Read-only, so the editor keeps them too.
+  "api::evaluation.admin-evaluation.list",
+  "api::report.admin-report.list",
+  // The options behind that screen's multi-select filters.
+  "api::ong.filter-options.ongs",
+  "api::ong.filter-options.programs",
+  "plugin::upload.content-api.upload",
 ];
 
 /**
@@ -157,6 +168,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // explanation of the steps available to them, not a bare 403.
     "api::auth.auth.deleteAccount",
     "api::evaluation.evaluation.myOngs",
+    // The admin can also be invited as a respondent on their own ONG's round
+    // (see resolveMembers / is-ngo-member) — same evaluation-filling actions
+    // ngo-member has, granted here too.
+    "api::evaluation.evaluation.current",
+    "api::evaluation.evaluation.detail",
+    "api::evaluation.evaluation.updateOne",
+    "api::evaluation.evaluation.finish",
     "api::auth.auth.registerMember",
     "api::auth.auth.resendMemberInvite",
     "api::ong.ong.members",
@@ -284,6 +302,7 @@ export default {
     await ensureRolePermissions(strapi);
     await ensurePublicPermissions(strapi);
     await backfillAccountStatus(strapi);
+    await backfillMediaTagSlugs(strapi);
     await seedLocalities(strapi);
     await seedDomains(strapi);
     await seedMenus(strapi);
@@ -331,6 +350,36 @@ async function backfillAccountStatus(strapi: Core.Strapi) {
   strapi.log.info(
     `[bootstrap] Backfilled accountStatus="active" for ${legacy.length} legacy user(s).`,
   );
+}
+
+/**
+ * `media-tag.slug` is a Strapi `uid` field, which the document service does not
+ * populate on `create()` (only the admin Content Manager does). Tags made
+ * through the media library therefore persisted with a NULL slug, which breaks
+ * the slug-based tag filter and the React key on the filter chips. Derive and
+ * store the slug for any such rows. Idempotent.
+ */
+async function backfillMediaTagSlugs(strapi: Core.Strapi) {
+  const rows = await strapi.db
+    .query("api::media-tag.media-tag")
+    .findMany({
+      where: { $or: [{ slug: null }, { slug: "" }] },
+      select: ["id", "nume"],
+    });
+
+  if (!rows.length) return;
+
+  let fixed = 0;
+  for (const row of rows as { id: number; nume: string }[]) {
+    const slug = slugify(row.nume);
+    if (!slug) continue;
+    await strapi.db
+      .query("api::media-tag.media-tag")
+      .update({ where: { id: row.id }, data: { slug } });
+    fixed += 1;
+  }
+
+  strapi.log.info(`[bootstrap] Backfilled slug for ${fixed} media tag(s).`);
 }
 
 /**
@@ -424,7 +473,9 @@ async function ensurePublicPermissions(strapi: Core.Strapi) {
       .findOne({ where: { type: roleType } });
 
     if (!role) {
-      strapi.log.warn(`[bootstrap] Role "${roleType}" not found; skipping public grants.`);
+      strapi.log.warn(
+        `[bootstrap] Role "${roleType}" not found; skipping public grants.`,
+      );
       continue;
     }
 

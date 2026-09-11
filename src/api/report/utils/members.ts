@@ -45,7 +45,8 @@ export const resolveMembers = async (
     const inOng = ((member.ong ?? []) as any[]).some(
       (ong: any) => ong?.documentId === ongDocumentId,
     );
-    if (!inOng || member.role?.type !== "ngo-member") {
+    const isRespondentRole = member.role?.type === "ngo-member" || member.role?.type === "ngo-admin";
+    if (!inOng || !isRespondentRole) {
       return {
         error: `Utilizatorul ${member.email} nu este membru al organizației`,
       };

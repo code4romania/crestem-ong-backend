@@ -733,7 +733,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     });
     const eligible = programDocumentId
       ? reports.filter(
-          (report: any) => phaseOfSameProgram(report, programDocumentId),
+          (report: any) => !phaseOfSameProgram(report, programDocumentId),
         )
       : reports;
     const today = todayInBucharest();
