@@ -89,7 +89,7 @@ export interface MenuSubItem extends Struct.ComponentSchema {
 }
 
 declare module '@strapi/strapi' {
-  export namespace Public {
+  export module Public {
     export interface ComponentSchemas {
       'evaluation.dimension': EvaluationDimension;
       'evaluation.question': EvaluationQuestion;
