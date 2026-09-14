@@ -19,6 +19,7 @@ import {
 import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
+import { registerOrAttachMember } from "../services/register-member";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
   loadUserWithOngs,
@@ -176,13 +177,21 @@ export default {
         return ctx.badRequest(scope.error);
       }
 
-      const result = await (
-        strapi.service("api::auth.auth") as AuthService
-      ).createMember(parsed.data, {
-        id: scope.ong.id,
-        documentId: scope.ong.documentId,
-        name: scope.ong.name,
-      });
+      const authService = strapi.service("api::auth.auth") as AuthService;
+      const result = await registerOrAttachMember(
+        strapi,
+        parsed.data,
+        { id: scope.ong.id, documentId: scope.ong.documentId, name: scope.ong.name },
+        (data, ong) => authService.createMember(data, ong),
+      );
+
+      if (result.attached === true) {
+        return {
+          message: "Utilizatorul avea deja un cont și a fost adăugat în organizație.",
+          id: result.id,
+          attached: true,
+        };
+      }
 
       return {
         message: result.emailSent
@@ -190,6 +199,7 @@ export default {
           : "Contul de membru a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
+        attached: false,
         ...(result.activationLink
           ? { activationLink: result.activationLink }
           : {}),

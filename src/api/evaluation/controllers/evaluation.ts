@@ -2,6 +2,7 @@ import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { evaluationDimensionsSchema } from "../validation/evaluation";
 import { computeProgress } from "../utils/progress";
+import { pendingEvaluationsByOng } from "../utils/pending";
 import { normalizeBlocks } from "../utils/normalize";
 import { decorateBlock } from "../utils/catalog";
 import { allPhasesEnded } from "../../report/utils/association";
@@ -128,6 +129,10 @@ export default factories.createCoreController(
         strapi,
         ctx.state.user.documentId,
       );
+      const pendingByOng = await pendingEvaluationsByOng(
+        strapi,
+        ctx.state.user.documentId,
+      );
       return {
         data: ((user?.ong ?? []) as any[])
           .filter(Boolean)
@@ -145,6 +150,7 @@ export default factories.createCoreController(
               name: program.name,
               programStatus: program.programStatus,
             })),
+            pendingEvaluation: pendingByOng.get(ong.documentId) ?? null,
           }))
           .sort((a, b) => `${a.name}`.localeCompare(`${b.name}`, "ro")),
       };

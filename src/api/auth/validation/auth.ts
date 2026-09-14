@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { ngoRoleSchema } from "../../../utils/ngo-role";
 import { DIMENSIONS } from "../../../constants/dimensions";
+import { stripHtml } from "../../../utils/rich-text";
 
 const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
 
@@ -116,22 +117,23 @@ export const registerIndividualSchema = z.object({
   }),
 });
 
+const emailFormatSchema = z
+  .email("Adresă de email invalidă")
+  .lowercase()
+  .min(6, "Adresa de email este prea scurtă");
+
 const inviteSchema = z.object({
   nume: z
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
-  email: z
-    .email("Adresă de email invalidă")
-    .lowercase()
-    .min(6, "Adresa de email este prea scurtă")
-    .refine(
-      async (email) =>
-        !(await strapi.db
-          .query("plugin::users-permissions.user")
-          .findOne({ where: { email: { $eqi: email } } })),
-      "Există deja un cont cu acest email",
-    ),
+  email: emailFormatSchema.refine(
+    async (email) =>
+      !(await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { email: { $eqi: email } } })),
+    "Există deja un cont cu acest email",
+  ),
   telefon: z
     .string()
     .trim()
@@ -140,10 +142,15 @@ const inviteSchema = z.object({
 });
 
 export const registerMentorSchema = inviteSchema.extend({
+  // Rich-text HTML from the TipTap editor — markup doesn't count against the
+  // visible-character limit.
   bio: z
     .string()
     .trim()
-    .max(1000, "Bio-ul poate avea maxim 1000 de caractere")
+    .refine(
+      (value) => stripHtml(value).length <= 1000,
+      "Bio-ul poate avea maxim 1000 de caractere",
+    )
     .optional(),
   avatar: z.number().int().positive().optional(),
   dimensiuni: z
@@ -162,8 +169,14 @@ export const registerMentorSchema = inviteSchema.extend({
  * Members belong to an organization, so they carry a role there. Mentors do not.
  * Unlike the accept-join-request flow (which reuses `ngoRoleSchema` as required),
  * the NGO admin can leave this blank when inviting a member directly.
+ *
+ * Unlike `inviteSchema`, the email is NOT checked for uniqueness here: an NGO
+ * admin adding an email that already has an account is a valid case — the
+ * controller attaches that existing user to the organization instead of
+ * creating a new account.
  */
 export const registerMemberSchema = inviteSchema.extend({
+  email: emailFormatSchema,
   rol: z
     .string()
     .trim()
