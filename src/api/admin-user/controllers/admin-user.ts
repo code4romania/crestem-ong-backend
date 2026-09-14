@@ -1,10 +1,4 @@
 import { Context } from "koa";
-import {
-  buildActivationLink,
-  exposeActivationLink,
-  ACTIVATION_PATH,
-} from "../../auth/utils/auth";
-import { pendingActivationTokens } from "../../../utils/activation";
 import { updateMentorSchema, updateStaffSchema } from "../validation/admin-user";
 import {
   ADMIN_USER_FORBIDDEN_MESSAGE,
@@ -48,11 +42,7 @@ async function resolveProgramsByMentor(mentorIds: string[]) {
   return programsByMentor;
 }
 
-function mapUser(
-  user: any,
-  programs: { documentId: string; name: string }[],
-  activationToken: string | undefined,
-) {
+function mapUser(user: any, programs: { documentId: string; name: string }[]) {
   return {
     documentId: user.documentId,
     nume: user.nume,
@@ -70,9 +60,6 @@ function mapUser(
     dimensiuni: user.dimensiuni ?? [],
     ariiDeExpertiza: user.ariiDeExpertiza ?? [],
     programs,
-    ...(activationToken
-      ? { activationLink: buildActivationLink(activationToken, ACTIVATION_PATH) }
-      : {}),
   };
 }
 
@@ -141,13 +128,6 @@ export default {
       strapi.documents("plugin::users-permissions.user").count({ filters }),
     ]);
 
-    const activationTokens = exposeActivationLink()
-      ? await pendingActivationTokens(
-          strapi,
-          users.map((user) => user.documentId),
-        )
-      : new Map<string, string>();
-
     const mentorIds = users
       .filter((user) => user.role?.type === "mentor")
       .map((user) => user.documentId);
@@ -156,11 +136,7 @@ export default {
 
     return {
       data: users.map((user) =>
-        mapUser(
-          user,
-          programsByMentor.get(user.documentId) ?? [],
-          activationTokens.get(user.documentId),
-        ),
+        mapUser(user, programsByMentor.get(user.documentId) ?? []),
       ),
       meta: {
         pagination: {
@@ -196,12 +172,8 @@ export default {
     const programsByMentor =
       user.role?.type === "mentor" ? await resolveProgramsByMentor([user.documentId]) : new Map();
 
-    const activationToken = exposeActivationLink()
-      ? (await pendingActivationTokens(strapi, [user.documentId])).get(user.documentId)
-      : undefined;
-
     return {
-      data: mapUser(user, programsByMentor.get(user.documentId) ?? [], activationToken),
+      data: mapUser(user, programsByMentor.get(user.documentId) ?? []),
     };
   },
 

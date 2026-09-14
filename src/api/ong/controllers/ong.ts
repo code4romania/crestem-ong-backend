@@ -13,7 +13,6 @@ import { phaseOfSameProgram, programOfReport } from "../../report/utils/associat
 import { isClosed } from "../../report/utils/lifecycle";
 import { toDateString, todayInBucharest } from "../../../utils/date";
 import { computeProgramStatus } from "../../program/utils/status";
-import { pendingActivationTokens } from "../../../utils/activation";
 import { isAnonymized } from "../../../utils/anonymize";
 import {
   belongsToOng,
@@ -26,11 +25,6 @@ import {
   getNgoMemberRoles,
   removeOngMembership,
 } from "../../../utils/membership";
-import {
-  buildActivationLink,
-  exposeActivationLink,
-  ACTIVATION_PATH,
-} from "../../auth/utils/auth";
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
 import { createFdscReportSchema } from "../validation/fdsc-report";
@@ -296,38 +290,21 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         },
         sort: { nume: "asc" },
       });
-    const activationTokens = exposeActivationLink()
-      ? await pendingActivationTokens(
-          strapi,
-          members.map((member) => member.documentId),
-        )
-      : new Map<string, string>();
     const roles = await getNgoMemberRoles(
       strapi,
       scope.ong.documentId,
       members.map((member) => member.documentId),
     );
     return {
-      data: members.map((member) => {
-        const activationToken = activationTokens.get(member.documentId);
-        return {
-          id: member.id,
-          documentId: member.documentId,
-          nume: member.nume,
-          email: member.email,
-          rol: roles.get(member.documentId) ?? null,
-          accountStatus: member.accountStatus,
-          createdAt: member.createdAt,
-          ...(activationToken
-            ? {
-                activationLink: buildActivationLink(
-                  activationToken,
-                  ACTIVATION_PATH,
-                ),
-              }
-            : {}),
-        };
-      }),
+      data: members.map((member) => ({
+        id: member.id,
+        documentId: member.documentId,
+        nume: member.nume,
+        email: member.email,
+        rol: roles.get(member.documentId) ?? null,
+        accountStatus: member.accountStatus,
+        createdAt: member.createdAt,
+      })),
     };
   },
   async removeMember(ctx: Context) {

@@ -37,9 +37,6 @@ export const STAFF_ROLE_LABELS: Record<"super-admin" | "editor-fdsc", string> = 
   "editor-fdsc": "Editor FDSC",
 };
 
-export const exposeActivationLink = () =>
-  process.env.DEV_EXPOSE_ACTIVATION_LINK === "true";
-
 export const buildActivationLink = (token: string, path: string) => {
   const base = process.env.FRONTEND_URL || "http://localhost:1337";
   return `${base.replace(/\/+$/, "")}${path}?token=${encodeURIComponent(token)}`;

@@ -28,6 +28,12 @@ export interface SendProgramAssignmentArgs {
   programName: string;
 }
 
+export interface SendEmailChangeConfirmationArgs {
+  to: string;
+  nume: string;
+  link: string;
+}
+
 export interface SendEvaluationInviteArgs {
   to: string;
   nume: string;
@@ -42,6 +48,9 @@ export interface EmailService {
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
+  sendEmailChangeConfirmation(
+    args: SendEmailChangeConfirmationArgs,
+  ): Promise<void>;
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -150,6 +159,30 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Poți completa evaluarea pe dimensiuni, în mai multe reprize. O dimensiune trimisă nu mai poate fi modificată.",
+        ].join("\n"),
+      });
+  },
+  async sendEmailChangeConfirmation({
+    to,
+    nume,
+    link,
+  }: SendEmailChangeConfirmationArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: "Confirmă noua adresă de email",
+        text: [
+          `Bună, ${nume},`,
+          "",
+          "Ai cerut schimbarea adresei de email a contului tău de pe platforma Creștem ONG cu aceasta.",
+          "Pentru a finaliza schimbarea, accesează linkul de mai jos:",
+          "",
+          link,
+          "",
+          "Adresa contului se schimbă doar după ce deschizi linkul. Până atunci rămâi cu cea veche.",
+          "Dacă nu ai cerut tu schimbarea, ignoră acest email și schimbă-ți parola.",
         ].join("\n"),
       });
   },

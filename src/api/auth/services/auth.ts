@@ -30,7 +30,6 @@ import {
   getEmailLinkSecret,
   signActivationToken,
   buildActivationLink,
-  exposeActivationLink,
   ACTIVATION_PATH,
   STAFF_ROLE_LABELS,
   RESET_PURPOSE,
@@ -78,15 +77,15 @@ export interface AuthService {
     userAgent?: string,
   ): Promise<{ jwt: string; refreshToken: string }>;
   /**
-   * Mint a one-time link that switches the account to `data.email`. The address
-   * is only applied once the link is confirmed, so a typo can never lock the
-   * account out. Returns the link itself only while invitation emails are
-   * unavailable (`DEV_EXPOSE_ACTIVATION_LINK`).
+   * Mint a one-time link that switches the account to `data.email` and mail it
+   * to that address. The address is only applied once the link is confirmed, so
+   * a typo can never lock the account out — and sending to the new address is
+   * what proves the user owns it.
    */
   requestEmailChange(
     userId: number,
     data: RequestEmailChangePayload,
-  ): Promise<{ confirmationLink?: string }>;
+  ): Promise<{ emailSent: boolean }>;
   /** Address a pending token would switch to, for the confirmation screen. */
   previewEmailChange(token: string): Promise<{ email: string }>;
   confirmEmailChange(
@@ -253,9 +252,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     return {
       id: user.id,
       emailSent,
-      ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
-        : {}),
     };
   },
   async createMember(
@@ -337,19 +333,12 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     } catch (error) {
       console.error("createMember email delivery failed", error);
-      console.warn(
-        "Member activation link (email delivery failed):",
-        buildActivationLink(token, ACTIVATION_PATH),
-      );
       emailSent = false;
     }
 
     return {
       id: user.id,
       emailSent,
-      ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
-        : {}),
     };
   },
   async createStaff(data: StaffCreatePayload): Promise<InviteCreateResult> {
@@ -418,9 +407,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     return {
       id: user.id,
       emailSent,
-      ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
-        : {}),
     };
   },
   async activateAccount(data: ActivateAccountPayload) {
@@ -505,18 +491,11 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     } catch (error) {
       console.error("resendMentorInvite email delivery failed", error);
-      console.warn(
-        "Mentor activation link (email delivery failed):",
-        buildActivationLink(token, ACTIVATION_PATH),
-      );
       emailSent = false;
     }
 
     return {
       emailSent,
-      ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
-        : {}),
     };
   },
   async resendMemberInvite(userId: number, ongId: number) {
@@ -560,18 +539,11 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     } catch (error) {
       console.error("resendMemberInvite email delivery failed", error);
-      console.warn(
-        "Member activation link (email delivery failed):",
-        buildActivationLink(token, ACTIVATION_PATH),
-      );
       emailSent = false;
     }
 
     return {
       emailSent,
-      ...(exposeActivationLink()
-        ? { activationLink: buildActivationLink(token, ACTIVATION_PATH) }
-        : {}),
     };
   },
   async forgotPassword(email: string) {
@@ -797,9 +769,23 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         .service("user")
         .edit(user.id, { emailChangeToken: token });
 
-      return exposeActivationLink()
-        ? { confirmationLink: buildEmailChangeLink(token) }
-        : {};
+      // Sent to the new address, not the current one: receiving it is the
+      // proof the user owns it.
+      let emailSent = true;
+      try {
+        await (
+          strapi.service("api::email.email") as EmailService
+        ).sendEmailChangeConfirmation({
+          to: data.email,
+          nume: user.nume,
+          link: buildEmailChangeLink(token),
+        });
+      } catch (error) {
+        console.error("requestEmailChange email delivery failed", error);
+        emailSent = false;
+      }
+
+      return { emailSent };
     } catch (error) {
       console.error("requestEmailChange failed", error);
       throw new Error("A apărut o eroare necunoscută");

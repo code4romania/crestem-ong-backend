@@ -120,9 +120,6 @@ export default {
           : "Contul de mentor a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerMentor failed", error);
@@ -150,9 +147,6 @@ export default {
           : "Contul a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerStaff failed", error);
@@ -190,9 +184,6 @@ export default {
           : "Contul de membru a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerMember failed", error);
@@ -239,9 +230,6 @@ export default {
           ? "Invitația a fost retrimisă."
           : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("resendMentorInvite failed", error);
@@ -271,9 +259,6 @@ export default {
           ? "Invitația a fost retrimisă."
           : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("resendMemberInvite failed", error);
@@ -391,8 +376,9 @@ export default {
 
       return {
         ...result,
-        message:
-          "Am generat linkul de confirmare. Deschide-l pentru a finaliza schimbarea",
+        message: result.emailSent
+          ? `Ți-am trimis un email de confirmare pe ${parsed.data.email}. Deschide linkul din el pentru a finaliza schimbarea`
+          : "Nu am putut trimite emailul de confirmare. Încearcă din nou mai târziu",
       };
     } catch (error) {
       console.error("requestEmailChange failed", error);
