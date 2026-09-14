@@ -20,7 +20,6 @@ import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { registerOrAttachMember } from "../services/register-member";
-import { registerOrAttachMember } from "../services/register-member";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
   loadUserWithOngs,
@@ -200,9 +199,6 @@ export default {
         id: result.id,
         emailSent: result.emailSent,
         attached: false,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerMember failed", error);

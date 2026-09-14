@@ -11,7 +11,6 @@ export type MemberRegistrationResult =
       attached: false;
       id: number;
       emailSent: boolean;
-      activationLink?: string;
     };
 
 /**

@@ -22,9 +22,6 @@ const DEFAULT_SORT = SORT_OPTIONS["nume:asc"];
 type OrgRef = { documentId: string; name: string };
 type ProgramWithOngs = { documentId: string; name: string; ongs: OrgRef[] };
 
-type OrgRef = { documentId: string; name: string };
-type ProgramWithOngs = { documentId: string; name: string; ongs: OrgRef[] };
-
 // Mentor <-> program assignment lives on the ngo-mentor join content-type — the
 // user model has no direct relation to filter or populate — so resolve it separately.
 // Each ngo-mentor row also carries the ong the mentor was assigned within that
@@ -36,18 +33,13 @@ export async function resolveProgramsByMentor(mentorIds: string[]) {
 
   const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
     filters: { mentors: { documentId: { $in: mentorIds } } },
-    populate: { program: true, ong: true, ong: true, mentors: true },
+    populate: { program: true, ong: true, mentors: true },
   });
   for (const row of rows as any[]) {
     const rowPrograms = Array.isArray(row.program)
       ? row.program
       : row.program
         ? [row.program]
-        : [];
-    const rowOngs: OrgRef[] = Array.isArray(row.ong)
-      ? row.ong
-      : row.ong
-        ? [row.ong]
         : [];
     const rowOngs: OrgRef[] = Array.isArray(row.ong)
       ? row.ong
@@ -79,11 +71,7 @@ export async function resolveProgramsByMentor(mentorIds: string[]) {
   return programsByMentor;
 }
 
-function mapUser(
-  user: any,
-  programs: ProgramWithOngs[],
-  activationToken: string | undefined,
-) {
+function mapUser(user: any, programs: ProgramWithOngs[]) {
   return {
     documentId: user.documentId,
     nume: user.nume,
