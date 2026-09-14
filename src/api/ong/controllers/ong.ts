@@ -22,6 +22,7 @@ import {
 } from "../../../utils/ong-scope";
 import {
   addOngMembership,
+  cancelPendingInvite,
   getNgoMemberRoles,
   removeOngMembership,
 } from "../../../utils/membership";
@@ -324,11 +325,13 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (!member || member.role?.type !== "ngo-member") {
       return ctx.badRequest("Membrul nu a fost găsit");
     }
-    const result = await removeOngMembership(
-      strapi,
-      member.documentId,
-      scope.ong.documentId,
-    );
+    // A pending invite has no identity to preserve — it exists only for this
+    // organization's invite, so cancelling it deletes the account outright
+    // instead of leaving an orphaned stub squatting on the email address.
+    const result =
+      member.accountStatus === "pending"
+        ? await cancelPendingInvite(strapi, member.documentId, scope.ong.documentId)
+        : await removeOngMembership(strapi, member.documentId, scope.ong.documentId);
     if ("error" in result) {
       return ctx.badRequest(result.error);
     }
