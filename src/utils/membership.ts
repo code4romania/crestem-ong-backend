@@ -177,3 +177,40 @@ export async function removeOngMembership(
   });
   return { data: { documentId: user.documentId } };
 }
+
+/**
+ * Cancel an invite an ONG admin sent by mistake, for a member who never
+ * activated it. Unlike `removeOngMembership` (which keeps the account — used
+ * where the member may have activated elsewhere, e.g. ONG deletion or
+ * self-service leave), a `pending` invite has no identity to preserve: it
+ * exists only because `createMember` made it for this one organization, so
+ * cancelling the last pending invite deletes the account outright instead of
+ * leaving an orphaned "individual" stub squatting on the email address.
+ * Refuses to act on an already-activated account — use `removeOngMembership`
+ * for those.
+ */
+export async function cancelPendingInvite(
+  strapi: any,
+  userDocumentId: string,
+  ongDocumentId: string,
+): Promise<{ error: string } | { data: { documentId: string } }> {
+  const user = await loadUserWithMemberships(strapi, userDocumentId);
+  const ongs = (user?.ong ?? []) as any[];
+  const membership = ongs.find((entry) => entry.documentId === ongDocumentId);
+  if (!user || !membership || user.accountStatus !== "pending") {
+    return { error: "Membrul nu a fost găsit" };
+  }
+  await deleteNgoMemberRole(strapi, user.documentId, ongDocumentId);
+  const remaining = ongs.filter((entry) => entry.documentId !== ongDocumentId);
+  if (remaining.length === 0) {
+    await strapi.documents(USER_MODEL_UID).delete({
+      documentId: user.documentId,
+    });
+    return { data: { documentId: user.documentId } };
+  }
+  await strapi.documents(USER_MODEL_UID).update({
+    documentId: user.documentId,
+    data: { ong: remaining.map((entry) => docRef(entry.documentId)) },
+  });
+  return { data: { documentId: user.documentId } };
+}
