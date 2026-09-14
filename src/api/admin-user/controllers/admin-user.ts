@@ -71,11 +71,7 @@ export async function resolveProgramsByMentor(mentorIds: string[]) {
   return programsByMentor;
 }
 
-function mapUser(
-  user: any,
-  programs: ProgramWithOngs[],
-  activationToken: string | undefined,
-) {
+function mapUser(user: any, programs: ProgramWithOngs[]) {
   return {
     documentId: user.documentId,
     nume: user.nume,

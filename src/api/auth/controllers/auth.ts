@@ -199,9 +199,6 @@ export default {
         id: result.id,
         emailSent: result.emailSent,
         attached: false,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerMember failed", error);
