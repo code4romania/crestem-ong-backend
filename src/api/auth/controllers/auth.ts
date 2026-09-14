@@ -19,6 +19,7 @@ import {
 import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
+import { registerOrAttachMember } from "../services/register-member";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
   loadUserWithOngs,
@@ -170,13 +171,26 @@ export default {
         return ctx.badRequest(scope.error);
       }
 
-      const result = await (
-        strapi.service("api::auth.auth") as AuthService
-      ).createMember(parsed.data, {
-        id: scope.ong.id,
-        documentId: scope.ong.documentId,
-        name: scope.ong.name,
-      });
+      const authService = strapi.service("api::auth.auth") as AuthService;
+      const result = await registerOrAttachMember(
+        strapi,
+        parsed.data,
+        {
+          id: scope.ong.id,
+          documentId: scope.ong.documentId,
+          name: scope.ong.name,
+        },
+        (data, ong) => authService.createMember(data, ong),
+      );
+
+      if (result.attached === true) {
+        return {
+          message:
+            "Utilizatorul avea deja un cont și a fost adăugat în organizație.",
+          id: result.id,
+          attached: true,
+        };
+      }
 
       return {
         message: result.emailSent
@@ -184,6 +198,10 @@ export default {
           : "Contul de membru a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
+        attached: false,
+        ...(result.activationLink
+          ? { activationLink: result.activationLink }
+          : {}),
       };
     } catch (error) {
       console.error("registerMember failed", error);
@@ -273,7 +291,9 @@ export default {
 
     try {
       const { userId, refreshToken } = await (
-        strapi.service("api::refresh-token.refresh-token") as RefreshTokenService
+        strapi.service(
+          "api::refresh-token.refresh-token",
+        ) as RefreshTokenService
       ).rotate(parsed.data.refreshToken, ctx.request.header["user-agent"]);
 
       const jwt = strapi
@@ -295,7 +315,9 @@ export default {
 
     try {
       await (
-        strapi.service("api::refresh-token.refresh-token") as RefreshTokenService
+        strapi.service(
+          "api::refresh-token.refresh-token",
+        ) as RefreshTokenService
       ).revoke(parsed.data.refreshToken);
     } catch (error) {
       console.error("logout failed", error);
@@ -318,7 +340,8 @@ export default {
     }
 
     return {
-      message: "Dacă există un cont cu acest email, vei primi un link de resetare",
+      message:
+        "Dacă există un cont cu acest email, vei primi un link de resetare",
     };
   },
   async resetPassword(ctx: Context) {
@@ -342,7 +365,9 @@ export default {
   },
   async changePassword(ctx: Context) {
     try {
-      const parsed = await changePasswordSchema.safeParseAsync(ctx.request.body);
+      const parsed = await changePasswordSchema.safeParseAsync(
+        ctx.request.body,
+      );
       if (!parsed.success) {
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }

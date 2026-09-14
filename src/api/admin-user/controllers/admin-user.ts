@@ -1,5 +1,8 @@
 import { Context } from "koa";
-import { updateMentorSchema, updateStaffSchema } from "../validation/admin-user";
+import {
+  updateMentorSchema,
+  updateStaffSchema,
+} from "../validation/admin-user";
 import {
   ADMIN_USER_FORBIDDEN_MESSAGE,
   canActOnUser,
@@ -16,24 +19,50 @@ const SORT_OPTIONS: Record<string, Record<string, "asc" | "desc">> = {
 };
 const DEFAULT_SORT = SORT_OPTIONS["nume:asc"];
 
+type OrgRef = { documentId: string; name: string };
+type ProgramWithOngs = { documentId: string; name: string; ongs: OrgRef[] };
+
 // Mentor <-> program assignment lives on the ngo-mentor join content-type — the
 // user model has no direct relation to filter or populate — so resolve it separately.
-async function resolveProgramsByMentor(mentorIds: string[]) {
-  const programsByMentor = new Map<string, { documentId: string; name: string }[]>();
+// Each ngo-mentor row also carries the ong the mentor was assigned within that
+// program, so a mentor mentoring the same program for two ongs shows up as two
+// rows here; they're grouped back into one program entry with both ongs listed.
+export async function resolveProgramsByMentor(mentorIds: string[]) {
+  const programsByMentor = new Map<string, ProgramWithOngs[]>();
   if (mentorIds.length === 0) return programsByMentor;
 
   const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
     filters: { mentors: { documentId: { $in: mentorIds } } },
-    populate: { program: true, mentors: true },
+    populate: { program: true, ong: true, mentors: true },
   });
   for (const row of rows as any[]) {
-    const rowPrograms = Array.isArray(row.program) ? row.program : row.program ? [row.program] : [];
+    const rowPrograms = Array.isArray(row.program)
+      ? row.program
+      : row.program
+        ? [row.program]
+        : [];
+    const rowOngs: OrgRef[] = Array.isArray(row.ong)
+      ? row.ong
+      : row.ong
+        ? [row.ong]
+        : [];
     for (const mentor of (row.mentors ?? []) as any[]) {
       if (!mentorIds.includes(mentor.documentId)) continue;
       const existing = programsByMentor.get(mentor.documentId) ?? [];
       for (const program of rowPrograms) {
-        if (!existing.some((p) => p.documentId === program.documentId)) {
-          existing.push({ documentId: program.documentId, name: program.name });
+        let entry = existing.find((p) => p.documentId === program.documentId);
+        if (!entry) {
+          entry = {
+            documentId: program.documentId,
+            name: program.name,
+            ongs: [],
+          };
+          existing.push(entry);
+        }
+        for (const ong of rowOngs) {
+          if (!entry.ongs.some((o) => o.documentId === ong.documentId)) {
+            entry.ongs.push({ documentId: ong.documentId, name: ong.name });
+          }
         }
       }
       programsByMentor.set(mentor.documentId, existing);
@@ -42,7 +71,11 @@ async function resolveProgramsByMentor(mentorIds: string[]) {
   return programsByMentor;
 }
 
-function mapUser(user: any, programs: { documentId: string; name: string }[]) {
+function mapUser(
+  user: any,
+  programs: ProgramWithOngs[],
+  activationToken: string | undefined,
+) {
   return {
     documentId: user.documentId,
     nume: user.nume,
@@ -69,7 +102,15 @@ export default {
       return ctx.unauthorized();
     }
 
-    const { search, role, ong, status, program, sort, page: pageParam } = ctx.query;
+    const {
+      search,
+      role,
+      ong,
+      status,
+      program,
+      sort,
+      page: pageParam,
+    } = ctx.query;
 
     const parsedPage = Number(pageParam);
     const page =
@@ -83,17 +124,21 @@ export default {
     const accountStatus = typeof status === "string" ? status.trim() : "";
     const programId = typeof program === "string" ? program.trim() : "";
     const sortOrder =
-      typeof sort === "string" && SORT_OPTIONS[sort] ? SORT_OPTIONS[sort] : DEFAULT_SORT;
+      typeof sort === "string" && SORT_OPTIONS[sort]
+        ? SORT_OPTIONS[sort]
+        : DEFAULT_SORT;
 
     // Mentor <-> program assignment lives on the ngo-mentor join content-type — the
     // user model has no direct relation to filter on — so resolve matching mentor
     // ids up front when a program filter is requested.
     let programMentorIds: string[] | null = null;
     if (programId) {
-      const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
-        filters: { program: { documentId: programId } },
-        populate: { mentors: true },
-      });
+      const rows = await strapi
+        .documents("api::ngo-mentor.ngo-mentor")
+        .findMany({
+          filters: { program: { documentId: programId } },
+          populate: { mentors: true },
+        });
       const idSet = new Set<string>();
       for (const row of rows as any[]) {
         for (const mentor of (row.mentors ?? []) as any[]) {
@@ -156,10 +201,12 @@ export default {
 
     const documentId = ctx.params.documentId as string;
 
-    const user = await strapi.documents("plugin::users-permissions.user").findOne({
-      documentId,
-      populate: { role: true, ong: true, avatar: true },
-    });
+    const user = await strapi
+      .documents("plugin::users-permissions.user")
+      .findOne({
+        documentId,
+        populate: { role: true, ong: true, avatar: true },
+      });
 
     if (!user) {
       return ctx.notFound("Utilizatorul nu a fost găsit");
@@ -170,7 +217,9 @@ export default {
     }
 
     const programsByMentor =
-      user.role?.type === "mentor" ? await resolveProgramsByMentor([user.documentId]) : new Map();
+      user.role?.type === "mentor"
+        ? await resolveProgramsByMentor([user.documentId])
+        : new Map();
 
     return {
       data: mapUser(user, programsByMentor.get(user.documentId) ?? []),
@@ -184,25 +233,32 @@ export default {
 
     const documentId = ctx.params.documentId as string;
 
-    const user = await strapi.db.query("plugin::users-permissions.user").findOne({
-      where: { documentId },
-      populate: ["role"],
-    });
+    const user = await strapi.db
+      .query("plugin::users-permissions.user")
+      .findOne({
+        where: { documentId },
+        populate: ["role"],
+      });
 
     if (!user) {
       return ctx.notFound("Utilizatorul nu a fost găsit");
     }
 
-    const roleType = user.role?.type as (typeof EDITABLE_ROLES)[number] | undefined;
+    const roleType = user.role?.type as
+      | (typeof EDITABLE_ROLES)[number]
+      | undefined;
     if (!roleType || !EDITABLE_ROLES.includes(roleType)) {
-      return ctx.badRequest("Acest tip de cont nu poate fi editat din acest ecran.");
+      return ctx.badRequest(
+        "Acest tip de cont nu poate fi editat din acest ecran.",
+      );
     }
 
     if (!canEditUser(ctx.state.user.role?.type)) {
       return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
     }
 
-    const schema = roleType === "mentor" ? updateMentorSchema : updateStaffSchema;
+    const schema =
+      roleType === "mentor" ? updateMentorSchema : updateStaffSchema;
     const parsed = await schema.safeParseAsync(ctx.request.body);
     if (!parsed.success) {
       return ctx.badRequest("Date invalide: ", parsed.error.flatten());
