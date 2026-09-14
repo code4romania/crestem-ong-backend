@@ -288,7 +288,6 @@ export default {
    * your application is initialized.
    */
   async register({ strapi }: { strapi: Core.Strapi }) {
-    assertActivationLinkGuard();
     // Has to happen here: `bootstrap()` is already too late, see the file.
     await migratePageStare(strapi);
   },
@@ -309,25 +308,6 @@ export default {
     await seedFooter(strapi);
   },
 };
-
-/**
- * Refuses to start with activation links exposed on a production deployment.
- * A no-op unless the flag is on.
- */
-function assertActivationLinkGuard() {
-  if (process.env.DEV_EXPOSE_ACTIVATION_LINK !== "true") return;
-  const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
-  if (appEnv === "production") {
-    throw new Error(
-      "DEV_EXPOSE_ACTIVATION_LINK nu poate fi activat în producție. " +
-        "Pe staging setează APP_ENV=staging.",
-    );
-  }
-  console.warn(
-    `[register] DEV_EXPOSE_ACTIVATION_LINK activ (APP_ENV=${appEnv}). ` +
-      "Linkurile de activare sunt expuse prin API. Dezactivează înainte de producție.",
-  );
-}
 
 /**
  * Accounts created before `accountStatus` was added to the user schema kept a

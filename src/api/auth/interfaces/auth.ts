@@ -34,12 +34,10 @@ export type ConfirmEmailChangePayload = z.infer<typeof confirmEmailChangeSchema>
 export type InviteCreateResult = {
   id: number;
   emailSent: boolean;
-  activationLink?: string;
 };
 
 export type InviteResendResult = {
   emailSent: boolean;
-  activationLink?: string;
 };
 
 export interface DeleteAccountPayload {

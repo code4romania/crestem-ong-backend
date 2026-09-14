@@ -20,6 +20,7 @@ import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { registerOrAttachMember } from "../services/register-member";
+import { registerOrAttachMember } from "../services/register-member";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
   loadUserWithOngs,
@@ -121,9 +122,6 @@ export default {
           : "Contul de mentor a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerMentor failed", error);
@@ -151,9 +149,6 @@ export default {
           : "Contul a fost creat, dar invitația nu a putut fi trimisă. Retrimite invitația.",
         id: result.id,
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("registerStaff failed", error);
@@ -181,13 +176,18 @@ export default {
       const result = await registerOrAttachMember(
         strapi,
         parsed.data,
-        { id: scope.ong.id, documentId: scope.ong.documentId, name: scope.ong.name },
+        {
+          id: scope.ong.id,
+          documentId: scope.ong.documentId,
+          name: scope.ong.name,
+        },
         (data, ong) => authService.createMember(data, ong),
       );
 
       if (result.attached === true) {
         return {
-          message: "Utilizatorul avea deja un cont și a fost adăugat în organizație.",
+          message:
+            "Utilizatorul avea deja un cont și a fost adăugat în organizație.",
           id: result.id,
           attached: true,
         };
@@ -249,9 +249,6 @@ export default {
           ? "Invitația a fost retrimisă."
           : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("resendMentorInvite failed", error);
@@ -281,9 +278,6 @@ export default {
           ? "Invitația a fost retrimisă."
           : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
         emailSent: result.emailSent,
-        ...(result.activationLink
-          ? { activationLink: result.activationLink }
-          : {}),
       };
     } catch (error) {
       console.error("resendMemberInvite failed", error);
@@ -298,7 +292,9 @@ export default {
 
     try {
       const { userId, refreshToken } = await (
-        strapi.service("api::refresh-token.refresh-token") as RefreshTokenService
+        strapi.service(
+          "api::refresh-token.refresh-token",
+        ) as RefreshTokenService
       ).rotate(parsed.data.refreshToken, ctx.request.header["user-agent"]);
 
       const jwt = strapi
@@ -320,7 +316,9 @@ export default {
 
     try {
       await (
-        strapi.service("api::refresh-token.refresh-token") as RefreshTokenService
+        strapi.service(
+          "api::refresh-token.refresh-token",
+        ) as RefreshTokenService
       ).revoke(parsed.data.refreshToken);
     } catch (error) {
       console.error("logout failed", error);
@@ -343,7 +341,8 @@ export default {
     }
 
     return {
-      message: "Dacă există un cont cu acest email, vei primi un link de resetare",
+      message:
+        "Dacă există un cont cu acest email, vei primi un link de resetare",
     };
   },
   async resetPassword(ctx: Context) {
@@ -367,7 +366,9 @@ export default {
   },
   async changePassword(ctx: Context) {
     try {
-      const parsed = await changePasswordSchema.safeParseAsync(ctx.request.body);
+      const parsed = await changePasswordSchema.safeParseAsync(
+        ctx.request.body,
+      );
       if (!parsed.success) {
         return ctx.badRequest("Date invalide: ", parsed.error.flatten());
       }
@@ -401,8 +402,9 @@ export default {
 
       return {
         ...result,
-        message:
-          "Am generat linkul de confirmare. Deschide-l pentru a finaliza schimbarea",
+        message: result.emailSent
+          ? `Ți-am trimis un email de confirmare pe ${parsed.data.email}. Deschide linkul din el pentru a finaliza schimbarea`
+          : "Nu am putut trimite emailul de confirmare. Încearcă din nou mai târziu",
       };
     } catch (error) {
       console.error("requestEmailChange failed", error);
