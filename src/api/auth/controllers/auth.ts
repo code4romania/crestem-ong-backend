@@ -20,7 +20,6 @@ import { deleteAccountSchema } from "../validation/delete-account";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { registerOrAttachMember } from "../services/register-member";
-import { registerOrAttachMember } from "../services/register-member";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import {
   loadUserWithOngs,
