@@ -68,6 +68,11 @@ describe("matchesBrowse", () => {
     expect(run({ q: "GHID FISCAL" })).toEqual(["Ghid fiscal pentru ONG-uri"]);
   });
 
+  it("search ignores diacritics — typing without them still matches the accented title", () => {
+    expect(run({ q: "bugetara" })).toEqual(["Planificare bugetară"]);
+    expect(run({ q: "obligatii" })).toEqual(["Ghid fiscal pentru ONG-uri"]);
+  });
+
   it("composes filters — each narrows the last", () => {
     expect(run({ categorie: "juridic-fiscal", tip: "Ghid" })).toEqual([
       "Ghid fiscal pentru ONG-uri",

@@ -24,6 +24,16 @@ export interface BrowseFilters {
 
 const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
 
+/**
+ * Strips diacritics on top of `fold`, for free-text search only: a visitor
+ * typing "craciun" or "ONG-uri" (no diacritics on the keyboard, or on a
+ * phone's autocorrect) means the same thing as "Crăciun" or "ONG-uri" with the
+ * accented forms it's stored with. Slug/tip filters keep plain `fold` — those
+ * values round-trip from a select the visitor didn't type into.
+ */
+const foldText = (value: string | null | undefined) =>
+  fold(value).normalize("NFD").replace(/[̀-ͯ]/g, "");
+
 export function matchesBrowse(article: BrowseArticle, filters: BrowseFilters): boolean {
   if (filters.categorie && fold(article.subcategorie?.parinte?.slug) !== fold(filters.categorie)) {
     return false;
@@ -35,8 +45,8 @@ export function matchesBrowse(article: BrowseArticle, filters: BrowseFilters): b
 
   if (filters.tip && fold(article.tip) !== fold(filters.tip)) return false;
 
-  const q = fold(filters.q);
-  if (q && !fold(article.titlu).includes(q) && !fold(article.rezumat).includes(q)) {
+  const q = foldText(filters.q);
+  if (q && !foldText(article.titlu).includes(q) && !foldText(article.rezumat).includes(q)) {
     return false;
   }
 
