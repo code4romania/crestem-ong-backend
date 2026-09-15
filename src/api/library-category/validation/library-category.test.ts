@@ -79,7 +79,7 @@ describe("descriere and icon", () => {
       createCategorySchema.safeParse({
         nume: "Juridic",
         slug: "juridic",
-        descriere: "x".repeat(501),
+        descriere: "x".repeat(2501),
       }).success,
     ).toBe(false);
   });

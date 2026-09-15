@@ -24,7 +24,7 @@ export const LIBRARY_ICON_KEYS = [
 const descriereBase = z
   .string()
   .trim()
-  .max(500, "Descrierea este prea lungă");
+  .max(2500, "Descrierea este prea lungă");
 
 const iconBase = z.enum(LIBRARY_ICON_KEYS, { message: "Pictogramă necunoscută" });
 
