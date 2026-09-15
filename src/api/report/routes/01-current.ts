@@ -43,6 +43,12 @@ export default {
       config: { policies: ["global::is-ngo-admin"] },
     },
     {
+      method: "DELETE",
+      path: "/reports/:documentId/members/:evaluationId",
+      handler: "report.removeMember",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
       method: "POST",
       path: "/reports/:documentId/finish",
       handler: "report.finishOne",

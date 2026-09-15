@@ -392,6 +392,46 @@ export default factories.createCoreController(
         },
       };
     },
+    async removeMember(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const report = await strapi.documents("api::report.report").findOne({
+        documentId: ctx.params.documentId,
+        populate: {
+          ong: true,
+          evaluations: { populate: { user: true, dimensions: true } },
+        },
+      });
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
+      }
+      const today = todayIso();
+      if (isClosed(report, today)) {
+        return ctx.badRequest("Runda de evaluare este închisă");
+      }
+      const evaluation = ((report.evaluations ?? []) as any[]).find(
+        (entry) => entry.documentId === ctx.params.evaluationId && entry.user,
+      );
+      if (!evaluation) {
+        return ctx.badRequest("Membrul nu a fost găsit");
+      }
+      const status = computeProgress(evaluation.dimensions, false).status;
+      if (status === "completat") {
+        return ctx.badRequest(
+          "Nu poți elimina un membru care a completat deja evaluarea",
+        );
+      }
+      await strapi
+        .documents("api::evaluation.evaluation")
+        .delete({ documentId: evaluation.documentId });
+      return { data: { documentId: evaluation.documentId } };
+    },
     async detail(ctx: Context) {
       if (!ctx.state.user) {
         return ctx.unauthorized();
