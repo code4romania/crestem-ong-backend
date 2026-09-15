@@ -35,6 +35,12 @@ describe("createArticleSchema", () => {
     expect(parsed.success && parsed.data.etichete).toEqual([]);
   });
 
+  it("rejects a rezumat past the cap", () => {
+    expect(
+      createArticleSchema.safeParse({ ...valid, rezumat: "x".repeat(401) }).success,
+    ).toBe(false);
+  });
+
   it("rejects a missing subcategory", () => {
     const { subcategorie, ...withoutSubcategory } = valid;
     expect(createArticleSchema.safeParse(withoutSubcategory).success).toBe(false);
