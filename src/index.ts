@@ -282,6 +282,14 @@ for (const actions of Object.values(ROLE_PERMISSIONS)) {
   actions.push(...PUBLIC_READ_ACTIONS);
 }
 
+/**
+ * Plugin-owned auth routes an anonymous visitor has to reach. Unlike
+ * `PUBLIC_READ_ACTIONS` these belong to `public` alone: they are what an
+ * unauthenticated caller needs, and the users-permissions strategy rejects the
+ * request outright when the Public role holds no permission at all.
+ */
+const PUBLIC_AUTH_ACTIONS = ["plugin::users-permissions.auth.callback"];
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -297,6 +305,7 @@ export default {
    * your application gets started.
    */
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
+    await ensurePublicRole(strapi);
     await ensureAppRoles(strapi);
     await ensureRolePermissions(strapi);
     await ensurePublicPermissions(strapi);
@@ -360,6 +369,31 @@ async function backfillMediaTagSlugs(strapi: Core.Strapi) {
   }
 
   strapi.log.info(`[bootstrap] Backfilled slug for ${fixed} media tag(s).`);
+}
+
+/**
+ * Recreates the built-in `public` role when it is absent. The plugin seeds it
+ * only into an empty role table, so a database that lost it never gets it back
+ * — and without it `findPublicPermissions()` returns nothing, which makes the
+ * strategy refuse every anonymous request with "Missing or invalid
+ * credentials", login included.
+ */
+async function ensurePublicRole(strapi: Core.Strapi) {
+  const existing = await strapi.db
+    .query("plugin::users-permissions.role")
+    .findOne({ where: { type: "public" } });
+
+  if (existing) return;
+
+  await strapi.db.query("plugin::users-permissions.role").create({
+    data: {
+      type: "public",
+      name: "Public",
+      description: "Default role given to unauthenticated user.",
+    },
+  });
+
+  strapi.log.info('[bootstrap] Recreated missing "public" role.');
 }
 
 /**
@@ -459,7 +493,12 @@ async function ensurePublicPermissions(strapi: Core.Strapi) {
       continue;
     }
 
-    for (const action of PUBLIC_READ_ACTIONS) {
+    const actions =
+      roleType === "public"
+        ? [...PUBLIC_READ_ACTIONS, ...PUBLIC_AUTH_ACTIONS]
+        : PUBLIC_READ_ACTIONS;
+
+    for (const action of actions) {
       const existing = await strapi.db
         .query("plugin::users-permissions.permission")
         .findOne({ where: { action, role: role.id } });
