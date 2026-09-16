@@ -14,6 +14,7 @@
 
 import { canView } from "../../page/utils/visibility";
 import { countBySubcategoryId } from "./counts";
+import { byCategoryOrder } from "./order";
 
 export interface PublicSubcategory {
   documentId: string;
@@ -48,6 +49,7 @@ export function buildPublicCategories(
 
   return rows
     .filter((row) => !row.parinte)
+    .sort(byCategoryOrder)
     .map((row) => {
       const copii = (children.get(row.documentId) ?? [])
         .map((child) => ({
@@ -74,7 +76,8 @@ export function buildPublicCategories(
 
 /**
  * The impure half: the two reads plus the visibility filter, then the rule
- * above. `rows` arrives sorted by `nume`, so both levels come out alphabetical.
+ * above. `rows` arrives sorted by `nume`, so subcategories come out
+ * alphabetical; top-level categories are then reordered to match the matrix.
  */
 export async function loadPublicCategories(
   strapi: any,
