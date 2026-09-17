@@ -1,4 +1,5 @@
 import { Context } from "koa";
+import { pageSlice } from "../../../utils/pagination";
 import {
   ADMIN_REPORT_POPULATE,
   adminReportDbFilters,
@@ -50,7 +51,7 @@ export default {
         filters,
         populate: ADMIN_REPORT_POPULATE,
         sort: { createdAt: "desc" },
-        pagination: { page, pageSize: PAGE_SIZE },
+        ...pageSlice(page, PAGE_SIZE),
       }),
       strapi.documents("api::report.report").count({ filters }),
     ]);

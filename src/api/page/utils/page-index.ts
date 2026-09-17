@@ -17,7 +17,7 @@ export interface IndexRow extends PageRow {
  */
 export async function loadPageIndex(strapi: any) {
   const pages = await strapi.documents("api::page.page").findMany({
-    fields: ["slug", "stare", "vizibilitate"],
+    fields: ["slug", "stare", "vizibilitate", "esteHomepage"],
     populate: { parinte: { fields: ["slug"] } },
     limit: -1,
   });
@@ -28,6 +28,7 @@ export async function loadPageIndex(strapi: any) {
     parinte: entry.parinte?.documentId ?? null,
     stare: entry.stare,
     vizibilitate: entry.vizibilitate,
+    esteHomepage: entry.esteHomepage ?? false,
   }));
 
   const nodes = buildTree(rows);

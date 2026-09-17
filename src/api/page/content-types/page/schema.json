@@ -47,6 +47,10 @@
       "type": "json",
       "default": []
     },
+    "esteHomepage": {
+      "type": "boolean",
+      "default": false
+    },
     "fisiere": {
       "type": "media",
       "multiple": true,

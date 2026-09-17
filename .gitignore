@@ -132,3 +132,17 @@ build
 .claude
 docs
 .superpowers/*
+############################
+# Legacy migration
+############################
+
+# Snapshot of the old application: personal data (emails, phone numbers).
+migration
+
+# Unelte de migrare: rămân doar local, nu intră în repo.
+scripts/legacy-export.mjs
+scripts/legacy-verify.mjs
+scripts/legacy-plan.ts
+scripts/legacy-import.ts
+scripts/cleanup-test-data.ts
+src/migration/

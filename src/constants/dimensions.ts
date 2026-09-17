@@ -147,7 +147,7 @@ export const DIMENSIONS: readonly Dimension[] = [
           {
             value: 4,
             label:
-              "Există criterii pentru structura de guvernanță însă toate persoanele implicate au aproximativ aceleași abilități și cunoștințe.",
+              "Există criterii pentru structura de guvernanță. Persoanele implicate au abilități și cunoștințe diferite, dar provin în principal din același mediu/ domeniu.",
           },
           {
             value: 5,
@@ -624,7 +624,7 @@ export const DIMENSIONS: readonly Dimension[] = [
           {
             value: 3,
             label:
-              "Există câteva practici de colectare a informațiilor pentru monitorizare și evaluare. Cu toate acestea, nu există un set concret de indicatori.",
+              "Organizația folosește în principal indicatori cantitativi și nu își evaluează progresul comparativ cu anii precedenți ci doar per activitate/ proiect.",
           },
           {
             value: 4,

@@ -8,6 +8,13 @@ export interface PageNode {
   documentId?: string;
   slug: string;
   parinte?: PageNode | null;
+  /**
+   * The landing page lives at the site root, so it contributes no segment —
+   * neither its own, nor one to a descendant's path. Deriving that here is
+   * what keeps `/` right in the admin list, in menu items and in CTA links
+   * without each of them having to know the homepage exists.
+   */
+  esteHomepage?: boolean;
 }
 
 /**
@@ -29,8 +36,10 @@ function chain(page: PageNode): PageNode[] {
   return nodes;
 }
 
-/** Slugs from the root down: `["programe", "accelerator"]`. */
+/** Slugs from the root down: `["programe", "accelerator"]`. The homepage has none. */
 export function pathSegments(page: PageNode): string[] {
+  if (page.esteHomepage) return [];
+
   return chain(page)
     .map((node) => node.slug)
     .reverse();

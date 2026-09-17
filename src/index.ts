@@ -4,6 +4,7 @@ import { seedLocalities } from "./utils/seed-localities";
 import { seedDomains } from "./utils/seed-domains";
 import { seedMenus } from "./utils/seed-menus";
 import { seedFooter } from "./utils/seed-footer";
+import { seedHomepage } from "./utils/seed-homepage";
 import { migratePageStare } from "./utils/migrate-page-stare";
 import { slugify } from "./api/media-tag/utils/slug";
 
@@ -316,6 +317,7 @@ export default {
     await seedDomains(strapi);
     await seedMenus(strapi);
     await seedFooter(strapi);
+    await seedHomepage(strapi);
   },
 };
 

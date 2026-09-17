@@ -1,4 +1,5 @@
 import { Context } from "koa";
+import { pageSlice } from "../../../utils/pagination";
 import {
   updateMentorSchema,
   updateStaffSchema,
@@ -164,7 +165,7 @@ export default {
         filters,
         sort: sortOrder,
         populate: { role: true, ong: true, avatar: true },
-        pagination: { page, pageSize: PAGE_SIZE },
+        ...pageSlice(page, PAGE_SIZE),
       }),
       strapi.documents("plugin::users-permissions.user").count({ filters }),
     ]);

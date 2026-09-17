@@ -1,4 +1,5 @@
 import { Context } from "koa";
+import { pageSlice } from "../../../utils/pagination";
 import {
   ADMIN_EVALUATION_POPULATE,
   adminEvaluationDbFilters,
@@ -51,7 +52,7 @@ export default {
         filters,
         populate: ADMIN_EVALUATION_POPULATE,
         sort: { createdAt: "desc" },
-        pagination: { page, pageSize: PAGE_SIZE },
+        ...pageSlice(page, PAGE_SIZE),
       }),
       strapi.documents("api::evaluation.evaluation").count({ filters }),
     ]);

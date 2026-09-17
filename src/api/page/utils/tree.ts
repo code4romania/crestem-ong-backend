@@ -5,6 +5,8 @@ export interface PageRow {
   documentId: string;
   slug: string;
   parinte?: string | null;
+  /** The landing page. It sits at `/`, outside the tree — see `checkParent`. */
+  esteHomepage?: boolean;
 }
 
 /**
@@ -15,7 +17,12 @@ export interface PageRow {
 export function buildTree(rows: PageRow[]): Map<string, PageNode> {
   const nodes = new Map<string, PageNode>();
   for (const row of rows) {
-    nodes.set(row.documentId, { documentId: row.documentId, slug: row.slug, parinte: null });
+    nodes.set(row.documentId, {
+      documentId: row.documentId,
+      slug: row.slug,
+      parinte: null,
+      esteHomepage: row.esteHomepage ?? false,
+    });
   }
   for (const row of rows) {
     const node = nodes.get(row.documentId)!;
@@ -68,6 +75,18 @@ export function checkParent({
   parentId: string | null;
   rows: PageRow[];
 }): string | null {
+  // The landing page answers at `/` and contributes no segment, so a page
+  // filed under it would derive `/homepage/despre` — a segment the homepage
+  // itself does not have. It stays out of the tree in both directions.
+  const self = pageId ? rows.find((row) => row.documentId === pageId) : null;
+  if (self?.esteHomepage && parentId) {
+    return "Pagina de start nu poate fi mutată sub altă pagină";
+  }
+
+  if (parentId && rows.find((row) => row.documentId === parentId)?.esteHomepage) {
+    return "Pagina de start nu poate avea subpagini";
+  }
+
   if (!parentId) return null;
 
   const parent = buildTree(rows).get(parentId);
@@ -93,7 +112,11 @@ export function checkParent({
  */
 export function findByPath(rows: PageRow[], path: string): string | null {
   const wanted = path.replace(/^\/+/, "").replace(/\/+$/, "");
-  if (!wanted) return null;
+  if (!wanted) {
+    // The site root. The homepage has no segments, which is also why no other
+    // path — its own slug included — can ever reach it.
+    return rows.find((row) => row.esteHomepage)?.documentId ?? null;
+  }
 
   const nodes = buildTree(rows);
   for (const [documentId, node] of nodes) {

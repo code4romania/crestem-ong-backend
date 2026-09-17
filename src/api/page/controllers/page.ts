@@ -15,6 +15,12 @@ import {
   collectPageLinkIds,
 } from "../utils/links";
 import { loadPageIndex, type PageIndex } from "../utils/page-index";
+import {
+  HOMEPAGE_DELETE_ERROR,
+  HOMEPAGE_UNPUBLISH_ERROR,
+  homepageUpdateError,
+  isHomepage,
+} from "../utils/homepage";
 import { checkParent, findByPath } from "../utils/tree";
 import { resolveCategoryBlocks } from "../../library-category/utils/blocks";
 
@@ -66,6 +72,7 @@ const listView = (page: any, index: PageIndex) => ({
   publicat: page.stare === "publicat",
   vizibilitate: page.vizibilitate ?? [],
   actualizat: page.updatedAt,
+  esteHomepage: Boolean(page.esteHomepage),
 });
 
 const detailView = (page: any, index: PageIndex, blocuri?: unknown) => ({
@@ -136,20 +143,38 @@ export default factories.createCoreController(
           }
         : {};
 
+      // The landing page is the most edited page on the site, so it is served
+      // outside the paginated set: the admin shows it first on every page of
+      // the list and under every search term, and the pagination counts stay
+      // about the pages a search can actually filter.
+      //
+      // Excluded by documentId rather than by the flag: rows written before
+      // the column existed carry NULL, and `esteHomepage: { $ne: true }` is
+      // `<> true` in SQL, which NULL never satisfies — every older page would
+      // vanish from the list.
+      const homepage = await strapi.documents("api::page.page").findFirst({
+        filters: { esteHomepage: true },
+      });
+
+      const paginated = homepage
+        ? { ...filters, documentId: { $ne: homepage.documentId } }
+        : filters;
+
       const [pages, total, index] = await Promise.all([
         strapi.documents("api::page.page").findMany({
-          filters,
+          filters: paginated,
           sort: { updatedAt: "desc" },
           limit: pageSize,
           start: (page - 1) * pageSize,
         }),
-        strapi.documents("api::page.page").count({ filters }),
+        strapi.documents("api::page.page").count({ filters: paginated }),
         loadPageIndex(strapi),
       ]);
 
       return {
         data: pages.map((entry: any) => listView(entry, index)),
         meta: {
+          homepage: homepage ? listView(homepage, index) : null,
           pagination: {
             page,
             pageSize,
@@ -181,6 +206,9 @@ export default factories.createCoreController(
           cale: index.pathOf(entry),
           parinte: index.parentOf(entry.documentId),
           publicat: entry.stare === "publicat",
+          // The menu picker may link to the homepage; the parent picker must
+          // not offer it, since it can have no subpages.
+          esteHomepage: Boolean(entry.esteHomepage),
         })),
       };
     },
@@ -248,6 +276,9 @@ export default factories.createCoreController(
       });
       if (!existing) return ctx.notFound("Pagina nu există");
 
+      const homepageError = homepageUpdateError(existing as any, parsed.data);
+      if (homepageError) return ctx.badRequest(homepageError);
+
       if (parsed.data.slug && parsed.data.slug !== existing.slug) {
         const duplicate = await strapi.documents("api::page.page").findFirst({
           filters: { slug: parsed.data.slug },
@@ -303,6 +334,7 @@ export default factories.createCoreController(
         documentId: ctx.params.documentId,
       });
       if (!existing) return ctx.notFound("Pagina nu există");
+      if (isHomepage(existing)) return ctx.badRequest(HOMEPAGE_DELETE_ERROR);
 
       await strapi.documents("api::page.page").delete({
         documentId: ctx.params.documentId,
@@ -330,6 +362,7 @@ export default factories.createCoreController(
         documentId: ctx.params.documentId,
       });
       if (!existing) return ctx.notFound("Pagina nu există");
+      if (isHomepage(existing)) return ctx.badRequest(HOMEPAGE_UNPUBLISH_ERROR);
 
       await strapi.documents("api::page.page").update({
         documentId: ctx.params.documentId,

@@ -1242,6 +1242,7 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    esteHomepage: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     fisiere: Schema.Attribute.Media<'images' | 'videos' | 'files', true>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::page.page'> &

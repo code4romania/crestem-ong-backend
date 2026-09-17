@@ -1,4 +1,5 @@
 import { Context } from "koa";
+import { pageSlice } from "../../../utils/pagination";
 import { csvParam, pageParam, textParam } from "../../../utils/query-params";
 import {
   ANSWERED_REPORTS_POPULATE,
@@ -79,7 +80,7 @@ const optionsHandler =
       documents.findMany({
         filters,
         sort: { name: "asc" },
-        pagination: { page, pageSize: PAGE_SIZE },
+        ...pageSlice(page, PAGE_SIZE),
       }),
       documents.count({ filters }),
       selected.length > 0 && page === 1

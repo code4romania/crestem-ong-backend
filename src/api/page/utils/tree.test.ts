@@ -99,3 +99,46 @@ describe("findByPath", () => {
     expect(findByPath(rows, "programe/social-change-accelerator")).toBe("accel");
   });
 });
+
+describe("the homepage in the tree", () => {
+  /** The landing page next to an ordinary top-level page. */
+  const withHome: PageRow[] = [
+    { documentId: "home-1", slug: "homepage", parinte: null, esteHomepage: true },
+    { documentId: "despre", slug: "despre", parinte: null },
+  ];
+
+  it("answers at the empty path and at the root path", () => {
+    expect(findByPath(withHome, "")).toBe("home-1");
+    expect(findByPath(withHome, "/")).toBe("home-1");
+  });
+
+  it("does not answer at its own slug", () => {
+    expect(findByPath(withHome, "homepage")).toBeNull();
+  });
+
+  it("still resolves ordinary pages", () => {
+    expect(findByPath(withHome, "despre")).toBe("despre");
+  });
+
+  it("returns null at the root when no homepage exists", () => {
+    expect(findByPath(rows, "")).toBeNull();
+  });
+
+  it("refuses to take a parent", () => {
+    expect(checkParent({ pageId: "home-1", parentId: "despre", rows: withHome })).toBe(
+      "Pagina de start nu poate fi mutată sub altă pagină",
+    );
+  });
+
+  it("refuses to be a parent", () => {
+    expect(checkParent({ pageId: "despre", parentId: "home-1", rows: withHome })).toBe(
+      "Pagina de start nu poate avea subpagini",
+    );
+  });
+
+  it("refuses to be the parent of a page being created", () => {
+    expect(checkParent({ pageId: null, parentId: "home-1", rows: withHome })).toBe(
+      "Pagina de start nu poate avea subpagini",
+    );
+  });
+});

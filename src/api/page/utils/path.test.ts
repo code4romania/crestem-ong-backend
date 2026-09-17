@@ -61,3 +61,16 @@ describe("ancestorDocumentIds", () => {
     expect(ancestorDocumentIds(page)).toEqual(["b", "a"]);
   });
 });
+
+describe("the homepage", () => {
+  it("has no segments, so its path is the site root", () => {
+    const home = { documentId: "home-1", slug: "homepage", esteHomepage: true, parinte: null };
+
+    expect(pathSegments(home)).toEqual([]);
+    expect(pagePath(home)).toBe("/");
+  });
+
+  it("leaves an ordinary top-level page alone", () => {
+    expect(pagePath({ documentId: "p-1", slug: "despre", parinte: null })).toBe("/despre");
+  });
+});

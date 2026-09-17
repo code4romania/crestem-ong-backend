@@ -3,6 +3,7 @@
  */
 
 import { factories } from "@strapi/strapi";
+import { pageSlice } from "../../../utils/pagination";
 import { Context } from "koa";
 import { computeProgress } from "../../evaluation/utils/progress";
 import {
@@ -70,31 +71,76 @@ const meetingMentorView = (mentor: any) =>
         isDeleted: isAnonymized(mentor),
       }
     : null;
+import { pageParam, textParam } from "../../../utils/query-params";
 import { performOngDeletion } from "../services/delete-ong";
 import { authorizeOngDeletion } from "../utils/delete-access";
 import { deleteUploadedFile } from "../../../utils/media";
+
+/** Organizations per page on the FDSC list, which loads them as it scrolls. */
+const LIST_PAGE_SIZE = 20;
 
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
     if (!ctx.state.user) {
       return ctx.unauthorized();
     }
+    const page = pageParam(ctx.query.page);
+    const search = textParam(ctx.query.search);
+    const judet = textParam(ctx.query.judet);
+    const program = textParam(ctx.query.program);
+
+    // Search and both filters run here rather than in the browser: the screen
+    // loads one page of twenty as it scrolls, so it never holds the whole list
+    // to filter against.
+    const filters: Record<string, unknown> = {};
+    if (search) {
+      filters.name = { $containsi: search };
+    }
+    if (judet) {
+      filters.judet = { documentId: judet };
+    }
+    if (program) {
+      filters.programs = { documentId: program };
+    }
+
     // Anonymized organizations stay listed (BR-33): FDSC must still see that
     // their evaluations were completed, and this list is the only navigation to
     // them. `ngoStatus` rides along so the frontend can badge them "Retras".
     // `listActive` below keeps its own `ngoStatus: "active"` filter — a deleted
     // organization must never reach an "available to assign" picker.
-    const ongs = await strapi.documents("api::ong.ong").findMany({
-      sort: { name: "asc" },
-      populate: {
-        judet: true,
-        localitate: true,
-        programs: true,
-        domeniuPrincipal: true,
-      },
-    });
-    const byOng = await membersByOng(strapi);
+    const [ongs, total] = await Promise.all([
+      strapi.documents("api::ong.ong").findMany({
+        filters,
+        sort: { name: "asc" },
+        ...pageSlice(page, LIST_PAGE_SIZE),
+        populate: {
+          judet: true,
+          localitate: true,
+          programs: true,
+          domeniuPrincipal: true,
+        },
+      }),
+      strapi.documents("api::ong.ong").count({ filters }),
+    ]);
+    // Only the members of the twenty organizations on this page, not of every
+    // organization there is.
+    const byOng = await membersByOng(
+      strapi,
+      ongs.map((ong) => ong.documentId),
+    );
     return {
+      meta: {
+        pagination: {
+          page,
+          pageSize: LIST_PAGE_SIZE,
+          pageCount: Math.max(1, Math.ceil(total / LIST_PAGE_SIZE)),
+          total,
+        },
+        // The county filter must offer every county that has organizations,
+        // not just the ones the pages loaded so far happen to cover. Page one
+        // carries them; the pages after it would only repeat the same list.
+        judete: page === 1 ? await judeteWithOngs(strapi) : undefined,
+      },
       data: ongs.map((ong) => {
         const { admin, memberCount } = byOng.get(ong.documentId) ?? {
           admin: null,
@@ -258,6 +304,26 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     await performOngDeletion(strapi, targetDocumentId);
     return { data: { documentId: targetDocumentId } };
+  },
+/**
+   * Every organization as id and name only, for the filter dropdowns that need
+   * the whole set at once. `list` cannot serve them any more — it pages — and
+   * `listActive` excludes withdrawn organizations, whose users still have to be
+   * filterable.
+   */
+  async listNames(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ongs = await strapi.documents("api::ong.ong").findMany({
+      sort: { name: "asc" },
+    });
+    return {
+      data: ongs.map((ong) => ({
+        documentId: ong.documentId,
+        name: ong.name,
+      })),
+    };
   },
   async listActive(ctx: Context) {
     if (!ctx.state.user) {
@@ -1902,13 +1968,45 @@ function mentorMeetingView(meeting: any) {
   };
 }
 
+/**
+ * The counties that have at least one organization, for the list screen's
+ * county filter. Read from the county side and kept to those with organizations
+ * — a county nothing is registered in would be a choice matching no row.
+ */
+async function judeteWithOngs(
+  strapi: any,
+): Promise<{ documentId: string; nume: string }[]> {
+  const judete = await strapi.documents("api::judet.judet").findMany({
+    sort: { nume: "asc" },
+    populate: { ongs: { fields: ["documentId"] } },
+  });
+  return (judete as any[])
+    .filter((judet) => (judet.ongs ?? []).length > 0)
+    .map((judet) => ({ documentId: judet.documentId, nume: judet.nume }));
+}
+
+/**
+ * Admin and member count per organization. `ongDocumentIds` narrows the read to
+ * the organizations actually being served — the paginated list needs twenty of
+ * them, not every member row in the database. Left out, it reads them all.
+ */
 async function membersByOng(
   strapi: any,
+  ongDocumentIds?: string[],
 ): Promise<Map<string, { admin: any; memberCount: number }>> {
+  if (ongDocumentIds?.length === 0) {
+    return new Map();
+  }
+  const filters: Record<string, unknown> = {
+    role: { type: { $in: ["ngo-admin", "ngo-member"] } },
+  };
+  if (ongDocumentIds) {
+    filters.ong = { documentId: { $in: ongDocumentIds } };
+  }
   const members = await strapi
     .documents("plugin::users-permissions.user")
     .findMany({
-      filters: { role: { type: { $in: ["ngo-admin", "ngo-member"] } } },
+      filters,
       populate: { role: true, ong: true },
     });
   const byOng = new Map<string, { admin: any; memberCount: number }>();
