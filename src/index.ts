@@ -78,6 +78,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::program.program.assignPhaseEvaluation",
   "api::program.program.removePhaseEvaluation",
   "api::ong.ong.overview",
+  "api::ong.ong.libraryActivity",
   "api::ong.ong.evaluations",
   "api::ong.ong.evaluationDetail",
   "api::ong.ong.fdscReports",
@@ -210,6 +211,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.list",
     "api::conversation.conversation.messages",
     "api::conversation.conversation.sendMessage",
+    "api::article-read.article-read.markRead",
+    "api::article-read.article-read.me",
   ],
   "ngo-member": [
     "api::auth.auth.me",
@@ -227,6 +230,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::evaluation.evaluation.finish",
     "api::ong.ong.joinable",
     "api::ong.ong.createJoinRequest",
+    "api::article-read.article-read.markRead",
+    "api::article-read.article-read.me",
   ],
   mentor: [
     "api::dashboard.dashboard.mentor",
@@ -241,6 +246,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.programsForMentor",
     "api::ong.ong.detail",
     "api::ong.ong.overview",
+    "api::ong.ong.libraryActivity",
     "api::ong.ong.evaluations",
     "api::ong.ong.evaluationDetail",
     "api::ong.ong.fdscReports",
@@ -264,6 +270,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.createJoinRequest",
     "api::individual.individual.me",
     "api::individual.individual.updateMe",
+    "api::article-read.article-read.markRead",
+    "api::article-read.article-read.me",
   ],
 };
 

@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "article_reads",
+  "info": {
+    "singularName": "article-read",
+    "pluralName": "article-reads",
+    "displayName": "Article Read",
+    "description": "One row per (user, article): the last time that user opened that article. A repeat read updates `accessedAt` in place rather than adding a row."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "article": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::article.article"
+    },
+    "accessedAt": {
+      "type": "datetime",
+      "required": true
+    }
+  }
+}

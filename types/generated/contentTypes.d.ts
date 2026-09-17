@@ -521,6 +521,40 @@ export interface ApiActivityActivity extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiArticleReadArticleRead extends Struct.CollectionTypeSchema {
+  collectionName: 'article_reads';
+  info: {
+    description: 'One row per (user, article): the last time that user opened that article. A repeat read updates `accessedAt` in place rather than adding a row.';
+    displayName: 'Article Read';
+    pluralName: 'article-reads';
+    singularName: 'article-read';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    accessedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    article: Schema.Attribute.Relation<'manyToOne', 'api::article.article'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::article-read.article-read'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
   collectionName: 'articles';
   info: {
@@ -1962,6 +1996,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::activity-type.activity-type': ApiActivityTypeActivityType;
       'api::activity.activity': ApiActivityActivity;
+      'api::article-read.article-read': ApiArticleReadArticleRead;
       'api::article.article': ApiArticleArticle;
       'api::conversation.conversation': ApiConversationConversation;
       'api::domain.domain': ApiDomainDomain;

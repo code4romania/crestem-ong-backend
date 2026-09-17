@@ -27,6 +27,8 @@ import {
   getNgoMemberRoles,
   removeOngMembership,
 } from "../../../utils/membership";
+import { aggregateOrgLibraryActivity } from "../../article-read/utils/aggregate";
+import { articlePath } from "../../article/utils/path";
 import { updateMyOngSchema } from "../validation/ong";
 import { acceptJoinRequestSchema } from "../validation/join-request";
 import { createFdscReportSchema } from "../validation/fdsc-report";
@@ -735,6 +737,64 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         lastFinalizedDate,
       },
     };
+  },
+  /**
+   * The org's combined library activity: every distinct article read by any
+   * of its members (admin included), most recently accessed first.
+   * `article-read` already dedupes per (user, article), so each member
+   * contributes at most one access per article — `totalAccesses` is a
+   * headcount, not a view count.
+   */
+  async libraryActivity(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const ong = await strapi.documents("api::ong.ong").findOne({
+      documentId: ctx.params.documentId,
+    });
+    if (!ong) {
+      return ctx.badRequest("Organizația nu există");
+    }
+    if (ctx.state.user.role?.type === "mentor") {
+      const hasOng = await mentorHasOng(
+        strapi,
+        ctx.state.user.documentId,
+        ong.documentId,
+      );
+      if (!hasOng) {
+        return ctx.forbidden("Nu ai acces la această organizație");
+      }
+    }
+
+    const members = await strapi
+      .documents("plugin::users-permissions.user")
+      .findMany({
+        filters: { ong: { documentId: ong.documentId } },
+        fields: ["documentId"],
+      });
+    if (members.length === 0) {
+      return { data: [] };
+    }
+
+    const reads = (await strapi.documents("api::article-read.article-read").findMany({
+      filters: {
+        user: { documentId: { $in: members.map((member: any) => member.documentId) } },
+      },
+      populate: {
+        article: {
+          fields: ["titlu", "tip", "slug"],
+          populate: { subcategorie: { populate: { parinte: true } } },
+        },
+      },
+      limit: -1,
+    })) as any[];
+
+    const withPaths = reads.map((read) => ({
+      accessedAt: read.accessedAt,
+      article: read.article ? { ...read.article, cale: articlePath(read.article) } : null,
+    }));
+
+    return { data: aggregateOrgLibraryActivity(withPaths) };
   },
   async evaluations(ctx: Context) {
     if (!ctx.state.user) {
