@@ -89,6 +89,8 @@ const SUPER_ADMIN_PERMISSIONS = [
   "plugin::upload.content-api.upload",
   "api::ong.ong.list",
   "api::ong.ong.listActive",
+  // Names only, for the organization filter on "Managementul utilizatorilor".
+  "api::ong.ong.listNames",
   "api::ong.ong.detail",
   "api::ong.ong.deleteOne",
   "api::mentor.mentor.listActive",
