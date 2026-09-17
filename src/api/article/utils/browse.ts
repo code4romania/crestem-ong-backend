@@ -22,7 +22,11 @@ export interface BrowseFilters {
   q: string | null;
 }
 
-const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+/**
+ * Exported so the admin article list (`article.list`) can match slugs the same
+ * case-insensitive way `publicList` does, without duplicating the rule.
+ */
+export const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
 
 /**
  * Strips diacritics on top of `fold`, for free-text search only: a visitor

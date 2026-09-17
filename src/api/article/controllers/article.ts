@@ -12,7 +12,7 @@ import { collectFileIds } from "../../page/utils/media";
 import { applyPageLinks, collectPageLinkIds } from "../../page/utils/links";
 import { loadPageIndex } from "../../page/utils/page-index";
 import { resolveCategoryBlocks } from "../../library-category/utils/blocks";
-import { browseArticles, foldText } from "../utils/browse";
+import { browseArticles, fold, foldText } from "../utils/browse";
 
 const UID = "api::article.article";
 const CATEGORY_UID = "api::library-category.library-category";
@@ -74,9 +74,21 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
    * portably across the supported database clients, so — like `publicList` —
    * this reads every article and filters in memory rather than pushing the
    * search into the query.
+   *
+   * `categorie`/`subcategorie` are slugs, matched with plain `fold` — the same
+   * convention `publicList` uses, since these round-trip from a select rather
+   * than free text. `vizibilitate` is checked with `Array.includes` rather than
+   * a Strapi filter because the field is a plain JSON column, not a native
+   * array-of-enum attribute, so a DB-level `$contains` isn't reliable across
+   * database clients.
    */
   async list(ctx: Context) {
     const search = typeof ctx.query.search === "string" ? ctx.query.search.trim() : "";
+    const categorie = typeof ctx.query.categorie === "string" ? ctx.query.categorie.trim() : "";
+    const subcategorie =
+      typeof ctx.query.subcategorie === "string" ? ctx.query.subcategorie.trim() : "";
+    const vizibilitate =
+      typeof ctx.query.vizibilitate === "string" ? ctx.query.vizibilitate.trim() : "";
     const page = Math.max(1, Number(ctx.query.page) || 1);
     const pageSize = 20;
 
@@ -87,11 +99,15 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     })) as any[];
 
     const q = foldText(search);
-    const matched = q
-      ? articles.filter(
-          (article) => foldText(article.titlu).includes(q) || foldText(article.rezumat).includes(q),
-        )
-      : articles;
+    const matched = articles.filter((article) => {
+      if (categorie && fold(article.subcategorie?.parinte?.slug) !== fold(categorie)) return false;
+      if (subcategorie && fold(article.subcategorie?.slug) !== fold(subcategorie)) return false;
+      if (vizibilitate && !(article.vizibilitate ?? []).includes(vizibilitate)) return false;
+      if (q && !foldText(article.titlu).includes(q) && !foldText(article.rezumat).includes(q)) {
+        return false;
+      }
+      return true;
+    });
     const total = matched.length;
 
     return {
