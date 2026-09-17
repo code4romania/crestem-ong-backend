@@ -12,7 +12,7 @@ import { collectFileIds } from "../../page/utils/media";
 import { applyPageLinks, collectPageLinkIds } from "../../page/utils/links";
 import { loadPageIndex } from "../../page/utils/page-index";
 import { resolveCategoryBlocks } from "../../library-category/utils/blocks";
-import { browseArticles } from "../utils/browse";
+import { browseArticles, fold, foldText } from "../utils/browse";
 
 const UID = "api::article.article";
 const CATEGORY_UID = "api::library-category.library-category";
@@ -67,33 +67,51 @@ async function checkSubcategory(strapi: any, documentId: string): Promise<string
 }
 
 export default factories.createCoreController(UID, ({ strapi }) => ({
+  /**
+   * `search` is matched with `foldText`, the same diacritics-insensitive fold
+   * `publicList` uses — an editor typing "craciun" expects to find "Crăciun"
+   * same as a visitor does. A DB-level `$containsi` can't fold diacritics
+   * portably across the supported database clients, so — like `publicList` —
+   * this reads every article and filters in memory rather than pushing the
+   * search into the query.
+   *
+   * `categorie`/`subcategorie` are slugs, matched with plain `fold` — the same
+   * convention `publicList` uses, since these round-trip from a select rather
+   * than free text. `vizibilitate` is checked with `Array.includes` rather than
+   * a Strapi filter because the field is a plain JSON column, not a native
+   * array-of-enum attribute, so a DB-level `$contains` isn't reliable across
+   * database clients.
+   */
   async list(ctx: Context) {
     const search = typeof ctx.query.search === "string" ? ctx.query.search.trim() : "";
+    const categorie = typeof ctx.query.categorie === "string" ? ctx.query.categorie.trim() : "";
+    const subcategorie =
+      typeof ctx.query.subcategorie === "string" ? ctx.query.subcategorie.trim() : "";
+    const vizibilitate =
+      typeof ctx.query.vizibilitate === "string" ? ctx.query.vizibilitate.trim() : "";
     const page = Math.max(1, Number(ctx.query.page) || 1);
     const pageSize = 20;
 
-    const filters = search
-      ? {
-          $or: [
-            { titlu: { $containsi: search } },
-            { rezumat: { $containsi: search } },
-          ],
-        }
-      : {};
+    const articles = (await strapi.documents(UID).findMany({
+      populate: POPULATE,
+      sort: { updatedAt: "desc" },
+      limit: -1,
+    })) as any[];
 
-    const [articles, total] = await Promise.all([
-      strapi.documents(UID).findMany({
-        filters,
-        populate: POPULATE,
-        sort: { updatedAt: "desc" },
-        limit: pageSize,
-        start: (page - 1) * pageSize,
-      }),
-      strapi.documents(UID).count({ filters }),
-    ]);
+    const q = foldText(search);
+    const matched = articles.filter((article) => {
+      if (categorie && fold(article.subcategorie?.parinte?.slug) !== fold(categorie)) return false;
+      if (subcategorie && fold(article.subcategorie?.slug) !== fold(subcategorie)) return false;
+      if (vizibilitate && !(article.vizibilitate ?? []).includes(vizibilitate)) return false;
+      if (q && !foldText(article.titlu).includes(q) && !foldText(article.rezumat).includes(q)) {
+        return false;
+      }
+      return true;
+    });
+    const total = matched.length;
 
     return {
-      data: (articles as any[]).map(listView),
+      data: matched.slice((page - 1) * pageSize, page * pageSize).map(listView),
       meta: {
         pagination: { page, pageSize, total, pageCount: Math.ceil(total / pageSize) },
       },

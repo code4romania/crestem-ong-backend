@@ -22,7 +22,11 @@ export interface BrowseFilters {
   q: string | null;
 }
 
-const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+/**
+ * Exported so the admin article list (`article.list`) can match slugs the same
+ * case-insensitive way `publicList` does, without duplicating the rule.
+ */
+export const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
 
 /**
  * Strips diacritics on top of `fold`, for free-text search only: a visitor
@@ -30,8 +34,12 @@ const fold = (value: string | null | undefined) => (value ?? "").trim().toLowerC
  * phone's autocorrect) means the same thing as "Crăciun" or "ONG-uri" with the
  * accented forms it's stored with. Slug/tip filters keep plain `fold` — those
  * values round-trip from a select the visitor didn't type into.
+ *
+ * Exported so the admin article list search (`article.list`) can match the
+ * same behaviour — that search is free text too, typed by an editor rather
+ * than a visitor, but the same "no diacritics on the keyboard" case applies.
  */
-const foldText = (value: string | null | undefined) =>
+export const foldText = (value: string | null | undefined) =>
   fold(value).normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function matchesBrowse(article: BrowseArticle, filters: BrowseFilters): boolean {
