@@ -17,6 +17,29 @@ import { browseArticles, fold, foldText } from "../utils/browse";
 const UID = "api::article.article";
 const CATEGORY_UID = "api::library-category.library-category";
 
+/**
+ * Declared outside `POPULATE` (and without its own `as const`) on purpose:
+ * Strapi's populate typing wants a *mutable* array of specific field-name
+ * literals, and `POPULATE`'s `as const` recursively freezes every array/object
+ * literal written directly inside it — including one built by spreading a
+ * const-tuple in place — into a readonly type. A separately declared
+ * constant, referenced by identifier, is not a literal expression inside that
+ * assertion, so it keeps the mutable array type it's given here while still
+ * narrowing each element to its own string-literal type (needed because
+ * Strapi's `fields` type is a union of this content type's actual attribute
+ * names, not a plain `string[]`). Only `strapi develop`'s stricter,
+ * freshly-generated-types type-check catches a mismatch here; a plain
+ * `tsc --noEmit` against stale generated types does not.
+ */
+const RELATED_ARTICLE_FIELDS: Array<"titlu" | "slug" | "etichete" | "tip" | "stare" | "vizibilitate"> = [
+  "titlu",
+  "slug",
+  "etichete",
+  "tip",
+  "stare",
+  "vizibilitate",
+];
+
 /** Two levels of relation, which is exactly what `articlePath` needs. */
 const POPULATE = {
   subcategorie: { populate: { parinte: true } },
@@ -27,7 +50,7 @@ const POPULATE = {
   // without it every column (including the full `blocuri` page-builder JSON)
   // of up to 3 related articles would be fetched only to be discarded.
   articoleRelationate: {
-    fields: ["titlu", "slug", "etichete", "tip", "stare", "vizibilitate"],
+    fields: RELATED_ARTICLE_FIELDS,
     populate: { subcategorie: { populate: { parinte: true } } },
   },
 } as const;

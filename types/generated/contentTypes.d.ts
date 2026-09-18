@@ -567,6 +567,10 @@ export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    articoleRelationate: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::article.article'
+    >;
     autor: Schema.Attribute.String;
     blocuri: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
     createdAt: Schema.Attribute.DateTime;
