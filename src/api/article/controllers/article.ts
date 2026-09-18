@@ -87,12 +87,13 @@ async function checkSubcategory(strapi: any, documentId: string): Promise<string
  */
 export async function checkRelatedArticles(strapi: any, ids: string[]): Promise<string | null> {
   if (ids.length === 0) return null;
+  const uniqueIds = [...new Set(ids)];
   const found = await strapi.documents(UID).findMany({
-    filters: { documentId: { $in: ids } },
+    filters: { documentId: { $in: uniqueIds } },
     fields: ["documentId"],
     limit: -1,
   });
-  if (found.length !== ids.length) return "Unul dintre articolele relaționate nu există";
+  if (found.length !== uniqueIds.length) return "Unul dintre articolele relaționate nu există";
   return null;
 }
 

@@ -42,4 +42,18 @@ describe("checkRelatedArticles", () => {
 
     expect(result).toBe("Unul dintre articolele relaționate nu există");
   });
+
+  it("returns null for a duplicate real id, instead of a false-positive error", async () => {
+    (globalThis as any).strapi = {
+      documents: () => ({
+        // `$in` collapses the duplicate, so a real backend returns one row
+        // for the two repeated ids.
+        findMany: async () => [{ documentId: "a1" }],
+      }),
+    };
+
+    const result = await checkRelatedArticles((globalThis as any).strapi, ["a1", "a1"]);
+
+    expect(result).toBeNull();
+  });
 });
