@@ -22,8 +22,21 @@ const POPULATE = {
   subcategorie: { populate: { parinte: true } },
   // Nested populate so `articlePath` can derive each related article's own
   // `cale` — same two levels `POPULATE` already fetches for the article itself.
-  articoleRelationate: { populate: { subcategorie: { populate: { parinte: true } } } },
+  // `fields` keeps this to what `relatedView` actually surfaces plus `stare`/
+  // `vizibilitate`, which `publicByPath` needs to run `canView` on each row —
+  // without it every column (including the full `blocuri` page-builder JSON)
+  // of up to 3 related articles would be fetched only to be discarded.
+  articoleRelationate: {
+    fields: ["titlu", "slug", "etichete", "tip", "stare", "vizibilitate"],
+    populate: { subcategorie: { populate: { parinte: true } } },
+  },
 } as const;
+
+/** Count of tags `a` and `b` share, used to rank related articles by overlap. */
+function sharedTagCount(a: string[], b: string[]): number {
+  const set = new Set(b);
+  return a.filter((tag) => set.has(tag)).length;
+}
 
 const relationView = (row: any) =>
   row ? { documentId: row.documentId, nume: row.nume, slug: row.slug } : null;
@@ -58,11 +71,18 @@ const listView = (article: any) => ({
   actualizat: article.updatedAt,
 });
 
-const detailView = (article: any) => ({
-  ...listView(article),
-  blocuri: article.blocuri ?? [],
-  articoleRelationate: (article.articoleRelationate ?? []).map(relatedView),
-});
+const detailView = (article: any) => {
+  const related = [...(article.articoleRelationate ?? [])].sort(
+    (a, b) =>
+      sharedTagCount(article.etichete ?? [], b.etichete ?? []) -
+      sharedTagCount(article.etichete ?? [], a.etichete ?? []),
+  );
+  return {
+    ...listView(article),
+    blocuri: article.blocuri ?? [],
+    articoleRelationate: related.map(relatedView),
+  };
+};
 
 /**
  * An article attaches to a subcategory, never to a bare category: its path is
@@ -83,7 +103,8 @@ async function checkSubcategory(strapi: any, documentId: string): Promise<string
 /**
  * Mirrors `checkSubcategory`: every picked id must be a real article, checked
  * here so a stale or mistyped id 400s instead of failing inside the relation
- * write (or silently dropping the id).
+ * write (or silently dropping the id). Exported solely so a unit test can
+ * import it directly.
  */
 export async function checkRelatedArticles(strapi: any, ids: string[]): Promise<string | null> {
   if (ids.length === 0) return null;
@@ -454,6 +475,15 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       populate: POPULATE,
     });
     if (!full) return ctx.notFound("Articolul nu există");
+
+    // A related pick is chosen editorially, with no visibility check at pick
+    // time — so a public visitor must never see a related article they could
+    // not otherwise open (e.g. `publicat` but restricted to `ngo-member`).
+    // Editorial reads (`detail`/`createOne`/`updateOne`) intentionally skip
+    // this: an editor picking their own draft/restricted articles is expected.
+    (full as any).articoleRelationate = ((full as any).articoleRelationate ?? []).filter(
+      (related: any) => canView(related, roleType),
+    );
 
     // Pass one: page-backed CTA hrefs, cleared for any target this caller
     // cannot view.

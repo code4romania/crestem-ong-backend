@@ -50,7 +50,10 @@ const etichete = eticheteBase.default([]);
  */
 const articoleRelationateBase = z
   .array(z.string().trim().min(1, "Id-ul articolului relaționat este invalid"))
-  .max(3, "Cel mult 3 articole relaționate");
+  .max(3, "Cel mult 3 articole relaționate")
+  .refine((value) => new Set(value).size === value.length, {
+    message: "Fiecare articol relaționat poate apărea o singură dată",
+  });
 const articoleRelationate = articoleRelationateBase.default([]);
 
 /**

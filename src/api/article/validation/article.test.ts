@@ -209,4 +209,16 @@ describe("articoleRelationate", () => {
       updateArticleSchema.safeParse({ articoleRelationate: ["a", "b", "c", "d"] }).success,
     ).toBe(false);
   });
+
+  it("rejects a duplicate id on create", () => {
+    expect(
+      createArticleSchema.safeParse({ ...valid, articoleRelationate: ["a", "a"] }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a duplicate id on update", () => {
+    expect(
+      updateArticleSchema.safeParse({ articoleRelationate: ["a", "a"] }).success,
+    ).toBe(false);
+  });
 });
