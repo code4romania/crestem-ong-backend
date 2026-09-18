@@ -132,6 +132,7 @@ build
 .claude
 docs
 .superpowers/*
+.worktrees
 ############################
 # Legacy migration
 ############################
