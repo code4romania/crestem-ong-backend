@@ -18,10 +18,23 @@ const UID = "api::article.article";
 const CATEGORY_UID = "api::library-category.library-category";
 
 /** Two levels of relation, which is exactly what `articlePath` needs. */
-const POPULATE = { subcategorie: { populate: { parinte: true } } } as const;
+const POPULATE = {
+  subcategorie: { populate: { parinte: true } },
+  // Nested populate so `articlePath` can derive each related article's own
+  // `cale` — same two levels `POPULATE` already fetches for the article itself.
+  articoleRelationate: { populate: { subcategorie: { populate: { parinte: true } } } },
+} as const;
 
 const relationView = (row: any) =>
   row ? { documentId: row.documentId, nume: row.nume, slug: row.slug } : null;
+
+const relatedView = (article: any) => ({
+  documentId: article.documentId,
+  titlu: article.titlu,
+  cale: articlePath(article),
+  etichete: article.etichete ?? [],
+  tip: article.tip ?? "",
+});
 
 /**
  * `publicat` is derived from `stare`, and `categorie` from the subcategory's
@@ -48,6 +61,7 @@ const listView = (article: any) => ({
 const detailView = (article: any) => ({
   ...listView(article),
   blocuri: article.blocuri ?? [],
+  articoleRelationate: (article.articoleRelationate ?? []).map(relatedView),
 });
 
 /**
@@ -63,6 +77,22 @@ async function checkSubcategory(strapi: any, documentId: string): Promise<string
 
   if (!target) return "Subcategoria nu există";
   if (!target.parinte) return "Articolul trebuie să fie într-o subcategorie, nu într-o categorie";
+  return null;
+}
+
+/**
+ * Mirrors `checkSubcategory`: every picked id must be a real article, checked
+ * here so a stale or mistyped id 400s instead of failing inside the relation
+ * write (or silently dropping the id).
+ */
+export async function checkRelatedArticles(strapi: any, ids: string[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const found = await strapi.documents(UID).findMany({
+    filters: { documentId: { $in: ids } },
+    fields: ["documentId"],
+    limit: -1,
+  });
+  if (found.length !== ids.length) return "Unul dintre articolele relaționate nu există";
   return null;
 }
 
@@ -196,6 +226,9 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const subcategoryError = await checkSubcategory(strapi, parsed.data.subcategorie);
     if (subcategoryError) return ctx.badRequest(subcategoryError);
 
+    const relatedError = await checkRelatedArticles(strapi, parsed.data.articoleRelationate);
+    if (relatedError) return ctx.badRequest(relatedError);
+
     const { subcategorie, ...fields } = parsed.data;
 
     // A new article always starts as a draft; publishing it is a second call.
@@ -203,6 +236,7 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       data: {
         ...fields,
         subcategorie: { set: [subcategorie] },
+        articoleRelationate: { set: fields.articoleRelationate },
         stare: "schita",
         dataPublicarii: null,
         fisiere: collectFileIds(fields.blocuri),
@@ -235,6 +269,14 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       if (duplicate) return ctx.badRequest("Există deja un articol cu acest slug");
     }
 
+    if (parsed.data.articoleRelationate !== undefined) {
+      if (parsed.data.articoleRelationate.includes(ctx.params.documentId)) {
+        return ctx.badRequest("Un articol nu poate fi relaționat cu el însuși");
+      }
+      const relatedError = await checkRelatedArticles(strapi, parsed.data.articoleRelationate);
+      if (relatedError) return ctx.badRequest(relatedError);
+    }
+
     // `stare` is not part of the update payload — publishing and withdrawing go
     // through their own endpoints, so an edit never changes what the public can
     // see.
@@ -243,6 +285,10 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
 
     if (parsed.data.blocuri !== undefined) {
       data.fisiere = collectFileIds(parsed.data.blocuri);
+    }
+
+    if (parsed.data.articoleRelationate !== undefined) {
+      data.articoleRelationate = { set: parsed.data.articoleRelationate };
     }
 
     if (subcategorie !== undefined) {

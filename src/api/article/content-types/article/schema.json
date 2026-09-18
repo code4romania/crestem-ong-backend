@@ -62,6 +62,11 @@
     },
     "tip": {
       "type": "string"
+    },
+    "articoleRelationate": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::article.article"
     }
   }
 }
