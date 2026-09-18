@@ -44,6 +44,16 @@ const eticheteBase = z
 const etichete = eticheteBase.default([]);
 
 /**
+ * Up to 3 documentIds, picked by the editor from the tag-matched candidates the
+ * frontend computes. Existence and self-reference are checked in the
+ * controller, which can read the taxonomy — this schema only caps the count.
+ */
+const articoleRelationateBase = z
+  .array(z.string().trim().min(1, "Id-ul articolului relaționat este invalid"))
+  .max(3, "Cel mult 3 articole relaționate");
+const articoleRelationate = articoleRelationateBase.default([]);
+
+/**
  * The subcategory, by documentId. Required: an article cannot attach to a bare
  * category, because its public path is assembled from the subcategory and that
  * subcategory's parent. Whether the target exists and actually has a parent is
@@ -64,6 +74,7 @@ export const createArticleSchema = z.strictObject({
   tip: tipBase.default(""),
   vizibilitate: vizibilitateSchema,
   blocuri: blocksSchema,
+  articoleRelationate,
 });
 
 export const updateArticleSchema = z.strictObject({
@@ -76,6 +87,7 @@ export const updateArticleSchema = z.strictObject({
   tip: tipBase.optional(),
   vizibilitate: vizibilitateSchema.optional(),
   blocuri: blocksSchemaBase.optional(),
+  articoleRelationate: articoleRelationateBase.optional(),
 });
 
 export type CreateArticleInput = z.infer<typeof createArticleSchema>;

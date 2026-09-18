@@ -177,3 +177,36 @@ describe("tip", () => {
     expect(parsed.success && "tip" in parsed.data).toBe(false);
   });
 });
+
+describe("articoleRelationate", () => {
+  it("defaults to empty on create", () => {
+    const parsed = createArticleSchema.safeParse(valid);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.articoleRelationate).toEqual([]);
+  });
+
+  it("accepts up to 3 ids", () => {
+    expect(
+      createArticleSchema.safeParse({ ...valid, articoleRelationate: ["a", "b", "c"] }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a 4th id", () => {
+    expect(
+      createArticleSchema.safeParse({ ...valid, articoleRelationate: ["a", "b", "c", "d"] })
+        .success,
+    ).toBe(false);
+  });
+
+  it("leaves an absent value absent on update", () => {
+    const parsed = updateArticleSchema.safeParse({ titlu: "Titlu nou" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && "articoleRelationate" in parsed.data).toBe(false);
+  });
+
+  it("still enforces the cap on update", () => {
+    expect(
+      updateArticleSchema.safeParse({ articoleRelationate: ["a", "b", "c", "d"] }).success,
+    ).toBe(false);
+  });
+});
