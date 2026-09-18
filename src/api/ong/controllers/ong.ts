@@ -81,6 +81,20 @@ import { deleteUploadedFile } from "../../../utils/media";
 /** Organizations per page on the FDSC list, which loads them as it scrolls. */
 const LIST_PAGE_SIZE = 20;
 
+/**
+ * A meeting created with a `dataOra` from a day strictly before today is
+ * created as already having happened — there is no other mechanism that
+ * would ever transition it out of `programata` (that only happens via the
+ * explicit `completeMeetingForMentor` action), so without this a past-dated
+ * meeting would stay `programata` forever and never become eligible for a
+ * report. A same-day meeting stays `programata` even once its time has
+ * passed — only a full day boundary counts, not a same-day time check.
+ */
+const initialMeetingStatus = (dataOra: string): "programata" | "efectuata" =>
+  toDateString(new Date(dataOra)) < todayInBucharest()
+    ? "efectuata"
+    : "programata";
+
 export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
   async list(ctx: Context) {
     if (!ctx.state.user) {
@@ -1309,7 +1323,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         subiect: data.subiect,
         dataOra: data.dataOra,
         format: data.format,
-        status: "programata",
+        status: initialMeetingStatus(data.dataOra),
         linkIntalnire: data.linkIntalnire || null,
         comentarii: data.comentarii || null,
         dimensiuni,
@@ -1729,7 +1743,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         subiect: data.subiect,
         dataOra: data.dataOra,
         format: data.format,
-        status: "programata",
+        status: initialMeetingStatus(data.dataOra),
         linkIntalnire: data.linkIntalnire || null,
         comentarii: data.comentarii || null,
         dimensiuni,
