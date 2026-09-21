@@ -1,5 +1,6 @@
 import type { Core } from "@strapi/strapi";
 import { toDateString } from "../../../utils/date";
+import { renderEmail } from "../utils/template";
 
 export interface SendAccountActivationArgs {
   to: string;
@@ -61,7 +62,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: `Activează-ți contul de ${roleLabel}`,
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           `Un administrator ți-a creat un cont de ${roleLabel} pe platforma Creștem ONG.`,
@@ -70,8 +71,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
-          "Dacă nu te așteptai la acest email, poți să îl ignori.",
-        ].join("\n"),
+        ]),
       });
   },
   async sendMemberActivation({ to, nume, ongName, link }: SendMemberActivationArgs) {
@@ -81,7 +81,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: `Ai fost invitat în organizația ${ongName}`,
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           `Ai fost invitat în organizația ${ongName} pe platforma Creștem ONG.`,
@@ -90,8 +90,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
-          "Dacă nu te așteptai la acest email, poți să îl ignori.",
-        ].join("\n"),
+        ]),
       });
   },
   async sendPasswordReset({ to, nume, link }: SendPasswordResetArgs) {
@@ -101,7 +100,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: "Resetează-ți parola",
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           "Am primit o cerere de resetare a parolei pentru contul tău de pe platforma Creștem ONG.",
@@ -110,8 +109,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 1 oră și poate fi folosit o singură dată.",
-          "Dacă nu ai cerut resetarea parolei, poți ignora acest email.",
-        ].join("\n"),
+        ]),
       });
   },
   async sendProgramAssignment({
@@ -126,12 +124,12 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: `Organizația ta a fost înscrisă în programul ${programName}`,
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           `Organizația ta, ${ongName}, a fost înscrisă în programul ${programName} pe platforma Creștem ONG.`,
           "Te poți autentifica în platformă pentru mai multe detalii.",
-        ].join("\n"),
+        ]),
       });
   },
   async sendEvaluationInvite({
@@ -147,7 +145,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: `Ai o evaluare de completat pentru ${ongName}`,
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           `Organizația ${ongName} a pornit o rundă de evaluare pe platforma Creștem ONG și ai fost invitat să o completezi.`,
@@ -159,7 +157,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Poți completa evaluarea pe dimensiuni, în mai multe reprize. O dimensiune trimisă nu mai poate fi modificată.",
-        ].join("\n"),
+        ]),
       });
   },
   async sendEmailChangeConfirmation({
@@ -173,7 +171,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .send({
         to,
         subject: "Confirmă noua adresă de email",
-        text: [
+        ...renderEmail([
           `Bună, ${nume},`,
           "",
           "Ai cerut schimbarea adresei de email a contului tău de pe platforma Creștem ONG cu aceasta.",
@@ -182,8 +180,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Adresa contului se schimbă doar după ce deschizi linkul. Până atunci rămâi cu cea veche.",
-          "Dacă nu ai cerut tu schimbarea, ignoră acest email și schimbă-ți parola.",
-        ].join("\n"),
+          "Dacă nu ai cerut tu această schimbare, schimbă-ți parola.",
+        ]),
       });
   },
 });
