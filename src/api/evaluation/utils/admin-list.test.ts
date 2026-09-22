@@ -291,9 +291,23 @@ describe("adminEvaluationDbFilters", () => {
     expect(adminEvaluationDbFilters({})).toEqual({});
   });
 
-  it("searches the respondent's address alone", () => {
-    expect(adminEvaluationDbFilters({ search: "ana@" })).toEqual({
-      user: { email: { $containsi: "ana@" } },
+  it("searches the respondent, the organization's administrator and the fiscal code", () => {
+    expect(adminEvaluationDbFilters({ search: "ana" })).toEqual({
+      $or: [
+        { user: { email: { $containsi: "ana" } } },
+        { user: { nume: { $containsi: "ana" } } },
+        {
+          report: {
+            ong: {
+              users: {
+                email: { $containsi: "ana" },
+                role: { type: "ngo-admin" },
+              },
+            },
+          },
+        },
+        { report: { ong: { cui: { $containsi: "ana" } } } },
+      ],
     });
   });
 
@@ -320,12 +334,14 @@ describe("adminEvaluationDbFilters", () => {
   });
 
   it("combines the organization scope with the search", () => {
-    expect(
-      adminEvaluationDbFilters({ ongs: ["ong-1"], search: "ana@" }),
-    ).toEqual({
-      user: { email: { $containsi: "ana@" } },
-      report: { ong: { documentId: { $in: ["ong-1"] } } },
+    const filters = adminEvaluationDbFilters({
+      ongs: ["ong-1"],
+      search: "ana@",
     });
+    // The scope stays its own clause, so it narrows every branch of the search
+    // rather than becoming one more way for a row to match.
+    expect(filters.report).toEqual({ ong: { documentId: { $in: ["ong-1"] } } });
+    expect(filters.$or).toHaveLength(4);
   });
 
   it("keeps both relation scopes under the same report filter", () => {

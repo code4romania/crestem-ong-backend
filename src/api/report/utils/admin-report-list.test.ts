@@ -185,9 +185,10 @@ describe("adminReportDbFilters", () => {
     expect(adminReportDbFilters({})).toEqual({});
   });
 
-  it("searches the administrators' addresses and the fiscal code", () => {
+  it("searches the organization's name, fiscal code, administrator and respondents", () => {
     expect(adminReportDbFilters({ search: "alfa" })).toEqual({
       $or: [
+        { ong: { name: { $containsi: "alfa" } } },
         {
           ong: {
             users: {
@@ -197,8 +198,19 @@ describe("adminReportDbFilters", () => {
           },
         },
         { ong: { cui: { $containsi: "alfa" } } },
+        { evaluations: { user: { email: { $containsi: "alfa" } } } },
       ],
     });
+  });
+
+  it("ignores a blank search", () => {
+    expect(adminReportDbFilters({ search: "   " })).toEqual({});
+  });
+
+  it("keeps the organization scope out of the search branches", () => {
+    const filters = adminReportDbFilters({ ongs: ["ong-1"], search: "alfa" });
+    expect(filters.ong).toEqual({ documentId: { $in: ["ong-1"] } });
+    expect(filters.$or).toHaveLength(4);
   });
 
   it("scopes to the organizations picked", () => {

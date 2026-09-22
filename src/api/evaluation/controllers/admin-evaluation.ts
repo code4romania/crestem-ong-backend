@@ -15,7 +15,8 @@ const PAGE_SIZE = 20;
 export default {
   /**
    * The FDSC-wide list of individual responses: one row per respondent per
-   * round. The address search and the organization/program scopes reach the
+   * round. The search (respondent name and address, the organization's admin
+   * address and fiscal code) and the organization/program scopes reach the
    * database; the status, and the program filter once it carries the
    * independent entry, are derived per row and applied — and paginated — in
    * memory.

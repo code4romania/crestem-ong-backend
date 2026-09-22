@@ -1,6 +1,7 @@
 import { computeProgress } from "../../evaluation/utils/progress";
 import {
   INDEPENDENT,
+  ongAdminEmailClause,
   includesIndependent,
   type ProgramRef,
 } from "../../evaluation/utils/admin-list";
@@ -123,9 +124,10 @@ export const buildAdminReportRows = (
 };
 
 /**
- * The criteria the database answers on its own. The search reaches an
- * organization through its administrators' addresses or its fiscal code — the
- * two identifiers this screen searches by.
+ * The criteria the database answers on its own. One search term reaches a round
+ * through its organization's name, administrator address and fiscal code, and
+ * through the address of anyone who answered that round — the users tab searches
+ * the same four things, from the other side of the relation.
  */
 export const adminReportDbFilters = ({
   search,
@@ -140,15 +142,10 @@ export const adminReportDbFilters = ({
   const term = search?.trim();
   if (term) {
     filters.$or = [
-      {
-        ong: {
-          users: {
-            email: { $containsi: term },
-            role: { type: "ngo-admin" },
-          },
-        },
-      },
+      { ong: { name: { $containsi: term } } },
+      { ong: ongAdminEmailClause(term) },
       { ong: { cui: { $containsi: term } } },
+      { evaluations: { user: { email: { $containsi: term } } } },
     ];
   }
   if (ongs?.length) {

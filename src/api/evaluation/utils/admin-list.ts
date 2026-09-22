@@ -130,9 +130,21 @@ export const buildAdminEvaluationRows = (
 };
 
 /**
- * The criteria the database answers on its own: the respondent's address, the
- * organizations picked and — unless the independent entry is among them — the
- * programs picked.
+ * An organization's administrator is reached through its users, and the role
+ * narrows the join to that one account — an organization has exactly one.
+ * Shared with the rounds list, which searches the same address.
+ */
+export const ongAdminEmailClause = (term: string) => ({
+  users: { email: { $containsi: term }, role: { type: "ngo-admin" } },
+});
+
+/**
+ * The criteria the database answers on its own: the search, the organizations
+ * picked and — unless the independent entry is among them — the programs picked.
+ *
+ * The search is one term against several columns: the respondent's address and
+ * name, and their organization's administrator address and fiscal code. The
+ * scopes stay separate keys so they narrow every branch instead of joining it.
  */
 export const adminEvaluationDbFilters = ({
   search,
@@ -146,7 +158,12 @@ export const adminEvaluationDbFilters = ({
   const filters: Record<string, unknown> = {};
   const term = search?.trim();
   if (term) {
-    filters.user = { email: { $containsi: term } };
+    filters.$or = [
+      { user: { email: { $containsi: term } } },
+      { user: { nume: { $containsi: term } } },
+      { report: { ong: ongAdminEmailClause(term) } },
+      { report: { ong: { cui: { $containsi: term } } } },
+    ];
   }
   const report: Record<string, unknown> = {};
   if (ongs?.length) {

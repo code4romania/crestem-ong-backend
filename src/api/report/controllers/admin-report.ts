@@ -15,8 +15,9 @@ const PAGE_SIZE = 20;
 export default {
   /**
    * The FDSC-wide list of rounds: one row per evaluation round an organization
-   * ran. The search and the organization/program scopes reach the database; the
-   * response statuses, and the program filter once it carries the independent
+   * ran. The search (organization name and fiscal code, its admin's address and
+   * its respondents' addresses) and the organization/program scopes reach the
+   * database; the response statuses, and the program filter once it carries the independent
    * entry, are derived and applied — and paginated — in memory.
    */
   async list(ctx: Context) {
