@@ -37,6 +37,12 @@ describe("createPageSchema", () => {
     expect(createPageSchema.safeParse({ ...valid, slug: "dashboard" }).success).toBe(false);
   });
 
+  // The library landing page is a CMS page like any other: it carries the
+  // "Categorii Bibliotecă" block, so editors must be able to claim its slug.
+  it("accepts the library slug", () => {
+    expect(createPageSchema.safeParse({ ...valid, slug: "biblioteca" }).success).toBe(true);
+  });
+
   it("rejects a slug that is not url-safe", () => {
     expect(createPageSchema.safeParse({ ...valid, slug: "Despre Noi" }).success).toBe(false);
   });

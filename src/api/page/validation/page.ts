@@ -18,7 +18,6 @@ export const RESERVED_SLUGS = [
   "membru",
   "schimbare-email",
   "api",
-  "biblioteca",
 ] as const;
 
 const slug = slugSchema.refine(
