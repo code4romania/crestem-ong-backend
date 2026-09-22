@@ -174,6 +174,7 @@ export default factories.createCoreController(
         strapi,
         created,
         ong.name,
+        ong.documentId,
         phase ? toDateString(phase.endDate) : undefined,
       );
       return {
@@ -256,7 +257,7 @@ export default factories.createCoreController(
       }
       const invites =
         created.length > 0
-          ? await sendInvites(strapi, created, ong.name, deadline)
+          ? await sendInvites(strapi, created, ong.name, ong.documentId, deadline)
           : null;
       return {
         data: {

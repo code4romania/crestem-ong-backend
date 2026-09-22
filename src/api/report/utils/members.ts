@@ -95,10 +95,19 @@ export const sendInvites = async (
   strapi: any,
   created: CreatedEvaluation[],
   ongName: string,
+  ongDocumentId: string,
   deadline?: string,
 ): Promise<InviteResult> => {
   const failed: string[] = [];
   for (const { member, evaluationDocumentId } of created) {
+    // An ngo-admin respondent is always the admin adding themselves — the
+    // candidate list they pick from holds ngo-members only. Mailing them would
+    // be an invitation to their own inbox, carrying a link to the member
+    // wizard, a route their role does not resolve. The evaluation is still
+    // created; only the email is skipped, so `notificationSentAt` stays null.
+    if (member.role?.type === "ngo-admin") {
+      continue;
+    }
     try {
       await (
         strapi.service("api::email.email") as EmailService
@@ -106,7 +115,7 @@ export const sendInvites = async (
         to: member.email,
         nume: member.nume,
         ongName,
-        link: buildEvaluationLink(evaluationDocumentId),
+        link: buildEvaluationLink(ongDocumentId, evaluationDocumentId),
         deadline,
       });
     } catch (error) {
