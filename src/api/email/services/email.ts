@@ -43,12 +43,19 @@ export interface SendEvaluationInviteArgs {
   deadline?: string;
 }
 
+export interface SendOngDeletedArgs {
+  to: string;
+  nume: string;
+  ongName: string;
+}
+
 export interface EmailService {
   sendAccountActivation(args: SendAccountActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
+  sendOngDeleted(args: SendOngDeletedArgs): Promise<void>;
   sendEmailChangeConfirmation(
     args: SendEmailChangeConfirmationArgs,
   ): Promise<void>;
@@ -129,6 +136,33 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           `Organizația ta, ${ongName}, a fost înscrisă în programul ${programName} pe platforma Creștem ONG.`,
           "Te poți autentifica în platformă pentru mai multe detalii.",
+        ]),
+      });
+  },
+  /**
+   * Sent to the members of an organization that has just been deleted (BR-33).
+   *
+   * The wording names no author: the deletion can be run by the organization's
+   * own contact person or by FDSC staff, and the same text has to hold in both
+   * cases. It also has to hold whether the member keeps other memberships or
+   * has just been demoted to `individual` by `removeOngMembership`, so the
+   * role is not mentioned either.
+   */
+  async sendOngDeleted({ to, nume, ongName }: SendOngDeletedArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: `Organizația ${ongName} a fost ștearsă`,
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          `Organizația ${ongName} a fost ștearsă de pe platforma Creștem ONG în urma solicitării.`,
+          "",
+          "Contul tău rămâne activ. Ai pierdut doar accesul la datele și programele acestei organizații; orice altă organizație din care faci parte rămâne neschimbată.",
+          "",
+          "Te poți autentifica în continuare și poți cere alăturarea la o altă organizație.",
         ]),
       });
   },

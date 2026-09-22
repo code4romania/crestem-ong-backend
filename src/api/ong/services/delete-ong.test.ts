@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { buildAnonymizedOngData, performOngDeletion } from "./delete-ong";
 
-const membership = vi.hoisted(() => ({ removeOngMembership: vi.fn(async () => ({})) }));
+const membership = vi.hoisted(() => ({
+  removeOngMembership: vi.fn(async () => ({})),
+  cancelPendingInvite: vi.fn(async () => ({})),
+}));
 vi.mock("../../../utils/membership", () => membership);
 
 const NGO_MENTOR_UID = "api::ngo-mentor.ngo-mentor";
@@ -19,6 +22,8 @@ interface HarnessOptions {
   providerThrows?: boolean;
   /** Makes the `plugin::upload.file` row delete reject, as a database error would. */
   fileRowDeleteThrows?: boolean;
+  /** Email addresses whose notification the email service rejects. */
+  emailFailsFor?: string[];
 }
 
 function harness(members: any[], options: HarnessOptions = {}) {
@@ -29,6 +34,7 @@ function harness(members: any[], options: HarnessOptions = {}) {
   const deletes: Array<{ uid: string; documentId: string }> = [];
   const removedFiles: Array<{ file: any; inTransaction: boolean }> = [];
   const deletedFileRows: Array<{ where: any; inTransaction: boolean }> = [];
+  const sentEmails: Array<{ args: any; inTransaction: boolean }> = [];
   const callOrder = {
     removeMembership: [] as number[],
     joinRequestDelete: [] as number[],
@@ -92,6 +98,17 @@ function harness(members: any[], options: HarnessOptions = {}) {
         }
       }),
     }),
+    service: (uid: string) => {
+      expect(uid).toBe("api::email.email");
+      return {
+        sendOngDeleted: vi.fn(async (args: any) => {
+          if ((options.emailFailsFor ?? []).includes(args.to)) {
+            throw new Error("SMTP unreachable");
+          }
+          sentEmails.push({ args, inTransaction });
+        }),
+      };
+    },
     plugin: (name: string) => ({
       provider: {
         delete: vi.fn(async (file: any) => {
@@ -110,6 +127,7 @@ function harness(members: any[], options: HarnessOptions = {}) {
     deletes,
     removedFiles,
     deletedFileRows,
+    sentEmails,
     findManyCalls,
     findOneCalls,
     callOrder,
@@ -121,6 +139,8 @@ function harness(members: any[], options: HarnessOptions = {}) {
 beforeEach(() => {
   membership.removeOngMembership.mockReset();
   membership.removeOngMembership.mockImplementation(async () => ({}));
+  membership.cancelPendingInvite.mockReset();
+  membership.cancelPendingInvite.mockImplementation(async () => ({}));
 });
 
 describe("buildAnonymizedOngData", () => {
@@ -301,7 +321,9 @@ describe("performOngDeletion", () => {
       providerThrows: true,
     });
 
-    await expect(performOngDeletion(h.strapi, "ong-1")).resolves.toBeUndefined();
+    await expect(performOngDeletion(h.strapi, "ong-1")).resolves.toEqual({
+      emailSent: true,
+    });
 
     expect(h.callOrder.fileRemove).toHaveLength(1);
     // The media-library row goes even when the provider object could not be
@@ -360,5 +382,153 @@ describe("performOngDeletion", () => {
       ...h.callOrder.mentorDetach,
     );
     expect(h.callOrder.ongUpdate[0]).toBeGreaterThan(maxBefore);
+  });
+});
+
+describe("performOngDeletion — invites that never activated", () => {
+  it("deletes the pending account outright instead of leaving an individual stub", async () => {
+    const h = harness([
+      { documentId: "u1", accountStatus: "active", email: "ana@x.ro", nume: "Ana" },
+      { documentId: "u2", accountStatus: "pending", email: "bogdan@x.ro", nume: "Bogdan" },
+    ]);
+
+    await performOngDeletion(h.strapi, "ong-1");
+
+    expect(membership.cancelPendingInvite).toHaveBeenCalledTimes(1);
+    expect(membership.cancelPendingInvite).toHaveBeenCalledWith(h.strapi, "u2", "ong-1");
+    // The activated member keeps their account; only the membership ends.
+    expect(membership.removeOngMembership).toHaveBeenCalledTimes(1);
+    expect(membership.removeOngMembership).toHaveBeenCalledWith(h.strapi, "u1", "ong-1");
+  });
+
+  it("treats a member with no accountStatus as activated", async () => {
+    const h = harness([{ documentId: "u1", role: { type: "ngo-member" } }]);
+    await performOngDeletion(h.strapi, "ong-1");
+    expect(membership.cancelPendingInvite).not.toHaveBeenCalled();
+    expect(membership.removeOngMembership).toHaveBeenCalledWith(h.strapi, "u1", "ong-1");
+  });
+});
+
+describe("performOngDeletion — member notification", () => {
+  const ong = { documentId: "ong-1", name: "Fundația X" };
+
+  it("emails every activated member, with the name the organization had before anonymization", async () => {
+    const h = harness(
+      [
+        { documentId: "u1", accountStatus: "active", email: "ana@x.ro", nume: "Ana" },
+        { documentId: "u2", accountStatus: "active", email: "bogdan@x.ro", nume: "Bogdan" },
+      ],
+      { ong },
+    );
+
+    const result = await performOngDeletion(h.strapi, "ong-1");
+
+    expect(result).toEqual({ emailSent: true });
+    expect(h.sentEmails.map((e) => e.args)).toEqual([
+      { to: "ana@x.ro", nume: "Ana", ongName: "Fundația X" },
+      { to: "bogdan@x.ro", nume: "Bogdan", ongName: "Fundația X" },
+    ]);
+  });
+
+  it("skips the member who triggered the deletion", async () => {
+    const h = harness(
+      [
+        { documentId: "admin-1", accountStatus: "active", email: "admin@x.ro", nume: "Admin" },
+        { documentId: "u2", accountStatus: "active", email: "bogdan@x.ro", nume: "Bogdan" },
+      ],
+      { ong },
+    );
+
+    await performOngDeletion(h.strapi, "ong-1", "admin-1");
+
+    expect(h.sentEmails.map((e) => e.args.to)).toEqual(["bogdan@x.ro"]);
+  });
+
+  it("notifies the ngo-admin when FDSC staff, who is not a member, deletes the organization", async () => {
+    const h = harness(
+      [{ documentId: "u1", accountStatus: "active", email: "admin@x.ro", nume: "Admin" }],
+      { ong },
+    );
+
+    await performOngDeletion(h.strapi, "ong-1", "fdsc-staff-1");
+
+    expect(h.sentEmails.map((e) => e.args.to)).toEqual(["admin@x.ro"]);
+  });
+
+  it("does not email invites that never activated", async () => {
+    const h = harness(
+      [
+        { documentId: "u1", accountStatus: "pending", email: "bogdan@x.ro", nume: "Bogdan" },
+        { documentId: "u2", accountStatus: "active", email: "ana@x.ro", nume: "Ana" },
+      ],
+      { ong },
+    );
+
+    await performOngDeletion(h.strapi, "ong-1");
+
+    expect(h.sentEmails.map((e) => e.args.to)).toEqual(["ana@x.ro"]);
+  });
+
+  it("sends only after the transaction has committed", async () => {
+    // A mail announcing a deletion that then rolls back cannot be recalled.
+    const h = harness(
+      [{ documentId: "u1", accountStatus: "active", email: "ana@x.ro", nume: "Ana" }],
+      { ong },
+    );
+
+    await performOngDeletion(h.strapi, "ong-1");
+
+    expect(h.sentEmails).toHaveLength(1);
+    expect(h.sentEmails[0].inTransaction).toBe(false);
+  });
+
+  it("sends no mail when the deletion itself fails", async () => {
+    const h = harness(
+      [{ documentId: "u1", accountStatus: "active", email: "ana@x.ro", nume: "Ana" }],
+      {
+        ong: { ...ong, logo: { id: 41, provider: "local" } },
+        fileRowDeleteThrows: true,
+      },
+    );
+
+    await expect(performOngDeletion(h.strapi, "ong-1")).rejects.toThrow(
+      "current transaction is aborted",
+    );
+
+    expect(h.sentEmails).toHaveLength(0);
+  });
+
+  it("keeps the deletion successful and mails the rest when one notification fails", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const h = harness(
+      [
+        { documentId: "u1", accountStatus: "active", email: "ana@x.ro", nume: "Ana" },
+        { documentId: "u2", accountStatus: "active", email: "bogdan@x.ro", nume: "Bogdan" },
+      ],
+      { ong, emailFailsFor: ["ana@x.ro"] },
+    );
+
+    const result = await performOngDeletion(h.strapi, "ong-1");
+
+    expect(result).toEqual({ emailSent: false });
+    expect(h.sentEmails.map((e) => e.args.to)).toEqual(["bogdan@x.ro"]);
+    expect(h.updates.find((u) => u.uid === ONG_UID)?.data.ngoStatus).toBe("deleted");
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it("skips a member with no email address", async () => {
+    const h = harness(
+      [
+        { documentId: "u1", accountStatus: "active", email: null, nume: "Fără mail" },
+        { documentId: "u2", accountStatus: "active", email: "ana@x.ro", nume: "Ana" },
+      ],
+      { ong },
+    );
+
+    const result = await performOngDeletion(h.strapi, "ong-1");
+
+    expect(result).toEqual({ emailSent: true });
+    expect(h.sentEmails.map((e) => e.args.to)).toEqual(["ana@x.ro"]);
   });
 });

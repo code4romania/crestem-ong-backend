@@ -1,6 +1,10 @@
-import { removeOngMembership } from "../../../utils/membership";
+import {
+  cancelPendingInvite,
+  removeOngMembership,
+} from "../../../utils/membership";
 import { detachOngFromMentorAssignments } from "../../../utils/mentor-assignments";
 import { deleteUploadedFile } from "../../../utils/media";
+import type { EmailService } from "../../email/services/email";
 
 const ONG_UID = "api::ong.ong";
 const USER_UID = "plugin::users-permissions.user";
@@ -79,22 +83,35 @@ export function buildAnonymizedOngData(documentId: string): AnonymizedOngData {
  * provider deletes it from disk/S3 outside any database transaction. It is
  * removed just before the relation is cleared, so an aborted deletion leaves a
  * broken image reference rather than an unreachable orphan.
+ *
+ * `actorDocumentId` is the user who asked for the deletion, so they can be left
+ * out of the notification — they know. FDSC staff are not members, so passing
+ * their id simply matches nobody and the whole membership, ngo-admin included,
+ * is notified.
  */
 export async function performOngDeletion(
   strapi: any,
   ongDocumentId: string,
-): Promise<void> {
-  await strapi.db.transaction(async () => {
+  actorDocumentId?: string,
+): Promise<{ emailSent: boolean }> {
+  const recipients = await strapi.db.transaction(async () => {
     const members: any[] = await strapi.documents(USER_UID).findMany({
       filters: { ong: { documentId: ongDocumentId } },
       populate: { role: true },
     });
 
-    // Each member keeps their account and every other affiliation; only this
-    // membership ends. `removeOngMembership` demotes them to `individual` when it
-    // was their last one.
+    // An activated member keeps their account and every other affiliation; only
+    // this membership ends, and `removeOngMembership` demotes them to
+    // `individual` when it was their last one. A `pending` invite has no
+    // identity to preserve — it exists only because this organization created
+    // it — so `cancelPendingInvite` deletes the account outright rather than
+    // leaving an "individual" stub squatting on the email address.
     for (const member of members) {
       if (!member?.documentId) continue;
+      if (member.accountStatus === "pending") {
+        await cancelPendingInvite(strapi, member.documentId, ongDocumentId);
+        continue;
+      }
       await removeOngMembership(strapi, member.documentId, ongDocumentId);
     }
 
@@ -123,9 +140,55 @@ export async function performOngDeletion(
     // itself has to go too.
     await deleteUploadedFile(strapi, ong?.logo);
 
+    // The name is read before the anonymizing update overwrites it with
+    // "Organizație ștearsă" — the notification has to name the real one.
+    const ongName = ong?.name;
+
     await strapi.documents(ONG_UID).update({
       documentId: ongDocumentId,
       data: buildAnonymizedOngData(ongDocumentId),
     });
+
+    return members
+      .filter(
+        (member) =>
+          member?.email &&
+          member.accountStatus !== "pending" &&
+          member.documentId !== actorDocumentId,
+      )
+      .map((member) => ({
+        to: member.email,
+        nume: member.nume,
+        ongName,
+      }));
   });
+
+  return { emailSent: await notifyMembers(strapi, recipients) };
+}
+
+/**
+ * Announces the deletion to the members, one mail at a time.
+ *
+ * Called only after `strapi.db.transaction` has resolved: a mail announcing a
+ * deletion that then rolls back cannot be recalled. By the same token a
+ * delivery failure cannot undo anything either, so it is logged and the
+ * remaining members are still mailed — the caller reports it through
+ * `emailSent`, exactly as `assignOngs` does.
+ */
+async function notifyMembers(
+  strapi: any,
+  recipients: Array<{ to: string; nume: string; ongName: string }>,
+): Promise<boolean> {
+  let emailSent = true;
+  for (const recipient of recipients) {
+    try {
+      await (
+        strapi.service("api::email.email") as EmailService
+      ).sendOngDeleted(recipient);
+    } catch (error) {
+      console.error("ong deletion notification delivery failed", error);
+      emailSent = false;
+    }
+  }
+  return emailSent;
 }

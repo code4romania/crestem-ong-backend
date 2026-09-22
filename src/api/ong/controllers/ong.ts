@@ -318,8 +318,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         ? ctx.forbidden(decision.message)
         : ctx.badRequest(decision.message);
     }
-    await performOngDeletion(strapi, targetDocumentId);
-    return { data: { documentId: targetDocumentId } };
+    const { emailSent } = await performOngDeletion(
+      strapi,
+      targetDocumentId,
+      ctx.state.user.documentId,
+    );
+    return { data: { documentId: targetDocumentId, emailSent } };
   },
 /**
    * Every organization as id and name only, for the filter dropdowns that need
