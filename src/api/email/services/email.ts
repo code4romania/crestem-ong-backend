@@ -72,12 +72,13 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ...renderEmail([
           `Bună, ${nume},`,
           "",
-          `Un administrator ți-a creat un cont de ${roleLabel} pe platforma Creștem ONG.`,
+          `Tocmai ți-a fost creat un cont de ${roleLabel} pe platforma Creștem ONG.`,
           "Pentru a-l activa, accesează linkul de mai jos și setează-ți parola:",
           "",
           link,
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
+          "Dacă nu ai solicitat/nu dorești crearea acestui cont, te rugăm să ignori acest email.",
         ]),
       });
   },
@@ -97,6 +98,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
+          "Dacă nu dorești să dai curs acestei invitații, te rugăm să ignori acest email.",
         ]),
       });
   },
@@ -116,6 +118,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 1 oră și poate fi folosit o singură dată.",
+          "Dacă nu ai cerut resetarea parolei, poți ignora acest email.",
         ]),
       });
   },
@@ -135,7 +138,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           `Bună, ${nume},`,
           "",
           `Organizația ta, ${ongName}, a fost înscrisă în programul ${programName} pe platforma Creștem ONG.`,
-          "Te poți autentifica în platformă pentru mai multe detalii.",
+          "",
+          "Autentifică-te în platformă și descoperă instrumentele și resursele disponibile pentru organizația ta.",
         ]),
       });
   },
@@ -158,9 +162,9 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ...renderEmail([
           `Bună, ${nume},`,
           "",
-          `Organizația ${ongName} a fost ștearsă de pe platforma Creștem ONG în urma solicitării.`,
+          `Organizația ${ongName} a fost ștearsă de pe platforma Creștem ONG în urma unei solicitări.`,
           "",
-          "Contul tău rămâne activ. Ai pierdut doar accesul la datele și programele acestei organizații; orice altă organizație din care faci parte rămâne neschimbată.",
+          "Contul tău în platformă rămâne activ, ai pierdut doar accesul la datele și programele acestei organizații. Orice altă organizație din care faci parte rămâne neschimbată.",
           "",
           "Te poți autentifica în continuare și poți cere alăturarea la o altă organizație.",
         ]),
@@ -182,7 +186,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ...renderEmail([
           `Bună, ${nume},`,
           "",
-          `Organizația ${ongName} a pornit o rundă de evaluare pe platforma Creștem ONG și ai fost invitat să o completezi.`,
+          `Organizația ${ongName} a pornit o sesiune de evaluare pe platforma Creștem ONG și te-a invitat să o completezi.`,
           ...(deadline
             ? [`Termenul limită pentru completare este ${toDateString(deadline)}.`]
             : []),
@@ -214,7 +218,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Adresa contului se schimbă doar după ce deschizi linkul. Până atunci rămâi cu cea veche.",
-          "Dacă nu ai cerut tu această schimbare, schimbă-ți parola.",
+          "Dacă nu ai cerut tu schimbarea, ignoră acest email și schimbă-ți parola.",
         ]),
       });
   },
