@@ -131,19 +131,31 @@ describe("buildAdminReportRows", () => {
     ]);
   });
 
-  it("keeps the rounds with at least one response in the requested status", () => {
-    const rows = buildAdminReportRows(
-      [
-        report({
-          documentId: "report-with-complete",
-          evaluations: [{ dimensions: [] }, { dimensions: completeDimensions(3) }],
-        }),
-        report({ documentId: "report-untouched", evaluations: [{ dimensions: [] }] }),
-      ],
-      { today: TODAY, status: "completat" },
-    );
+  it("keeps the rounds whose own status is the requested one", () => {
+    // A running round with a finished response used to match "completat" too.
+    const reports = [
+      report({
+        documentId: "report-finished",
+        finished: true,
+        finishedAt: "2026-01-10T09:00:00.000Z",
+        evaluations: [{ dimensions: completeDimensions(3) }],
+      }),
+      report({
+        documentId: "report-running-with-complete",
+        evaluations: [{ dimensions: [] }, { dimensions: completeDimensions(3) }],
+      }),
+    ];
 
-    expect(rows.map((row) => row.documentId)).toEqual(["report-with-complete"]);
+    expect(
+      buildAdminReportRows(reports, { today: TODAY, status: "finalizata" }).map(
+        (row) => row.documentId,
+      ),
+    ).toEqual(["report-finished"]);
+    expect(
+      buildAdminReportRows(reports, { today: TODAY, status: "in_desfasurare" }).map(
+        (row) => row.documentId,
+      ),
+    ).toEqual(["report-running-with-complete"]);
   });
 
   it("keeps the rounds outside every program when the independent entry is picked", () => {
@@ -237,8 +249,8 @@ describe("reportNeedsInMemoryPagination", () => {
     ).toBe(false);
   });
 
-  it("is true for the status, which is derived from the responses", () => {
-    expect(reportNeedsInMemoryPagination({ status: "completat" })).toBe(true);
+  it("is true for the status, which is derived from the round's dates", () => {
+    expect(reportNeedsInMemoryPagination({ status: "finalizata" })).toBe(true);
   });
 
   it("is true for the independent entry", () => {
