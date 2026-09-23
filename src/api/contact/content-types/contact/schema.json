@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "contacts",
+  "info": {
+    "singularName": "contact",
+    "pluralName": "contacts",
+    "displayName": "Contact",
+    "description": "Mesaje trimise din formularul public de contact"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 120
+    },
+    "email": {
+      "type": "email",
+      "required": true
+    },
+    "organization": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "subject": {
+      "type": "string",
+      "required": true,
+      "maxLength": 160
+    },
+    "message": {
+      "type": "text",
+      "required": true,
+      "maxLength": 5000
+    },
+    "consentedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "contactStatus": {
+      "type": "enumeration",
+      "enum": ["new", "in_progress", "closed"],
+      "default": "new",
+      "required": true
+    }
+  }
+}

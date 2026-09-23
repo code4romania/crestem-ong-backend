@@ -15,6 +15,7 @@ export const BLOCK_TYPES = [
   "callout",
   "category-grid",
   "columns",
+  "contact",
   "custom-html",
   "divider",
   "documents",
