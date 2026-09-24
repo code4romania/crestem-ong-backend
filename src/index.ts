@@ -52,6 +52,14 @@ const APP_ROLES = [
  * Everything the administrator reaches. `editor-fdsc` is derived from it below:
  * the two FDSC staff accounts differ by exactly one action.
  */
+/** Transfer rol Admin ONG from the FDSC side: the FDSC Admin only (US-5). */
+const FDSC_ADMIN_TRANSFER_ACTIONS = [
+  "api::admin-transfer.admin-transfer.fdscDetail",
+  "api::admin-transfer.admin-transfer.fdscCreate",
+  "api::admin-transfer.admin-transfer.fdscCancel",
+  "api::admin-transfer.admin-transfer.fdscResend",
+];
+
 const SUPER_ADMIN_PERMISSIONS = [
   "api::dashboard.dashboard.fdsc",
   "api::auth.auth.me",
@@ -144,6 +152,9 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::ong.filter-options.ongs",
   "api::ong.filter-options.programs",
   "plugin::upload.content-api.upload",
+  // "Schimbă administratorul" (US-5). The route policy is `is-super-admin`
+  // too; the editor is denied below.
+  ...FDSC_ADMIN_TRANSFER_ACTIONS,
 ];
 
 /**
@@ -157,6 +168,7 @@ const EDITOR_FDSC_DENIED_ACTIONS = [
   "api::auth.auth.registerMentor",
   "api::auth.auth.resendMentorInvite",
   "api::admin-user.admin-user.update",
+  ...FDSC_ADMIN_TRANSFER_ACTIONS,
 ];
 
 const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
@@ -197,6 +209,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.joinRequests",
     "api::ong.ong.acceptJoinRequest",
     "api::ong.ong.rejectJoinRequest",
+    // Transfer rol Admin ONG (US-1, US-2, US-4).
+    "api::admin-transfer.admin-transfer.current",
+    "api::admin-transfer.admin-transfer.create",
+    "api::admin-transfer.admin-transfer.cancel",
+    "api::admin-transfer.admin-transfer.resend",
     "plugin::upload.content-api.upload",
     "api::program.program.mentors",
     "api::program.program.ongMentors",
@@ -237,6 +254,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::ong.ong.createJoinRequest",
     "api::article-read.article-read.markRead",
     "api::article-read.article-read.me",
+    // An existing recipient of an admin transfer is always an active member
+    // of that ONG (see admin-transfer/utils/eligibility.ts), so only this role
+    // answers signed in (US-3 BR3).
+    "api::admin-transfer.admin-transfer.accept",
+    "api::admin-transfer.admin-transfer.decline",
+    "api::admin-transfer.admin-transfer.incoming",
   ],
   mentor: [
     "api::dashboard.dashboard.mentor",

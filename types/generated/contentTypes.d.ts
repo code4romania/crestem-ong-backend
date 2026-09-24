@@ -521,6 +521,72 @@ export interface ApiActivityActivity extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAdminTransferAdminTransfer
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'admin_transfers';
+  info: {
+    description: 'Propunerea de transfer al rolului de administrator al unui ONG';
+    displayName: 'Admin Transfer';
+    pluralName: 'admin-transfers';
+    singularName: 'admin-transfer';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    createdPendingAccount: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    expiresAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    initiatedBy: Schema.Attribute.Enumeration<['ngo-admin', 'fdsc']> &
+      Schema.Attribute.Required;
+    initiator: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::admin-transfer.admin-transfer'
+    > &
+      Schema.Attribute.Private;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    previousAdmin: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    recipient: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    recipientEmail: Schema.Attribute.String & Schema.Attribute.Required;
+    recipientName: Schema.Attribute.String;
+    resolvedAt: Schema.Attribute.DateTime;
+    resolvedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    tokenCiphertext: Schema.Attribute.Text &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private;
+    tokenHash: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    transferStatus: Schema.Attribute.Enumeration<
+      ['pending', 'accepted', 'declined', 'cancelled', 'expired']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiArticleReadArticleRead extends Struct.CollectionTypeSchema {
   collectionName: 'article_reads';
   info: {
@@ -2054,6 +2120,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::activity-type.activity-type': ApiActivityTypeActivityType;
       'api::activity.activity': ApiActivityActivity;
+      'api::admin-transfer.admin-transfer': ApiAdminTransferAdminTransfer;
       'api::article-read.article-read': ApiArticleReadArticleRead;
       'api::article.article': ApiArticleArticle;
       'api::contact.contact': ApiContactContact;

@@ -7,6 +7,14 @@ const membership = vi.hoisted(() => ({
 }));
 vi.mock("../../../utils/membership", () => membership);
 
+const transferFlow = vi.hoisted(() => ({
+  cancelForOngDeletion: vi.fn(async () => {}),
+}));
+vi.mock("../../admin-transfer/services/transfer-flow", () => transferFlow);
+vi.mock("../../admin-transfer/services/repository", () => ({
+  createTransferDeps: () => ({ marker: "transfer-deps" }),
+}));
+
 const NGO_MENTOR_UID = "api::ngo-mentor.ngo-mentor";
 const ONG_UID = "api::ong.ong";
 const USER_UID = "plugin::users-permissions.user";
@@ -382,6 +390,20 @@ describe("performOngDeletion", () => {
       ...h.callOrder.mentorDetach,
     );
     expect(h.callOrder.ongUpdate[0]).toBeGreaterThan(maxBefore);
+  });
+});
+
+describe("performOngDeletion — admin transfer", () => {
+  it("cancels the ONG's pending admin transfer inside the deletion transaction (D5)", async () => {
+    const h = harness([]);
+    transferFlow.cancelForOngDeletion.mockImplementation(async () => {
+      expect(h.transactionCount()).toBe(1);
+    });
+    await performOngDeletion(h.strapi, "ong-1");
+    expect(transferFlow.cancelForOngDeletion).toHaveBeenCalledWith(
+      { marker: "transfer-deps" },
+      "ong-1",
+    );
   });
 });
 

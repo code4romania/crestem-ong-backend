@@ -5,6 +5,8 @@ import {
 import { detachOngFromMentorAssignments } from "../../../utils/mentor-assignments";
 import { deleteUploadedFile } from "../../../utils/media";
 import type { EmailService } from "../../email/services/email";
+import { cancelForOngDeletion } from "../../admin-transfer/services/transfer-flow";
+import { createTransferDeps } from "../../admin-transfer/services/repository";
 
 const ONG_UID = "api::ong.ong";
 const USER_UID = "plugin::users-permissions.user";
@@ -95,6 +97,11 @@ export async function performOngDeletion(
   actorDocumentId?: string,
 ): Promise<{ emailSent: boolean }> {
   const recipients = await strapi.db.transaction(async () => {
+    // A pending "Transferă organizația" dies with the organization, and the
+    // account its invite created goes with it (spec D5). Silent: the deletion
+    // mail below already tells everyone concerned.
+    await cancelForOngDeletion(createTransferDeps(strapi), ongDocumentId);
+
     const members: any[] = await strapi.documents(USER_UID).findMany({
       filters: { ong: { documentId: ongDocumentId } },
       populate: { role: true },

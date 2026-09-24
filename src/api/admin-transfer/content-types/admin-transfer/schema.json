@@ -1,0 +1,81 @@
+{
+  "kind": "collectionType",
+  "collectionName": "admin_transfers",
+  "info": {
+    "singularName": "admin-transfer",
+    "pluralName": "admin-transfers",
+    "displayName": "Admin Transfer",
+    "description": "Propunerea de transfer al rolului de administrator al unui ONG"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong"
+    },
+    "transferStatus": {
+      "type": "enumeration",
+      "enum": ["pending", "accepted", "declined", "cancelled", "expired"],
+      "default": "pending",
+      "required": true
+    },
+    "initiatedBy": {
+      "type": "enumeration",
+      "enum": ["ngo-admin", "fdsc"],
+      "required": true
+    },
+    "initiator": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "previousAdmin": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "recipient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "recipientEmail": {
+      "type": "string",
+      "required": true
+    },
+    "recipientName": {
+      "type": "string"
+    },
+    "createdPendingAccount": {
+      "type": "boolean",
+      "default": false
+    },
+    "tokenHash": {
+      "type": "string",
+      "private": true,
+      "unique": true,
+      "required": true
+    },
+    "tokenCiphertext": {
+      "type": "text",
+      "private": true,
+      "required": true
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "resolvedAt": {
+      "type": "datetime"
+    },
+    "resolvedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}
