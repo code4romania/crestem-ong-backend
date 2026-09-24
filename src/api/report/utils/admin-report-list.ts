@@ -39,10 +39,7 @@ export interface AdminReportRow {
 
 export interface AdminReportFilters {
   today: string;
-  /**
-   * One of the four per-response statuses. A round matches when at least one of
-   * its responses is in it — the status of a respondent, not of the round.
-   */
+  /** A `RoundStatus` — the status of the round itself, as the list shows it. */
   status?: string;
   programs?: string[];
 }
@@ -82,22 +79,14 @@ const toRow = (report: any, today: string): AdminReportRow => {
   };
 };
 
-const hasResponseInStatus = (report: any, today: string, status: string) => {
-  const closed = isClosed(report, today);
-  return ((report.evaluations ?? []) as any[]).some(
-    (evaluation) =>
-      computeProgress(evaluation.dimensions, closed).status === status,
-  );
-};
-
 const matchesPrograms = (row: AdminReportRow, programs: string[]) =>
   (row.independent && programs.includes(INDEPENDENT)) ||
   row.programs.some((listed) => programs.includes(listed.documentId));
 
 /**
  * The rounds of every organization, newest first. Both derived filters are
- * applied here: the responses' statuses and, when the independent entry is
- * picked, program membership.
+ * applied here: the round's status and, when the independent entry is picked,
+ * program membership.
  */
 export const buildAdminReportRows = (
   reports: any[],
@@ -105,14 +94,12 @@ export const buildAdminReportRows = (
 ): AdminReportRow[] => {
   const byCreatedAt = new Map<string, string>();
   return reports
-    .filter((report) =>
-      status ? hasResponseInStatus(report, today, status) : true,
-    )
     .map((report) => {
       const row = toRow(report, today);
       byCreatedAt.set(row.documentId, report.createdAt ?? "");
       return row;
     })
+    .filter((row) => (status ? row.roundStatus === status : true))
     .filter((row) =>
       includesIndependent(programs) ? matchesPrograms(row, programs!) : true,
     )
