@@ -58,6 +58,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::auth.auth.registerMentor",
   "api::auth.auth.resendMentorInvite",
   "api::auth.auth.registerStaff",
+  "api::auth.auth.inviteImported",
   "api::auth.auth.changePassword",
   "api::auth.auth.deleteAccount",
   "api::auth.auth.requestEmailChange",
@@ -156,6 +157,7 @@ const EDITOR_FDSC_DENIED_ACTIONS = [
   "api::auth.auth.registerStaff",
   "api::auth.auth.registerMentor",
   "api::auth.auth.resendMentorInvite",
+  "api::auth.auth.inviteImported",
   "api::admin-user.admin-user.update",
 ];
 

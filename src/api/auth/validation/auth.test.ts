@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { registerMemberSchema, registerMentorSchema } from "./auth";
+import {
+  activateAccountSchema,
+  registerMemberSchema,
+  registerMentorSchema,
+} from "./auth";
 
 const mentorBase = {
   nume: "Ion Popescu",
@@ -36,5 +40,36 @@ describe("registerMemberSchema", () => {
       rol: "Coordonator",
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe("activateAccountSchema — acordul termenilor", () => {
+  const base = {
+    token: "un-token",
+    password: "ParolaNoua1!",
+    confirmedPassword: "ParolaNoua1!",
+  };
+
+  it("rejects a body without the consent field", () => {
+    expect(activateAccountSchema.safeParse(base).success).toBe(false);
+  });
+
+  it("rejects an unchecked box", () => {
+    const parsed = activateAccountSchema.safeParse({
+      ...base,
+      acordTermeniSiConditii: false,
+    });
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error.issues[0].message).toBe(
+      "Este necesar acordul tău pentru a continua",
+    );
+  });
+
+  it("accepts a checked box", () => {
+    expect(
+      activateAccountSchema.safeParse({ ...base, acordTermeniSiConditii: true })
+        .success,
+    ).toBe(true);
   });
 });
