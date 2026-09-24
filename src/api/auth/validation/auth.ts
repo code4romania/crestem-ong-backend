@@ -197,6 +197,9 @@ export const activateAccountSchema = z
       .min(1, "Tokenul este obligatoriu"),
     password: passwordSchema,
     confirmedPassword: confirmedPasswordSchema,
+    acordTermeniSiConditii: z.literal(true, {
+      message: "Este necesar acordul tău pentru a continua",
+    }),
   })
   .refine((data) => data.password === data.confirmedPassword, {
     message: "Parolele nu coincid",

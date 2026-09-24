@@ -431,7 +431,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
 
     if (
       !user ||
-      !["mentor", "ngo-member", "super-admin", "editor-fdsc"].includes(
+      !["mentor", "ngo-member", "ngo-admin", "super-admin", "editor-fdsc"].includes(
         user.role?.type,
       ) ||
       user.accountStatus !== "pending" ||
@@ -444,6 +444,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       await strapi.plugin("users-permissions").service("user").edit(user.id, {
         password: data.password,
         accountStatus: "active",
+        acordTermeniSiConditii: true,
         resetPasswordToken: null,
       });
 
@@ -593,6 +594,29 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           to: user.email,
           nume: user.nume,
           roleLabel: STAFF_ROLE_LABELS[user.role.type as "super-admin" | "editor-fdsc"],
+          link: buildActivationLink(token, ACTIVATION_PATH),
+        });
+
+        return;
+      }
+
+      // The administrators carried over from the old platform land as pending
+      // with no token. Without this branch "Am uitat parola" answers them with
+      // silence and the account has no way back.
+      if (user.role?.type === "ngo-admin") {
+        const token = signActivationToken(user.id);
+
+        await strapi
+          .plugin("users-permissions")
+          .service("user")
+          .edit(user.id, { resetPasswordToken: token });
+
+        await (
+          strapi.service("api::email.email") as EmailService
+        ).sendMigratedAccountActivation({
+          to: user.email,
+          nume: user.nume,
+          ongName: (user.ong ?? [])[0]?.name ?? "",
           link: buildActivationLink(token, ACTIVATION_PATH),
         });
 

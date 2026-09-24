@@ -16,6 +16,13 @@ export interface SendMemberActivationArgs {
   link: string;
 }
 
+export interface SendMigratedAccountActivationArgs {
+  to: string;
+  nume: string;
+  ongName: string;
+  link: string;
+}
+
 export interface SendPasswordResetArgs {
   to: string;
   nume: string;
@@ -52,6 +59,9 @@ export interface SendOngDeletedArgs {
 export interface EmailService {
   sendAccountActivation(args: SendAccountActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
+  sendMigratedAccountActivation(
+    args: SendMigratedAccountActivationArgs,
+  ): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
@@ -99,6 +109,38 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
           "Dacă nu dorești să dai curs acestei invitații, te rugăm să ignori acest email.",
+        ]),
+      });
+  },
+  /**
+   * Sent once, to the organization administrators carried over from the old
+   * platform. The wording differs from `sendAccountActivation` on purpose:
+   * nobody created these accounts for them — they already had one, and the
+   * "un administrator ți-a creat un cont" copy would read as a mistake.
+   */
+  async sendMigratedAccountActivation({
+    to,
+    nume,
+    ongName,
+    link,
+  }: SendMigratedAccountActivationArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: "Contul tău Creștem ONG a fost mutat pe noua platformă",
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          "Platforma Creștem ONG s-a mutat într-o versiune nouă.",
+          `Contul tău și datele organizației ${ongName} au fost transferate: organizația, rapoartele și evaluările completate până acum sunt toate acolo.`,
+          "",
+          "Din motive de siguranță, parola veche nu a fost transferată. Ca să intri, accesează linkul de mai jos și setează-ți o parolă nouă:",
+          "",
+          link,
+          "",
+          "Linkul este valabil 7 zile și poate fi folosit o singură dată. Dacă expiră, poți cere unul nou din pagina de autentificare, cu „Am uitat parola”.",
         ]),
       });
   },
