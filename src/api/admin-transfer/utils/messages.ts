@@ -7,7 +7,7 @@
  */
 export const TRANSFER_MESSAGES = {
   NOT_ELIGIBLE:
-    "Această adresă nu poate primi rolul de administrator. Rolul poate fi transferat doar unui membru activ al organizației sau unei adrese care nu are cont pe platformă.",
+    "Această adresă nu poate primi rolul de administrator. Rolul poate fi transferat doar unui membru activ al organizației care nu face parte și din alte organizații, sau unei adrese care nu are cont pe platformă.",
   PENDING_MEMBER:
     "Acest membru nu și-a activat încă contul. Transferul este posibil după activare.",
   SELF: "Nu îți poți transfera rolul ție.",
