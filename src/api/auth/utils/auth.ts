@@ -42,6 +42,13 @@ export const buildActivationLink = (token: string, path: string) => {
   return `${base.replace(/\/+$/, "")}${path}?token=${encodeURIComponent(token)}`;
 };
 
+export const LOGIN_PATH = "/autentificare";
+
+export const buildLoginLink = () => {
+  const base = process.env.FRONTEND_URL || "http://localhost:1337";
+  return `${base.replace(/\/+$/, "")}${LOGIN_PATH}`;
+};
+
 export const RESET_PURPOSE = "password-reset";
 
 export const signResetToken = (userId: number) =>

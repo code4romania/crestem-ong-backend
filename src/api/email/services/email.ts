@@ -16,6 +16,13 @@ export interface SendMemberActivationArgs {
   link: string;
 }
 
+export interface SendMemberAddedArgs {
+  to: string;
+  nume: string;
+  ongName: string;
+  link: string;
+}
+
 export interface SendMigratedAccountActivationArgs {
   to: string;
   nume: string;
@@ -59,6 +66,7 @@ export interface SendOngDeletedArgs {
 export interface EmailService {
   sendAccountActivation(args: SendAccountActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
+  sendMemberAdded(args: SendMemberAddedArgs): Promise<void>;
   sendMigratedAccountActivation(
     args: SendMigratedAccountActivationArgs,
   ): Promise<void>;
@@ -109,6 +117,29 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
           "Dacă nu dorești să dai curs acestei invitații, te rugăm să ignori acest email.",
+        ]),
+      });
+  },
+  /**
+   * Sent when an NGO admin adds someone who already has an active account.
+   * Nothing needs activating, so the link points at the login page.
+   */
+  async sendMemberAdded({ to, nume, ongName, link }: SendMemberAddedArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: `Ai fost adăugat în organizația ${ongName}`,
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          `Ai fost adăugat ca membru în organizația ${ongName} pe platforma Creștem ONG.`,
+          "Te poți autentifica cu contul tău existent pentru a accesa datele și programele organizației:",
+          "",
+          link,
+          "",
+          "Dacă nu te așteptai să faci parte din această organizație, te rugăm să iei legătura cu administratorul ei.",
         ]),
       });
   },

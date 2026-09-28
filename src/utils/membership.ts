@@ -112,20 +112,25 @@ export async function getNgoMemberRolesForUser(
   );
 }
 
+/**
+ * Returns `true` only when the user was newly attached to the organization —
+ * `false` when the user is missing or already a member (the role is still
+ * updated in that case).
+ */
 export async function addOngMembership(
   strapi: any,
   userDocumentId: string,
   ongDocumentId: string,
   role?: string,
-) {
+): Promise<boolean> {
   const user = await loadUserWithMemberships(strapi, userDocumentId);
-  if (!user) return;
+  if (!user) return false;
   if (role) {
     await setNgoMemberRole(strapi, user.documentId, ongDocumentId, role);
   }
   const ongs = (user.ong ?? []) as any[];
   if (ongs.some((entry) => entry.documentId === ongDocumentId)) {
-    return;
+    return false;
   }
   const updateData: Record<string, unknown> = {
     ong: [
@@ -145,6 +150,7 @@ export async function addOngMembership(
     documentId: user.documentId,
     data: updateData,
   });
+  return true;
 }
 
 export async function removeOngMembership(

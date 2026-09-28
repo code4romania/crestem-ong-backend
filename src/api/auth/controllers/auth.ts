@@ -193,10 +193,15 @@ export default {
 
       if (result.attached === true) {
         return {
-          message:
-            "Utilizatorul avea deja un cont și a fost adăugat în organizație.",
+          message: result.alreadyMember
+            ? "Utilizatorul face deja parte din organizație."
+            : result.emailSent
+              ? "Utilizatorul avea deja un cont și a fost adăugat în organizație. A fost notificat pe email."
+              : "Utilizatorul avea deja un cont și a fost adăugat în organizație, dar notificarea pe email nu a putut fi trimisă.",
           id: result.id,
           attached: true,
+          alreadyMember: result.alreadyMember,
+          emailSent: result.emailSent,
         };
       }
 
