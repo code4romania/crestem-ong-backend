@@ -43,8 +43,7 @@
       "type": "text"
     },
     "icon": {
-      "type": "enumeration",
-      "enum": ["folder", "settings", "scale", "message", "trending", "users", "award", "book", "globe", "heart", "briefcase", "calendar"],
+      "type": "string",
       "default": "folder"
     }
   }

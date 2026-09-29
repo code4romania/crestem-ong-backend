@@ -951,23 +951,7 @@ export interface ApiLibraryCategoryLibraryCategory
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     descriere: Schema.Attribute.Text;
-    icon: Schema.Attribute.Enumeration<
-      [
-        'folder',
-        'settings',
-        'scale',
-        'message',
-        'trending',
-        'users',
-        'award',
-        'book',
-        'globe',
-        'heart',
-        'briefcase',
-        'calendar',
-      ]
-    > &
-      Schema.Attribute.DefaultTo<'folder'>;
+    icon: Schema.Attribute.String & Schema.Attribute.DefaultTo<'folder'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

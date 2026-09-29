@@ -57,7 +57,7 @@ describe("descriere and icon", () => {
     expect(parsed.success && parsed.data.icon).toBe("folder");
   });
 
-  it("accepts a known icon key", () => {
+  it("accepts a legacy icon key", () => {
     expect(
       createCategorySchema.safeParse({
         nume: "Juridic",
@@ -67,11 +67,25 @@ describe("descriere and icon", () => {
     ).toBe(true);
   });
 
-  it("rejects an unknown icon key", () => {
-    expect(
-      createCategorySchema.safeParse({ nume: "Juridic", slug: "juridic", icon: "rocket" })
-        .success,
-    ).toBe(false);
+  // The frontend stores any lucide icon as `lucide:<kebab-name>`. Whether lucide
+  // has that icon is the frontend's call (it falls back when it doesn't); the
+  // backend only guards the shape.
+  it("accepts a lucide icon name", () => {
+    for (const icon of ["lucide:rocket", "lucide:arrow-down-0-1"]) {
+      expect(
+        createCategorySchema.safeParse({ nume: "Juridic", slug: "juridic", icon }).success,
+        icon,
+      ).toBe(true);
+    }
+  });
+
+  it("rejects a malformed icon value", () => {
+    for (const icon of ["Rocket", "lucide:", "lucide:-x", "icon:rocket", "a b", "x".repeat(80), ""]) {
+      expect(
+        createCategorySchema.safeParse({ nume: "Juridic", slug: "juridic", icon }).success,
+        icon,
+      ).toBe(false);
+    }
   });
 
   it("rejects a description past the cap", () => {

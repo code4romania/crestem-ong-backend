@@ -2,31 +2,23 @@ import { z } from "zod";
 import { slugSchema } from "../../../utils/content-blocks";
 
 /**
- * The icon palette, identical to the frontend's `CATEGORY_ICON_KEYS` in
- * `blocks/category-grid/schema.ts`. Kept as a literal here rather than shared:
- * the two repos have no shared package, and this list changes about never.
+ * A category's icon: `lucide:<kebab-name>` for any lucide icon, or a legacy key
+ * of the former twelve-icon palette (`folder`, `book`…), which older rows still
+ * hold. Shape only — the backend doesn't know lucide's list; the frontend
+ * (`components/ui/icons`) maps legacy keys and falls back on unknown names.
  */
-export const LIBRARY_ICON_KEYS = [
-  "folder",
-  "settings",
-  "scale",
-  "message",
-  "trending",
-  "users",
-  "award",
-  "book",
-  "globe",
-  "heart",
-  "briefcase",
-  "calendar",
-] as const;
+const ICON_PATTERN = /^(?:lucide:)?[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const descriereBase = z
   .string()
   .trim()
   .max(2500, "Descrierea este prea lungă");
 
-const iconBase = z.enum(LIBRARY_ICON_KEYS, { message: "Pictogramă necunoscută" });
+const iconBase = z
+  .string({ message: "Pictogramă necunoscută" })
+  // `lucide:` + the frontend's 64-character name cap.
+  .max(71, "Pictogramă necunoscută")
+  .regex(ICON_PATTERN, "Pictogramă necunoscută");
 
 const nume = z
   .string({ message: "Numele este obligatoriu" })
