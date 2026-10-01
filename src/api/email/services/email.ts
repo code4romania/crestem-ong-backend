@@ -30,6 +30,13 @@ export interface SendMigratedAccountActivationArgs {
   link: string;
 }
 
+export interface SendPlatformUpdateNoticeArgs {
+  to: string;
+  nume: string;
+  ongName: string;
+  link: string;
+}
+
 export interface SendPasswordResetArgs {
   to: string;
   nume: string;
@@ -70,6 +77,7 @@ export interface EmailService {
   sendMigratedAccountActivation(
     args: SendMigratedAccountActivationArgs,
   ): Promise<void>;
+  sendPlatformUpdateNotice(args: SendPlatformUpdateNoticeArgs): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
@@ -80,7 +88,12 @@ export interface EmailService {
 }
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
-  async sendAccountActivation({ to, nume, roleLabel, link }: SendAccountActivationArgs) {
+  async sendAccountActivation({
+    to,
+    nume,
+    roleLabel,
+    link,
+  }: SendAccountActivationArgs) {
     await strapi
       .plugin("email")
       .service("email")
@@ -100,7 +113,12 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         ]),
       });
   },
-  async sendMemberActivation({ to, nume, ongName, link }: SendMemberActivationArgs) {
+  async sendMemberActivation({
+    to,
+    nume,
+    ongName,
+    link,
+  }: SendMemberActivationArgs) {
     await strapi
       .plugin("email")
       .service("email")
@@ -172,6 +190,39 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată. Dacă expiră, poți cere unul nou din pagina de autentificare, cu „Am uitat parola”.",
+        ]),
+      });
+  },
+  /**
+   * Sent once, to the organization administrators carried over from the old
+   * platform together with their password hash. Purely informative: the
+   * account is imported active, so the link points at the login page.
+   */
+  async sendPlatformUpdateNotice({
+    to,
+    nume,
+    ongName,
+    link,
+  }: SendPlatformUpdateNoticeArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: "Platforma Creștem ONG s-a actualizat",
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          "Platforma Creștem ONG s-a mutat într-o versiune nouă.",
+          `Contul tău și datele organizației ${ongName} au fost transferate: organizația, rapoartele și evaluările completate până acum sunt toate acolo.`,
+          "",
+          "Te poți autentifica cu aceeași adresă de email și aceeași parolă ca până acum:",
+          "",
+          link,
+          "",
+          "Dacă nu îți mai amintești parola, o poți reseta din pagina de autentificare, cu „Am uitat parola”.",
+          "",
+          "Notă: Prin activarea contului și continuarea utilizării platformei, confirmi că ai luat la cunoștință noua Politică de Confidențialitate și noii Termeni și Condiții.",
         ]),
       });
   },
@@ -261,7 +312,9 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           `Organizația ${ongName} a pornit o sesiune de evaluare pe platforma Creștem ONG și te-a invitat să o completezi.`,
           ...(deadline
-            ? [`Termenul limită pentru completare este ${toDateString(deadline)}.`]
+            ? [
+                `Termenul limită pentru completare este ${toDateString(deadline)}.`,
+              ]
             : []),
           "Accesează linkul de mai jos, autentifică-te și completează evaluarea:",
           "",

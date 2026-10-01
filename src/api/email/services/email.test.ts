@@ -49,6 +49,26 @@ describe("sendMigratedAccountActivation", () => {
   });
 });
 
+describe("sendPlatformUpdateNotice", () => {
+  it("tells the imported admin the platform moved and links to login", async () => {
+    const h = harness();
+
+    await h.service.sendPlatformUpdateNotice({
+      to: "contact@ong-exemplu.ro",
+      nume: "Ion Popescu",
+      ongName: "Asociația Exemplu",
+      link: "https://app.crestem-ong.ro/autentificare",
+    });
+
+    expect(h.send).toHaveBeenCalledTimes(1);
+    const payload = h.send.mock.calls[0][0];
+    expect(payload.to).toBe("contact@ong-exemplu.ro");
+    expect(payload.text).toContain("Ion Popescu");
+    expect(payload.text).toContain("Asociația Exemplu");
+    expect(payload.text).toContain("https://app.crestem-ong.ro/autentificare");
+  });
+});
+
 describe("sendMemberAdded", () => {
   it("tells an existing user which organization added them and links to login", async () => {
     const h = harness();

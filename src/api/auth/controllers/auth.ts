@@ -20,11 +20,7 @@ import { deleteAccountSchema } from "../validation/delete-account";
 import { inviteImportedSchema } from "../validation/invite-imported";
 import { inviteImportedAdmins } from "../services/invite-imported";
 import type { EmailService } from "../../email/services/email";
-import {
-  signActivationToken,
-  buildActivationLink,
-  ACTIVATION_PATH,
-} from "../utils/auth";
+import { buildLoginLink } from "../utils/auth";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { registerOrAttachMember } from "../services/register-member";
@@ -294,8 +290,9 @@ export default {
     }
   },
   /**
-   * One-time migration endpoint, driven by hand from Postman. Removed once the
-   * imported administrators have been invited — see the plan at
+   * One-time migration endpoint, driven by hand from Postman: mails every
+   * organization administrator that the platform moved. Removed once the run
+   * is done — see the plan at
    * docs/superpowers/plans/2026-09-22-invitatii-conturi-importate.md.
    */
   async inviteImported(ctx: Context) {
@@ -306,12 +303,11 @@ export default {
 
     try {
       const result = await inviteImportedAdmins(strapi, parsed.data, {
-        signToken: signActivationToken,
-        buildLink: (token: string) => buildActivationLink(token, ACTIVATION_PATH),
+        buildLink: buildLoginLink,
         sendEmail: (args) =>
           (
             strapi.service("api::email.email") as EmailService
-          ).sendMigratedAccountActivation(args),
+          ).sendPlatformUpdateNotice(args),
       });
 
       strapi.log.info(

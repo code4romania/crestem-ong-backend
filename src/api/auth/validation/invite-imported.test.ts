@@ -8,7 +8,6 @@ describe("inviteImportedSchema", () => {
     expect(parsed.success).toBe(true);
     expect(parsed.data).toEqual({
       dryRun: false,
-      force: false,
       batchSize: 10,
       batchDelayMs: 1000,
     });
@@ -51,6 +50,12 @@ describe("inviteImportedSchema", () => {
   it("rejects a non-positive limit", () => {
     expect(inviteImportedSchema.safeParse({ limit: 0 }).success).toBe(false);
     expect(inviteImportedSchema.safeParse({ limit: -5 }).success).toBe(false);
+  });
+
+  it("rejects a negative or fractional afterId", () => {
+    expect(inviteImportedSchema.safeParse({ afterId: -1 }).success).toBe(false);
+    expect(inviteImportedSchema.safeParse({ afterId: 1.5 }).success).toBe(false);
+    expect(inviteImportedSchema.safeParse({ afterId: 0 }).success).toBe(true);
   });
 
   it("rejects a batch size outside the allowed range", () => {

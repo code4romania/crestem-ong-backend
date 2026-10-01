@@ -17,13 +17,14 @@ export type InviteImportedResult = {
   failed: number;
   skipped: number;
   dryRun: boolean;
+  // Id of the last account in this call; pass it as `afterId` to the next.
+  lastId: number | null;
   failures: InviteImportedFailure[];
   recipients?: InviteImportedRecipient[];
 };
 
 export type InviteImportedDeps = {
-  signToken: (userId: number) => string;
-  buildLink: (token: string) => string;
+  buildLink: () => string;
   sendEmail: (args: {
     to: string;
     nume: string;
@@ -48,13 +49,13 @@ function ongNameOf(user: any): string {
 }
 
 /**
- * One-time invitation run for the organization administrators carried over
- * from the old platform.
+ * One-time notice run for the organization administrators carried over from
+ * the old platform. The accounts are imported already active, with their old
+ * password hash, so the mail is purely informative and nothing is written back.
  *
- * `resetPasswordToken` doubles as the "already invited" marker: the import
- * never writes it, and every send does, so a rerun skips whoever already has
- * one and the caller can work through ~450 accounts in tranches without
- * tracking any state between calls.
+ * With no marker on the account, tranches are driven by an id cursor: each
+ * call returns `lastId`, and the next one passes it as `afterId`. Addresses
+ * that failed are retried through `emails`.
  */
 export async function inviteImportedAdmins(
   strapi: any,
@@ -64,11 +65,11 @@ export async function inviteImportedAdmins(
   const sleep = deps.sleep ?? wait;
 
   const where: Record<string, unknown> = {
-    accountStatus: "pending",
+    accountStatus: "active",
     role: { type: "ngo-admin" },
   };
-  if (!options.force) {
-    where.resetPasswordToken = { $null: true };
+  if (options.afterId !== undefined) {
+    where.id = { $gt: options.afterId };
   }
 
   const candidates: any[] = await strapi.db.query(USER_UID).findMany({
@@ -99,6 +100,7 @@ export async function inviteImportedAdmins(
     failed: 0,
     skipped,
     dryRun: options.dryRun,
+    lastId: selected.length > 0 ? selected[selected.length - 1].id : null,
     failures: [],
   };
 
@@ -112,38 +114,21 @@ export async function inviteImportedAdmins(
     return result;
   }
 
-  const users = strapi.plugin("users-permissions").service("user");
   const batches = chunk(selected, options.batchSize);
+  const link = deps.buildLink();
 
   for (const [index, batch] of batches.entries()) {
     await Promise.all(
       batch.map(async (user) => {
-        const token = deps.signToken(user.id);
-
         try {
-          await users.edit(user.id, { resetPasswordToken: token });
-
           await deps.sendEmail({
             to: user.email,
             nume: user.nume,
             ongName: ongNameOf(user),
-            link: deps.buildLink(token),
+            link,
           });
-
           result.sent++;
         } catch (error) {
-          // A token left behind would mark the account as invited and hide it
-          // from the next tranche, although nothing reached the inbox.
-          try {
-            await users.edit(user.id, { resetPasswordToken: null });
-          } catch (rollbackError) {
-            console.error(
-              "inviteImportedAdmins rollback failed",
-              user.id,
-              rollbackError,
-            );
-          }
-
           result.failed++;
           result.failures.push({
             email: user.email,

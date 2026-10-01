@@ -5,10 +5,11 @@ const USER_UID = "plugin::users-permissions.user";
 
 const defaults = {
   dryRun: false,
-  force: false,
   batchSize: 10,
   batchDelayMs: 0,
 };
+
+const LOGIN_LINK = "https://app.test/autentificare";
 
 function user(id: number, email: string, ongName = "Asociația Exemplu") {
   return { id, email, nume: `Admin ${id}`, ong: [{ id: id * 10, name: ongName }] };
@@ -16,7 +17,6 @@ function user(id: number, email: string, ongName = "Asociația Exemplu") {
 
 function harness(rows: any[]) {
   const findManyCalls: any[] = [];
-  const edits: Array<{ id: number; data: any }> = [];
   const strapi = {
     db: {
       query: (uid: string) => {
@@ -29,27 +29,13 @@ function harness(rows: any[]) {
         };
       },
     },
-    plugin: (name: string) => {
-      expect(name).toBe("users-permissions");
-      return {
-        service: (svc: string) => {
-          expect(svc).toBe("user");
-          return {
-            edit: async (id: number, data: any) => {
-              edits.push({ id, data });
-            },
-          };
-        },
-      };
-    },
   } as any;
-  return { strapi, findManyCalls, edits };
+  return { strapi, findManyCalls };
 }
 
 function deps(overrides: Record<string, unknown> = {}) {
   return {
-    signToken: (id: number) => `token-${id}`,
-    buildLink: (token: string) => `https://app.test/membru/activare?token=${token}`,
+    buildLink: () => LOGIN_LINK,
     sendEmail: vi.fn(async () => {}),
     sleep: vi.fn(async () => {}),
     ...overrides,
@@ -57,43 +43,38 @@ function deps(overrides: Record<string, unknown> = {}) {
 }
 
 describe("inviteImportedAdmins", () => {
-  it("selects only pending ngo-admins that were never invited", async () => {
+  it("selects every active ngo-admin", async () => {
     const h = harness([user(1, "a@ong.ro")]);
 
     await inviteImportedAdmins(h.strapi, defaults, deps());
 
     expect(h.findManyCalls[0].where).toEqual({
-      accountStatus: "pending",
+      accountStatus: "active",
       role: { type: "ngo-admin" },
-      resetPasswordToken: { $null: true },
     });
     expect(h.findManyCalls[0].orderBy).toEqual({ id: "asc" });
     expect(h.findManyCalls[0].populate).toEqual(["ong"]);
   });
 
-  it("drops the token filter when force is set", async () => {
-    const h = harness([user(1, "a@ong.ro")]);
+  it("starts after the given id", async () => {
+    const h = harness([user(101, "a@ong.ro")]);
 
-    await inviteImportedAdmins(h.strapi, { ...defaults, force: true }, deps());
+    await inviteImportedAdmins(h.strapi, { ...defaults, afterId: 100 }, deps());
 
-    expect(h.findManyCalls[0].where).toEqual({
-      accountStatus: "pending",
-      role: { type: "ngo-admin" },
-    });
+    expect(h.findManyCalls[0].where.id).toEqual({ $gt: 100 });
   });
 
-  it("stores the token before sending the link built from it", async () => {
+  it("sends the login link and reports the id to continue from", async () => {
     const h = harness([user(7, "seven@ong.ro", "Asociația Șapte")]);
     const d = deps();
 
     const result = await inviteImportedAdmins(h.strapi, defaults, d);
 
-    expect(h.edits).toEqual([{ id: 7, data: { resetPasswordToken: "token-7" } }]);
     expect(d.sendEmail).toHaveBeenCalledWith({
       to: "seven@ong.ro",
       nume: "Admin 7",
       ongName: "Asociația Șapte",
-      link: "https://app.test/membru/activare?token=token-7",
+      link: LOGIN_LINK,
     });
     expect(result).toEqual({
       total: 1,
@@ -101,11 +82,21 @@ describe("inviteImportedAdmins", () => {
       failed: 0,
       skipped: 0,
       dryRun: false,
+      lastId: 7,
       failures: [],
     });
   });
 
-  it("rolls the token back when delivery fails, so a rerun picks the user up", async () => {
+  it("reports no lastId when nobody is left", async () => {
+    const h = harness([]);
+
+    const result = await inviteImportedAdmins(h.strapi, defaults, deps());
+
+    expect(result.total).toBe(0);
+    expect(result.lastId).toBeNull();
+  });
+
+  it("collects delivery failures and keeps going", async () => {
     const h = harness([user(1, "ok@ong.ro"), user(2, "bad@ong.ro")]);
     const d = deps({
       sendEmail: vi.fn(async ({ to }: any) => {
@@ -115,7 +106,6 @@ describe("inviteImportedAdmins", () => {
 
     const result = await inviteImportedAdmins(h.strapi, defaults, d);
 
-    expect(h.edits).toContainEqual({ id: 2, data: { resetPasswordToken: null } });
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(1);
     expect(result.failures).toEqual([
@@ -123,7 +113,7 @@ describe("inviteImportedAdmins", () => {
     ]);
   });
 
-  it("touches nothing on a dry run and reports who would be mailed", async () => {
+  it("sends nothing on a dry run and reports who would be mailed", async () => {
     const h = harness([user(3, "three@ong.ro", "Asociația Trei")]);
     const d = deps();
 
@@ -133,10 +123,10 @@ describe("inviteImportedAdmins", () => {
       d,
     );
 
-    expect(h.edits).toEqual([]);
     expect(d.sendEmail).not.toHaveBeenCalled();
     expect(result.sent).toBe(0);
     expect(result.total).toBe(1);
+    expect(result.lastId).toBe(3);
     expect(result.recipients).toEqual([
       {
         id: 3,
@@ -164,7 +154,7 @@ describe("inviteImportedAdmins", () => {
     expect(d.sendEmail.mock.calls[0][0].to).toBe("Contact@ONG.ro");
   });
 
-  it("caps the run at limit", async () => {
+  it("caps the run at limit and continues from the last capped id", async () => {
     const h = harness([user(1, "a@ong.ro"), user(2, "b@ong.ro"), user(3, "c@ong.ro")]);
     const d = deps();
 
@@ -175,6 +165,7 @@ describe("inviteImportedAdmins", () => {
     );
 
     expect(result.total).toBe(2);
+    expect(result.lastId).toBe(2);
     expect(d.sendEmail).toHaveBeenCalledTimes(2);
   });
 

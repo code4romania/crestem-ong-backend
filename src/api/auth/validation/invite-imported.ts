@@ -24,8 +24,13 @@ export const inviteImportedSchema = z.object({
     .positive("Limita trebuie să fie pozitivă")
     .max(1000, "Limita nu poate depăși 1000")
     .optional(),
+  // Cursor for tranches: pass the `lastId` of the previous call.
+  afterId: z
+    .number()
+    .int("afterId trebuie să fie număr întreg")
+    .nonnegative("afterId nu poate fi negativ")
+    .optional(),
   dryRun: z.boolean().optional().default(false),
-  force: z.boolean().optional().default(false),
   batchSize: z
     .number()
     .int("Dimensiunea lotului trebuie să fie număr întreg")
