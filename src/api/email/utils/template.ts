@@ -5,7 +5,14 @@
  * Callers keep passing the same array of lines they used to join with `\n`
  * for the text-only version — a blank line starts a new paragraph, and
  * consecutive lines become one paragraph broken with `<br>`.
+ *
+ * A line can also be a list of segments, to link a phrase inside a sentence.
+ * Links are typed rather than parsed out of the text on purpose: a name or an
+ * ONG name typed as `[x](https://…)` must stay text, never become a link.
  */
+
+export type EmailLink = { text: string; href: string };
+export type EmailLine = string | Array<string | EmailLink>;
 
 const SIGN_OFF_GREETING = "O zi bună!";
 const SIGN_OFF_TEAM = "Echipa Creștem ONG";
@@ -30,6 +37,11 @@ function frontendOrigin(): string {
   return process.env.FRONTEND_URL || "http://localhost:1337";
 }
 
+/** Absolute URL of a frontend page, for links inside an email body. */
+export function frontendUrl(path: string): string {
+  return `${frontendOrigin().replace(/\/+$/, "")}${path}`;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -39,12 +51,12 @@ function escapeHtml(value: string): string {
 }
 
 /** Groups lines into paragraphs, using blank lines as the separator. */
-function toParagraphs(lines: string[]): string[][] {
-  const paragraphs: string[][] = [];
-  let current: string[] = [];
+function toParagraphs(lines: EmailLine[]): EmailLine[][] {
+  const paragraphs: EmailLine[][] = [];
+  let current: EmailLine[] = [];
 
   for (const line of lines) {
-    if (line.trim() === "") {
+    if (typeof line === "string" && line.trim() === "") {
       if (current.length > 0) {
         paragraphs.push(current);
         current = [];
@@ -58,13 +70,19 @@ function toParagraphs(lines: string[]): string[][] {
   return paragraphs;
 }
 
-function renderLine(line: string): string {
+function renderSegment(segment: string | EmailLink): string {
+  if (typeof segment === "string") return escapeHtml(segment);
+  return `<a href="${escapeHtml(segment.href)}" style="color:${COLOR_LINK};text-decoration:underline;">${escapeHtml(segment.text)}</a>`;
+}
+
+function renderLine(line: EmailLine): string {
+  if (typeof line !== "string") return line.map(renderSegment).join("");
   const escaped = escapeHtml(line);
   if (!BARE_URL.test(line)) return escaped;
   return `<a href="${escaped}" style="color:${COLOR_LINK};text-decoration:underline;word-break:break-all;">${escaped}</a>`;
 }
 
-function renderParagraph(lines: string[]): string {
+function renderParagraph(lines: EmailLine[]): string {
   const body = lines.map(renderLine).join("<br>");
   return `<p style="margin:0 0 20px 0;font-family:${FONT_STACK};font-size:16px;line-height:1.6;color:${COLOR_TEXT};">${body}</p>`;
 }
@@ -73,7 +91,7 @@ function rule(): string {
   return `<hr style="border:0;border-top:1px solid ${COLOR_RULE};margin:0;">`;
 }
 
-function renderHtml(lines: string[]): string {
+function renderHtml(lines: EmailLine[]): string {
   const paragraphs = toParagraphs(lines).map(renderParagraph).join("\n          ");
   const logo = `${frontendOrigin()}/email/logo.png`;
   const footer = FOOTER_LINES.map(escapeHtml).join("<br>");
@@ -126,9 +144,18 @@ export interface RenderedEmail {
   html: string;
 }
 
-export function renderEmail(lines: string[]): RenderedEmail {
+function lineToText(line: EmailLine): string {
+  if (typeof line === "string") return line;
+  return line
+    .map((segment) =>
+      typeof segment === "string" ? segment : `${segment.text} (${segment.href})`,
+    )
+    .join("");
+}
+
+export function renderEmail(lines: EmailLine[]): RenderedEmail {
   return {
-    text: [...lines, "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join("\n"),
+    text: [...lines.map(lineToText), "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join("\n"),
     html: renderHtml(lines),
   };
 }

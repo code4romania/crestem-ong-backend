@@ -1,6 +1,6 @@
 import type { Core } from "@strapi/strapi";
 import { toDateString } from "../../../utils/date";
-import { renderEmail } from "../utils/template";
+import { frontendUrl, renderEmail } from "../utils/template";
 
 export interface SendAccountActivationArgs {
   to: string;
@@ -222,7 +222,19 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Dacă nu îți mai amintești parola, o poți reseta din pagina de autentificare, cu „Am uitat parola”.",
           "",
-          "Notă: Prin activarea contului și continuarea utilizării platformei, confirmi că ai luat la cunoștință noua Politică de Confidențialitate și noii Termeni și Condiții.",
+          [
+            "Notă: Prin continuarea utilizării platformei, confirmi că ai luat la cunoștință noua ",
+            {
+              text: "Politică de Confidențialitate",
+              href: frontendUrl("/politica-de-confidentialitate"),
+            },
+            " și noii ",
+            {
+              text: "Termeni și Condiții",
+              href: frontendUrl("/termeni-si-conditii"),
+            },
+            ".",
+          ],
         ]),
       });
   },

@@ -17,6 +17,17 @@ describe("renderEmail text", () => {
     expect(renderEmail(LINES).text).toContain(LINES.join("\n"));
   });
 
+  it("writes a link segment as its text followed by the URL in parentheses", () => {
+    const { text } = renderEmail([
+      [
+        "Citește ",
+        { text: "Termenii", href: "https://crestemong.ro/termeni" },
+        ".",
+      ],
+    ]);
+    expect(text).toContain("Citește Termenii (https://crestemong.ro/termeni).");
+  });
+
   it("appends the sign-off after a blank line", () => {
     expect(renderEmail(["Bună, Ana,"]).text).toBe(
       "Bună, Ana,\n\nO zi bună!\nEchipa Creștem ONG",
@@ -64,6 +75,27 @@ describe("renderEmail html", () => {
   it("escapes the ampersand inside a link without breaking the href", () => {
     const { html } = renderEmail(["https://crestemong.ro/a?x=1&y=2"]);
     expect(html).toContain('href="https://crestemong.ro/a?x=1&amp;y=2"');
+  });
+
+  it("renders a link segment inside a line as an anchor around its text", () => {
+    const { html } = renderEmail([
+      [
+        "Citește ",
+        { text: "Termenii", href: "https://crestemong.ro/termeni" },
+        ".",
+      ],
+    ]);
+    expect(html).toContain(
+      'Citește <a href="https://crestemong.ro/termeni" style="color:#00ca86;text-decoration:underline;">Termenii</a>.',
+    );
+  });
+
+  it("escapes both the text and the href of a link segment", () => {
+    const { html } = renderEmail([
+      [{ text: "<b>A</b>", href: "https://crestemong.ro/a?x=1&y=2" }],
+    ]);
+    expect(html).toContain('href="https://crestemong.ro/a?x=1&amp;y=2"');
+    expect(html).toContain(">&lt;b&gt;A&lt;/b&gt;</a>");
   });
 
   it("is a full document with a doctype", () => {
