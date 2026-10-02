@@ -52,12 +52,6 @@ export default {
     },
     {
       method: "POST",
-      path: "/auth/invite-imported",
-      handler: "auth.inviteImported",
-      config: { policies: ["global::is-super-admin"] },
-    },
-    {
-      method: "POST",
       path: "/auth/activate",
       handler: "auth.activate",
       config: { auth: false },

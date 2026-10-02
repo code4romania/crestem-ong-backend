@@ -17,10 +17,6 @@ import {
   confirmEmailChangeSchema,
 } from "../validation/auth";
 import { deleteAccountSchema } from "../validation/delete-account";
-import { inviteImportedSchema } from "../validation/invite-imported";
-import { inviteImportedAdmins } from "../services/invite-imported";
-import type { EmailService } from "../../email/services/email";
-import { buildLoginLink } from "../utils/auth";
 import { LocalitateService } from "../../localitate/services/localitate";
 import { AuthService } from "../services/auth";
 import { registerOrAttachMember } from "../services/register-member";
@@ -287,39 +283,6 @@ export default {
     } catch (error) {
       console.error("resendMemberInvite failed", error);
       return ctx.badRequest(error.message);
-    }
-  },
-  /**
-   * One-time migration endpoint, driven by hand from Postman: mails every
-   * organization administrator that the platform moved. Removed once the run
-   * is done — see the plan at
-   * docs/superpowers/plans/2026-09-22-invitatii-conturi-importate.md.
-   */
-  async inviteImported(ctx: Context) {
-    const parsed = inviteImportedSchema.safeParse(ctx.request.body ?? {});
-    if (!parsed.success) {
-      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
-    }
-
-    try {
-      const result = await inviteImportedAdmins(strapi, parsed.data, {
-        buildLink: buildLoginLink,
-        sendEmail: (args) =>
-          (
-            strapi.service("api::email.email") as EmailService
-          ).sendPlatformUpdateNotice(args),
-      });
-
-      strapi.log.info(
-        `[invite-imported] total=${result.total} sent=${result.sent} failed=${result.failed} skipped=${result.skipped} dryRun=${result.dryRun}`,
-      );
-
-      return result;
-    } catch (error) {
-      console.error("inviteImported failed", error);
-      return ctx.badRequest(
-        "A apărut o eroare neașteptată la trimiterea invitațiilor.",
-      );
     }
   },
   async refresh(ctx: Context) {

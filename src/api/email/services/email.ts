@@ -1,6 +1,6 @@
 import type { Core } from "@strapi/strapi";
 import { toDateString } from "../../../utils/date";
-import { frontendUrl, renderEmail } from "../utils/template";
+import { renderEmail } from "../utils/template";
 
 export interface SendAccountActivationArgs {
   to: string;
@@ -17,20 +17,6 @@ export interface SendMemberActivationArgs {
 }
 
 export interface SendMemberAddedArgs {
-  to: string;
-  nume: string;
-  ongName: string;
-  link: string;
-}
-
-export interface SendMigratedAccountActivationArgs {
-  to: string;
-  nume: string;
-  ongName: string;
-  link: string;
-}
-
-export interface SendPlatformUpdateNoticeArgs {
   to: string;
   nume: string;
   ongName: string;
@@ -74,10 +60,6 @@ export interface EmailService {
   sendAccountActivation(args: SendAccountActivationArgs): Promise<void>;
   sendMemberActivation(args: SendMemberActivationArgs): Promise<void>;
   sendMemberAdded(args: SendMemberAddedArgs): Promise<void>;
-  sendMigratedAccountActivation(
-    args: SendMigratedAccountActivationArgs,
-  ): Promise<void>;
-  sendPlatformUpdateNotice(args: SendPlatformUpdateNoticeArgs): Promise<void>;
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
@@ -158,83 +140,6 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Dacă nu te așteptai să faci parte din această organizație, te rugăm să iei legătura cu administratorul ei.",
-        ]),
-      });
-  },
-  /**
-   * Sent once, to the organization administrators carried over from the old
-   * platform. The wording differs from `sendAccountActivation` on purpose:
-   * nobody created these accounts for them — they already had one, and the
-   * "un administrator ți-a creat un cont" copy would read as a mistake.
-   */
-  async sendMigratedAccountActivation({
-    to,
-    nume,
-    ongName,
-    link,
-  }: SendMigratedAccountActivationArgs) {
-    await strapi
-      .plugin("email")
-      .service("email")
-      .send({
-        to,
-        subject: "Contul tău Creștem ONG a fost mutat pe noua platformă",
-        ...renderEmail([
-          `Bună, ${nume},`,
-          "",
-          "Platforma Creștem ONG s-a mutat într-o versiune nouă.",
-          `Contul tău și datele organizației ${ongName} au fost transferate: organizația, rapoartele și evaluările completate până acum sunt toate acolo.`,
-          "",
-          "Din motive de siguranță, parola veche nu a fost transferată. Ca să intri, accesează linkul de mai jos și setează-ți o parolă nouă:",
-          "",
-          link,
-          "",
-          "Linkul este valabil 7 zile și poate fi folosit o singură dată. Dacă expiră, poți cere unul nou din pagina de autentificare, cu „Am uitat parola”.",
-        ]),
-      });
-  },
-  /**
-   * Sent once, to the organization administrators carried over from the old
-   * platform together with their password hash. Purely informative: the
-   * account is imported active, so the link points at the login page.
-   */
-  async sendPlatformUpdateNotice({
-    to,
-    nume,
-    ongName,
-    link,
-  }: SendPlatformUpdateNoticeArgs) {
-    await strapi
-      .plugin("email")
-      .service("email")
-      .send({
-        to,
-        subject: "Platforma Creștem ONG s-a actualizat",
-        ...renderEmail([
-          `Bună, ${nume},`,
-          "",
-          "Platforma Creștem ONG s-a mutat într-o versiune nouă.",
-          `Contul tău și datele organizației ${ongName} au fost transferate: organizația, rapoartele și evaluările completate până acum sunt toate acolo.`,
-          "",
-          "Te poți autentifica cu aceeași adresă de email și aceeași parolă ca până acum:",
-          "",
-          link,
-          "",
-          "Dacă nu îți mai amintești parola, o poți reseta din pagina de autentificare, cu „Am uitat parola”.",
-          "",
-          [
-            "Notă: Prin continuarea utilizării platformei, confirmi că ai luat la cunoștință noua ",
-            {
-              text: "Politică de Confidențialitate",
-              href: frontendUrl("/politica-de-confidentialitate"),
-            },
-            " și noii ",
-            {
-              text: "Termeni și Condiții",
-              href: frontendUrl("/termeni-si-conditii"),
-            },
-            ".",
-          ],
         ]),
       });
   },
