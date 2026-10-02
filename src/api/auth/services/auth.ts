@@ -242,6 +242,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         to: data.email,
         nume: data.nume,
         roleLabel: "mentor",
+        includeTermsNote: true,
         link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
@@ -488,6 +489,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
         to: user.email,
         nume: user.nume,
         roleLabel: "mentor",
+        includeTermsNote: true,
         link: buildActivationLink(token, ACTIVATION_PATH),
       });
     } catch (error) {
@@ -574,6 +576,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           to: user.email,
           nume: user.nume,
           roleLabel: "mentor",
+          includeTermsNote: true,
           link: buildActivationLink(token, ACTIVATION_PATH),
         });
 

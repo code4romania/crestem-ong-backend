@@ -1,12 +1,14 @@
 import type { Core } from "@strapi/strapi";
 import { toDateString } from "../../../utils/date";
-import { renderEmail } from "../utils/template";
+import { renderEmail, termsNote } from "../utils/template";
 
 export interface SendAccountActivationArgs {
   to: string;
   nume: string;
   roleLabel: string;
   link: string;
+  /** Mentor accounts only: staff accounts are for the dashboard. */
+  includeTermsNote?: boolean;
 }
 
 export interface SendMemberActivationArgs {
@@ -75,6 +77,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
     nume,
     roleLabel,
     link,
+    includeTermsNote = false,
   }: SendAccountActivationArgs) {
     await strapi
       .plugin("email")
@@ -92,6 +95,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
           "Dacă nu ai solicitat/nu dorești crearea acestui cont, te rugăm să ignori acest email.",
+          ...(includeTermsNote ? ["", termsNote()] : []),
         ]),
       });
   },
@@ -117,6 +121,8 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Linkul este valabil 7 zile și poate fi folosit o singură dată.",
           "Dacă nu dorești să dai curs acestei invitații, te rugăm să ignori acest email.",
+          "",
+          termsNote(),
         ]),
       });
   },

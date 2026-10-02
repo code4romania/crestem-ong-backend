@@ -3,7 +3,7 @@
  * Kept next to the feature rather than in `api::email.email`: nothing else
  * sends them, and the flow talks to them through `TransferMailer`.
  */
-import { renderEmail } from "../../email/utils/template";
+import { renderEmail, termsNote } from "../../email/utils/template";
 import { toDisplayDate } from "../../../utils/date";
 import type { ProposalEmail, TransferEmail, TransferMailer } from "./transfer-flow";
 
@@ -32,6 +32,7 @@ export function proposalMessage(args: ProposalEmail): Message {
       "",
       `Propunerea este valabilă până la ${toDisplayDate(new Date(args.expiresAt))}.`,
       "Dacă nu te aștepți la acest mesaj, poți ignora acest email.",
+      ...(args.isNewAccount ? ["", termsNote()] : []),
     ]),
   };
 }

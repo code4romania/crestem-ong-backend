@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderEmail } from "./template";
+import { renderEmail, termsNote } from "./template";
 
 const LINES = [
   "Bună, Ana,",
@@ -68,5 +68,49 @@ describe("renderEmail html", () => {
 
   it("is a full document with a doctype", () => {
     expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
+  });
+});
+
+describe("renderEmail links inside a line", () => {
+  const line = ["Citește ", { text: "Termenii", href: "https://crestemong.ro/termeni?a=1&b=2" }, "."];
+
+  it("renders a link segment as an anchor on its text", () => {
+    expect(renderEmail([line]).html).toContain(
+      'Citește <a href="https://crestemong.ro/termeni?a=1&amp;b=2" style="color:#00ca86;text-decoration:underline;">Termenii</a>.',
+    );
+  });
+
+  it("keeps the URL in parentheses in the text version", () => {
+    expect(renderEmail([line]).text).toContain(
+      "Citește Termenii (https://crestemong.ro/termeni?a=1&b=2).",
+    );
+  });
+
+  it("never parses link markup out of a string line", () => {
+    const { html } = renderEmail(["[Click](https://evil.example)"]);
+    expect(html).not.toContain('href="https://evil.example"');
+  });
+});
+
+describe("termsNote", () => {
+  const { text, html } = renderEmail(["Bună, Ana,", "", termsNote()]);
+
+  it("links the privacy policy and the terms on the frontend origin", () => {
+    expect(html).toContain(
+      '<a href="http://localhost:1337/politica-de-confidentialitate" style="color:#00ca86;text-decoration:underline;">Politica de Confidențialitate</a>',
+    );
+    expect(html).toContain(
+      '<a href="http://localhost:1337/termeni-si-conditii" style="color:#00ca86;text-decoration:underline;">Termenii și Condițiile</a>',
+    );
+  });
+
+  it("reads as one sentence in the text version", () => {
+    expect(text).toContain(
+      "Notă: Prin activarea contului și continuarea utilizării platformei, confirmi că ai luat la cunoștință Politica de Confidențialitate (http://localhost:1337/politica-de-confidentialitate) și Termenii și Condițiile (http://localhost:1337/termeni-si-conditii).",
+    );
+  });
+
+  it("sits in a body paragraph, styled like the rest of the body", () => {
+    expect(html).toMatch(/<p style="margin:0 0 20px 0;[^"]*font-size:16px;[^"]*">Notă: /);
   });
 });

@@ -32,4 +32,14 @@ describe("proposalMessage", () => {
   it("tells a new account that accepting sets its password", () => {
     expect(proposalMessage({ ...base, isNewAccount: true }).text).toContain("îți setezi parola");
   });
+
+  it("ends the proposal to a new account with the terms note", () => {
+    const text = proposalMessage({ ...base, isNewAccount: true }).text;
+    expect(text).toContain("Notă: Prin activarea contului");
+    expect(text).toContain("/termeni-si-conditii");
+  });
+
+  it("leaves the note out for an existing account", () => {
+    expect(proposalMessage(base).text).not.toContain("Notă:");
+  });
 });

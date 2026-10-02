@@ -5,7 +5,19 @@
  * Callers keep passing the same array of lines they used to join with `\n`
  * for the text-only version — a blank line starts a new paragraph, and
  * consecutive lines become one paragraph broken with `<br>`.
+ *
+ * A line that needs a link inside its text is an array of segments instead
+ * of a string. Links are never parsed out of strings, so a name or an ONG
+ * name interpolated into a line cannot turn itself into a link.
  */
+
+/** A run of text inside a line, rendered as a link to `href`. */
+export interface EmailLink {
+  text: string;
+  href: string;
+}
+
+export type EmailLine = string | Array<string | EmailLink>;
 
 const SIGN_OFF_GREETING = "O zi bună!";
 const SIGN_OFF_TEAM = "Echipa Creștem ONG";
@@ -39,12 +51,12 @@ function escapeHtml(value: string): string {
 }
 
 /** Groups lines into paragraphs, using blank lines as the separator. */
-function toParagraphs(lines: string[]): string[][] {
-  const paragraphs: string[][] = [];
-  let current: string[] = [];
+function toParagraphs(lines: EmailLine[]): EmailLine[][] {
+  const paragraphs: EmailLine[][] = [];
+  let current: EmailLine[] = [];
 
   for (const line of lines) {
-    if (line.trim() === "") {
+    if (typeof line === "string" && line.trim() === "") {
       if (current.length > 0) {
         paragraphs.push(current);
         current = [];
@@ -58,13 +70,32 @@ function toParagraphs(lines: string[]): string[][] {
   return paragraphs;
 }
 
-function renderLine(line: string): string {
+function renderLine(line: EmailLine): string {
+  if (typeof line !== "string") {
+    return line
+      .map((segment) =>
+        typeof segment === "string"
+          ? escapeHtml(segment)
+          : `<a href="${escapeHtml(segment.href)}" style="color:${COLOR_LINK};text-decoration:underline;">${escapeHtml(segment.text)}</a>`,
+      )
+      .join("");
+  }
   const escaped = escapeHtml(line);
   if (!BARE_URL.test(line)) return escaped;
   return `<a href="${escaped}" style="color:${COLOR_LINK};text-decoration:underline;word-break:break-all;">${escaped}</a>`;
 }
 
-function renderParagraph(lines: string[]): string {
+/** The text-only form of a line: a link keeps its URL in parentheses. */
+function textLine(line: EmailLine): string {
+  if (typeof line === "string") return line;
+  return line
+    .map((segment) =>
+      typeof segment === "string" ? segment : `${segment.text} (${segment.href})`,
+    )
+    .join("");
+}
+
+function renderParagraph(lines: EmailLine[]): string {
   const body = lines.map(renderLine).join("<br>");
   return `<p style="margin:0 0 20px 0;font-family:${FONT_STACK};font-size:16px;line-height:1.6;color:${COLOR_TEXT};">${body}</p>`;
 }
@@ -73,7 +104,7 @@ function rule(): string {
   return `<hr style="border:0;border-top:1px solid ${COLOR_RULE};margin:0;">`;
 }
 
-function renderHtml(lines: string[]): string {
+function renderHtml(lines: EmailLine[]): string {
   const paragraphs = toParagraphs(lines).map(renderParagraph).join("\n          ");
   const logo = `${frontendOrigin()}/email/logo.png`;
   const footer = FOOTER_LINES.map(escapeHtml).join("<br>");
@@ -126,9 +157,24 @@ export interface RenderedEmail {
   html: string;
 }
 
-export function renderEmail(lines: string[]): RenderedEmail {
+/**
+ * Closing line of the emails sent to an account that is still `pending`:
+ * activating it means accepting the privacy policy and the terms.
+ */
+export function termsNote(): EmailLine {
+  const origin = frontendOrigin();
+  return [
+    "Notă: Prin activarea contului și continuarea utilizării platformei, confirmi că ai luat la cunoștință ",
+    { text: "Politica de Confidențialitate", href: `${origin}/politica-de-confidentialitate` },
+    " și ",
+    { text: "Termenii și Condițiile", href: `${origin}/termeni-si-conditii` },
+    ".",
+  ];
+}
+
+export function renderEmail(lines: EmailLine[]): RenderedEmail {
   return {
-    text: [...lines, "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join("\n"),
+    text: [...lines.map(textLine), "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join("\n"),
     html: renderHtml(lines),
   };
 }
