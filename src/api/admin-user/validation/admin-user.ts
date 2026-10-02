@@ -11,8 +11,8 @@ const bioSchema = z
   .string()
   .trim()
   .refine(
-    (value) => stripHtml(value).length <= 1000,
-    "Bio-ul poate avea maxim 1000 de caractere",
+    (value) => stripHtml(value).length <= 5000,
+    "Bio-ul poate avea maxim 5000 de caractere",
   )
   .optional();
 

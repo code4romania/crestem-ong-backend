@@ -14,23 +14,35 @@ import { stripHtml } from "../../../utils/rich-text";
 
 const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
 
+/**
+ * Trimmed before the format check, so a pasted address with a stray space
+ * passes, and lowercased with `.toLowerCase()` rather than zod's `.lowercase()`:
+ * the latter is a format check, not a transform, and rejected any capital
+ * letter with zod's English "Invalid lowercase" message.
+ */
+const emailFormatSchema = z
+  .string({ message: "Adresa de email este obligatorie" })
+  .trim()
+  .pipe(
+    z
+      .email("Adresă de email invalidă")
+      .min(6, "Adresa de email este prea scurtă"),
+  )
+  .transform((value) => value.toLowerCase());
+
 export const registerNgoSchema = z.object({
   // --- Account (users-permissions user) ---
   nume: z
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
-  email: z
-    .email("Adresă de email invalidă")
-    .lowercase()
-    .min(6, "Adresa de email este prea scurtă")
-    .refine(
-      async (email) =>
-        !(await strapi.db
-          .query("plugin::users-permissions.user")
-          .findOne({ where: { email: { $eqi: email } } })),
-      "Există deja un cont cu acest email",
-    ),
+  email: emailFormatSchema.refine(
+    async (email) =>
+      !(await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { email: { $eqi: email } } })),
+    "Există deja un cont cu acest email",
+  ),
   password: z
     .string({ message: "Parola este obligatorie" })
     .min(8, "Parola trebuie să aibă minim 8 caractere")
@@ -95,17 +107,13 @@ export const registerIndividualSchema = z.object({
     .string({ message: "Numele persoanei este obligatoriu" })
     .trim()
     .min(3, "Numele trebuie să aibă minim 3 caractere"),
-  email: z
-    .email("Adresă de email invalidă")
-    .lowercase()
-    .min(6, "Adresa de email este prea scurtă")
-    .refine(
-      async (email) =>
-        !(await strapi.db
-          .query("plugin::users-permissions.user")
-          .findOne({ where: { email: { $eqi: email } } })),
-      "Există deja un cont cu acest email",
-    ),
+  email: emailFormatSchema.refine(
+    async (email) =>
+      !(await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { email: { $eqi: email } } })),
+    "Există deja un cont cu acest email",
+  ),
   password: passwordSchema,
   telefon: z
     .string()
@@ -116,11 +124,6 @@ export const registerIndividualSchema = z.object({
     message: "Trebuie să accepți termenii și condițiile",
   }),
 });
-
-const emailFormatSchema = z
-  .email("Adresă de email invalidă")
-  .lowercase()
-  .min(6, "Adresa de email este prea scurtă");
 
 const inviteSchema = z.object({
   nume: z
@@ -148,8 +151,8 @@ export const registerMentorSchema = inviteSchema.extend({
     .string()
     .trim()
     .refine(
-      (value) => stripHtml(value).length <= 1000,
-      "Bio-ul poate avea maxim 1000 de caractere",
+      (value) => stripHtml(value).length <= 5000,
+      "Bio-ul poate avea maxim 5000 de caractere",
     )
     .optional(),
   avatar: z.number().int().positive().optional(),
@@ -214,10 +217,7 @@ export const refreshTokenSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z
-    .email("Adresă de email invalidă")
-    .lowercase()
-    .min(6, "Adresa de email este prea scurtă"),
+  email: emailFormatSchema,
 });
 
 export const resetPasswordSchema = z
@@ -251,17 +251,13 @@ export const requestEmailChangeSchema = z.object({
   currentPassword: z
     .string({ message: "Parola actuală este obligatorie" })
     .min(1, "Parola actuală este obligatorie"),
-  email: z
-    .email("Adresă de email invalidă")
-    .lowercase()
-    .min(6, "Adresa de email este prea scurtă")
-    .refine(
-      async (email) =>
-        !(await strapi.db
-          .query("plugin::users-permissions.user")
-          .findOne({ where: { email: { $eqi: email } } })),
-      "Există deja un cont cu această adresă de email",
-    ),
+  email: emailFormatSchema.refine(
+    async (email) =>
+      !(await strapi.db
+        .query("plugin::users-permissions.user")
+        .findOne({ where: { email: { $eqi: email } } })),
+    "Există deja un cont cu această adresă de email",
+  ),
 });
 
 export const confirmEmailChangeSchema = z.object({
