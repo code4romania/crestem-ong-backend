@@ -11,6 +11,10 @@ RUN set -ex; \
     python3 \
     vips-dev
 
+# package-lock.json is written by npm 11; the npm 10 bundled with node:22
+# rejects it (`Missing: yaml@2.9.1 from lock file`), so match the lockfile.
+RUN npm install -g npm@11.19.0
+
 COPY package.json package-lock.json ./
 
 # No --ignore-scripts here: sharp and esbuild both need their install scripts.
