@@ -4,7 +4,7 @@
  *
  * Callers keep passing the same array of lines they used to join with `\n`
  * for the text-only version — a blank line starts a new paragraph, and
- * consecutive lines become one paragraph broken with `<br>`.
+ * consecutive lines become one paragraph broken with `<br>`
  *
  * A line that needs a link inside its text is an array of segments instead
  * of a string. Links are never parsed out of strings, so a name or an ONG
@@ -90,7 +90,9 @@ function textLine(line: EmailLine): string {
   if (typeof line === "string") return line;
   return line
     .map((segment) =>
-      typeof segment === "string" ? segment : `${segment.text} (${segment.href})`,
+      typeof segment === "string"
+        ? segment
+        : `${segment.text} (${segment.href})`,
     )
     .join("");
 }
@@ -105,7 +107,9 @@ function rule(): string {
 }
 
 function renderHtml(lines: EmailLine[]): string {
-  const paragraphs = toParagraphs(lines).map(renderParagraph).join("\n          ");
+  const paragraphs = toParagraphs(lines)
+    .map(renderParagraph)
+    .join("\n          ");
   const logo = `${frontendOrigin()}/email/logo.png`;
   const footer = FOOTER_LINES.map(escapeHtml).join("<br>");
 
@@ -165,7 +169,10 @@ export function termsNote(): EmailLine {
   const origin = frontendOrigin();
   return [
     "Notă: Prin activarea contului și continuarea utilizării platformei, confirmi că ai luat la cunoștință ",
-    { text: "Politica de Confidențialitate", href: `${origin}/politica-de-confidentialitate` },
+    {
+      text: "Politica de Confidențialitate",
+      href: `${origin}/politica-de-confidentialitate`,
+    },
     " și ",
     { text: "Termenii și Condițiile", href: `${origin}/termeni-si-conditii` },
     ".",
@@ -174,7 +181,9 @@ export function termsNote(): EmailLine {
 
 export function renderEmail(lines: EmailLine[]): RenderedEmail {
   return {
-    text: [...lines.map(textLine), "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join("\n"),
+    text: [...lines.map(textLine), "", SIGN_OFF_GREETING, SIGN_OFF_TEAM].join(
+      "\n",
+    ),
     html: renderHtml(lines),
   };
 }
