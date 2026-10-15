@@ -1,0 +1,1248 @@
+[
+  {
+    "name": "SCA1 - FDSC",
+    "startDate": "2025-02-14",
+    "endDate": "2026-03-25",
+    "phases": [
+      {
+        "title": "Etapa inițială",
+        "startDate": "2025-02-14",
+        "endDate": "2025-04-15"
+      },
+      {
+        "title": "Etapa finală",
+        "startDate": "2026-03-10",
+        "endDate": "2026-03-25"
+      }
+    ],
+    "ongs": [
+      {
+        "cui": "50598025",
+        "name": "ASOCIAȚIA GABRIELLE - DIN GRIJĂ PENTRU FEMEI"
+      },
+      {
+        "cui": "48233639",
+        "name": "ACS Drive Your Courage"
+      },
+      {
+        "cui": "36770264",
+        "name": "ActivRandom"
+      },
+      {
+        "cui": "13714680",
+        "name": "Alianța Națională a Organizațiilor Studențești din România (ANOSR)"
+      },
+      {
+        "cui": "49655879",
+        "name": "Asociația Impreuna pentru o lume mai frumoasa"
+      },
+      {
+        "cui": "50027304",
+        "name": "Asociatia Abilitatea învinge dizabilitatea"
+      },
+      {
+        "cui": "36188224",
+        "name": "Asociatia Altium"
+      },
+      {
+        "cui": "38967271",
+        "name": "Asociatia Ambulanta Life"
+      },
+      {
+        "cui": "48017988",
+        "name": "Asociatia Amestec"
+      },
+      {
+        "cui": "35873040",
+        "name": "Asociatia Antonia pentru Educatie si Inovare Sociala"
+      },
+      {
+        "cui": "45793283",
+        "name": "Asociatia Argos Pentru Protectia Animalelor"
+      },
+      {
+        "cui": "48610038",
+        "name": "Asociatia Aripi de Talent"
+      },
+      {
+        "cui": "30388150",
+        "name": "Asociatia Art-Activ"
+      },
+      {
+        "cui": "41626975",
+        "name": "Asociatia Artipic"
+      },
+      {
+        "cui": "34396253",
+        "name": "Asociatia Asco Forall"
+      },
+      {
+        "cui": "51152860",
+        "name": "Asociatia Bewise"
+      },
+      {
+        "cui": "34439230",
+        "name": "Asociatia Brandyou-UP"
+      },
+      {
+        "cui": "29602322",
+        "name": "Asociatia Casa Tuturor"
+      },
+      {
+        "cui": "29604439",
+        "name": "Asociatia Centrul de Informare și Formare Magia Jiu"
+      },
+      {
+        "cui": "31559577",
+        "name": "Asociatia Centrul de Servicii INtegrate - ACSI"
+      },
+      {
+        "cui": "42789857",
+        "name": "Asociatia Cetatenilor Implicati in Comunitate Iasi"
+      },
+      {
+        "cui": "51307787",
+        "name": "Asociatia Civic Access"
+      },
+      {
+        "cui": "39347170",
+        "name": "Asociatia Colectionar de Fapte Bune"
+      },
+      {
+        "cui": "46081500",
+        "name": "Asociatia Comunitatile Viitorului"
+      },
+      {
+        "cui": "50078987",
+        "name": "Asociatia Contrast"
+      },
+      {
+        "cui": "35877727",
+        "name": "Asociatia Copii pentru Viitor"
+      },
+      {
+        "cui": "31738769",
+        "name": "Asociatia Create.Act.Enjoy"
+      },
+      {
+        "cui": "31411499",
+        "name": "ASOCIATIA CULTURALA EDUCATIA PRIN TEATRU PAIATA"
+      },
+      {
+        "cui": "44444471",
+        "name": "Asociatia Culturala Tu si Eu"
+      },
+      {
+        "cui": "50183397",
+        "name": "ASOCIATIA DE SCLEROZA MULTIPLA WILLNESS"
+      },
+      {
+        "cui": "49500955",
+        "name": "Asociatia de Teatru Digital"
+      },
+      {
+        "cui": "7119395",
+        "name": "Asociatia de Turism si Ecologie DIANTHUS"
+      },
+      {
+        "cui": "38447384",
+        "name": "Asociatia Doina Lie"
+      },
+      {
+        "cui": "46605574",
+        "name": "Asociatia EduAct"
+      },
+      {
+        "cui": "50549308",
+        "name": "ASOCIATIA EDUCATIE SI SANATATE PENTRU TOTI"
+      },
+      {
+        "cui": "47033543",
+        "name": "Asociatia Excelenta, Calitate si Inovare in Educatie"
+      },
+      {
+        "cui": "50634721",
+        "name": "ASOCIATIA FABRICA DE ZAMBETE LAVLIFE"
+      },
+      {
+        "cui": "41732682",
+        "name": "ASOCIATIA FOLCLORICA BRAU MUNTENESC"
+      },
+      {
+        "cui": "37590814",
+        "name": "Asociatia Gradina de Plante Medicinale din Ardeal"
+      },
+      {
+        "cui": "41424577",
+        "name": "Asociatia GRAM"
+      },
+      {
+        "cui": "51298409",
+        "name": "ASOCIATIA IMPACT PENTRU TOTI"
+      },
+      {
+        "cui": "27450678",
+        "name": "Asociatia IQ LEVEL"
+      },
+      {
+        "cui": "37516125",
+        "name": "Asociatia Little Help"
+      },
+      {
+        "cui": "44611782",
+        "name": "Asociatia Mental Help"
+      },
+      {
+        "cui": "51194440",
+        "name": "ASOCIATIA MEREU"
+      },
+      {
+        "cui": "30947813",
+        "name": "Asociatia MERIT Asociatia pentru Mediu, Ecologie, Responsabilitate, Incluziune Sociala, Tineret"
+      },
+      {
+        "cui": "46743259",
+        "name": "Asociatia Mindlifeline"
+      },
+      {
+        "cui": "33983241",
+        "name": "Asociatia NewYorkCrew"
+      },
+      {
+        "cui": "50704916",
+        "name": "Asociatia Organizatia pentru Dezvoltarea Profesionala a Femeilor (Carierista)"
+      },
+      {
+        "cui": "35210838",
+        "name": "Asociatia pentru cultura, ecologie si turism ACEST TRUBADUR"
+      },
+      {
+        "cui": "49135973",
+        "name": "ASOCIATIA PENTRU EDUCATIE, RELATIONARE, OMOGENITATE SI SEXUALITATE (EROS)"
+      },
+      {
+        "cui": "25485424",
+        "name": "Asociatia Prietenii Scolii Valea Lupului"
+      },
+      {
+        "cui": "41362164",
+        "name": "ASOCIATIA PRIETENII SPITALULUI BUHUSI"
+      },
+      {
+        "cui": "35926358",
+        "name": "ASOCIATIA PRO AUTISM"
+      },
+      {
+        "cui": "26528388",
+        "name": "Asociatia Pro-Ghioroc Ma-Gyorok"
+      },
+      {
+        "cui": "27239124",
+        "name": "Asociatia Prosperitas Vitae Egyesület"
+      },
+      {
+        "cui": "46588007",
+        "name": "Asociatia Rigas"
+      },
+      {
+        "cui": "34208961",
+        "name": "Asociatia Right"
+      },
+      {
+        "cui": "43209567",
+        "name": "Asociatia Sprijin pentru Normalitate Autism"
+      },
+      {
+        "cui": "35812671",
+        "name": "Asociatia Sprijin, Organizare, Suport Mielom-S.O.S. Mielom"
+      },
+      {
+        "cui": "26168238",
+        "name": "ASOCIATIA STEPS OF HOPE"
+      },
+      {
+        "cui": "46303991",
+        "name": "Asociatia Strigat pentru Educatie"
+      },
+      {
+        "cui": "30626423",
+        "name": "ASOCIATIA SWISS WEBSCHOOL"
+      },
+      {
+        "cui": "47754884",
+        "name": "Asociatia Terra Gloria"
+      },
+      {
+        "cui": "43868002",
+        "name": "Asociatia Toti Pentru Unul"
+      },
+      {
+        "cui": "46130980",
+        "name": "Asociatia Transilvania 3D"
+      },
+      {
+        "cui": "49116246",
+        "name": "Asociatia Valeria"
+      },
+      {
+        "cui": "48906301",
+        "name": "ASOCIATIA VOINTA"
+      },
+      {
+        "cui": "50313977",
+        "name": "Asociatia Youth Division Sibiu"
+      },
+      {
+        "cui": "33791122",
+        "name": "Asociatia Zambet si Speranta pentru Viitor"
+      },
+      {
+        "cui": "46039521",
+        "name": "Asociația Spirit Nobil"
+      },
+      {
+        "cui": "38498132",
+        "name": "Asociația All Grow"
+      },
+      {
+        "cui": "49414420",
+        "name": "Asociația Antreprenoare"
+      },
+      {
+        "cui": "48155468",
+        "name": "Asociația ARK ORADEA"
+      },
+      {
+        "cui": "42863732",
+        "name": "Asociația AVA Autenticitate, Varietate, Acceptare"
+      },
+      {
+        "cui": "35392993",
+        "name": "Asociația Bastonul Alb"
+      },
+      {
+        "cui": "32096209",
+        "name": "Asociația C.L.A.R.A - Centrul de Legătură, Acompaniere și Resurse în Asistență Socială"
+      },
+      {
+        "cui": "42640420",
+        "name": "Asociația Capace cu Suflet"
+      },
+      {
+        "cui": "49593539",
+        "name": "Asociația Centrul de Dezvoltare Activă pentru Toți (CDAPT)"
+      },
+      {
+        "cui": "30330655",
+        "name": "Asociația Centrul de Resurse pentru Regenerare Urbană"
+      },
+      {
+        "cui": "18407229",
+        "name": "Asociaţia Centrul European pentru Diversitate"
+      },
+      {
+        "cui": "31226300",
+        "name": "Asociația Centrul pentru Studiul Democrației"
+      },
+      {
+        "cui": "50742057",
+        "name": "Asociația Club Sportiv Street Workout Iași"
+      },
+      {
+        "cui": "49215606",
+        "name": "Asociația Consiliul Cetățenilor Internaționali Cluj"
+      },
+      {
+        "cui": "41892195",
+        "name": "Asociația Create Yourself"
+      },
+      {
+        "cui": "36191238",
+        "name": "Asociația Creativities"
+      },
+      {
+        "cui": "37845446",
+        "name": "Asociația Culturală Cărțile pe Față"
+      },
+      {
+        "cui": "45937010",
+        "name": "Asociația DA Adventures"
+      },
+      {
+        "cui": "32512874",
+        "name": "Asociația de dezvoltare personala Grigore Popa"
+      },
+      {
+        "cui": "50082023",
+        "name": "Asociația Decis Artis Târgu Mureș"
+      },
+      {
+        "cui": "38160785",
+        "name": "Asociația Doula România"
+      },
+      {
+        "cui": "34807227",
+        "name": "Asociația Educație pentru Democrație"
+      },
+      {
+        "cui": "25614847",
+        "name": "Asociația Entuziart"
+      },
+      {
+        "cui": "47697584",
+        "name": "Asociația EUCivitas21"
+      },
+      {
+        "cui": "45837118",
+        "name": "Asociația Fă din bine un obicei"
+      },
+      {
+        "cui": "51253547",
+        "name": "Asociația Generația Fără Vicii"
+      },
+      {
+        "cui": "33641419",
+        "name": "Asociația Good Life Performers"
+      },
+      {
+        "cui": "50145628",
+        "name": "Asociația Hârșova 3D"
+      },
+      {
+        "cui": "50630541",
+        "name": "Asociația Horpaz Atitudine Civică"
+      },
+      {
+        "cui": "51044613",
+        "name": "Asociația Hub-ul de Cărămidă"
+      },
+      {
+        "cui": "51334331",
+        "name": "Asociația INCORDEN"
+      },
+      {
+        "cui": "43444953",
+        "name": "Asociația Învățăm Viața"
+      },
+      {
+        "cui": "50258228",
+        "name": "Asociația Lanțului Alimentar Scurt"
+      },
+      {
+        "cui": "45428881",
+        "name": "Asociația LUNA ȘI NOI"
+      },
+      {
+        "cui": "34587903",
+        "name": "Asociația Lunca Pogănișului"
+      },
+      {
+        "cui": "46661612",
+        "name": "Asociația Mentor"
+      },
+      {
+        "cui": "49124699",
+        "name": "Asociația Merida"
+      },
+      {
+        "cui": "46061766",
+        "name": "Asociația Mihai și Prietenii"
+      },
+      {
+        "cui": "27696819",
+        "name": "Asociația Minte Forte"
+      },
+      {
+        "cui": "7853722",
+        "name": "Asociația Moașelor din România (AMsR)"
+      },
+      {
+        "cui": "49301910",
+        "name": "Asociația Noi, Ploieștenii"
+      },
+      {
+        "cui": "51466430",
+        "name": "Asociația Oportunități de Viitor"
+      },
+      {
+        "cui": "43260055",
+        "name": "Asociația Pastel"
+      },
+      {
+        "cui": "26096629",
+        "name": "Asociația pentru sprijinirea familiei și copilului \"Open Hearts\""
+      },
+      {
+        "cui": "36913780",
+        "name": "ASOCIAȚIA PENTRU SPRIJINIREA FEMEII ÎNSĂRCINATE SI A FAMILIEI"
+      },
+      {
+        "cui": "50446388",
+        "name": "ASOCIAȚIA PENTRU SUSȚINEREA EDUCAȚIEI MEDICALE"
+      },
+      {
+        "cui": "44530831",
+        "name": "Asociația Pentru Viață, Fără Frontiere"
+      },
+      {
+        "cui": "40859638",
+        "name": "Asociația pentru Victimele Abuzului Sexual (AVAS)"
+      },
+      {
+        "cui": "50173989",
+        "name": "ASOCIAȚIA POVESTEA ȘCOLII CONTINUĂ"
+      },
+      {
+        "cui": "39070974",
+        "name": "Asociația Pride"
+      },
+      {
+        "cui": "48833536",
+        "name": "Asociația Quo Vadis Crevedia"
+      },
+      {
+        "cui": "43377234",
+        "name": "Asociația Răsăritul de Argint"
+      },
+      {
+        "cui": "14706694",
+        "name": "Asociația Studenților În Contabilitate și Informatică de Gestiune"
+      },
+      {
+        "cui": "46253265",
+        "name": "Asociația Timbru de Bucovina"
+      },
+      {
+        "cui": "50404242",
+        "name": "Asociația Toți Copiii Citesc"
+      },
+      {
+        "cui": "43929576",
+        "name": "Asociația Toți Copiii Sunt Copii"
+      },
+      {
+        "cui": "35095747",
+        "name": "Asociația Turism Alternativ"
+      },
+      {
+        "cui": "46772254",
+        "name": "Asociația Uniti Reușim"
+      },
+      {
+        "cui": "42960042",
+        "name": "Asociația Vă Ajutăm din Dej"
+      },
+      {
+        "cui": "46302040",
+        "name": "AZI ELEVI, MAINE LIDERI"
+      },
+      {
+        "cui": "49105620",
+        "name": "Bemotions"
+      },
+      {
+        "cui": "33367110",
+        "name": "Centrul de Cercetare si Comunicare Interculturală (CCCI)"
+      },
+      {
+        "cui": "43021767",
+        "name": "Centrul Popular de Cercetare si Documentare"
+      },
+      {
+        "cui": "50390864",
+        "name": "Creatori de comunitate"
+      },
+      {
+        "cui": "49940646",
+        "name": "EDNAE - EVERYONE DESERVES NONVIOLENCE AND EQUALITY"
+      },
+      {
+        "cui": "30868922",
+        "name": "Fundatia Schottener Servicii Sociale"
+      },
+      {
+        "cui": "46338647",
+        "name": "Fundația AssA"
+      },
+      {
+        "cui": "26148672",
+        "name": "JJ Films & Culture"
+      },
+      {
+        "cui": "47806215",
+        "name": "Junior Chamber International Iași"
+      },
+      {
+        "cui": "45841909",
+        "name": "Little Paws Squad and the Environment"
+      },
+      {
+        "cui": "50492007",
+        "name": "Mame la inaltine"
+      },
+      {
+        "cui": "51613859",
+        "name": "Pe Calea Educatiei"
+      },
+      {
+        "cui": "50152722",
+        "name": "Prezenti pentru viitor"
+      },
+      {
+        "cui": "47970276",
+        "name": "Asociatia Tinerilor Romi Energici, Ambitiosi si Motivati-Roma TEAM"
+      },
+      {
+        "cui": "12270466",
+        "name": "Societatea Elevilor din Liceul Economic Floarea de Colt"
+      },
+      {
+        "cui": "49913943",
+        "name": "STEP UP SOCIETY"
+      },
+      {
+        "cui": "45706503",
+        "name": "Străzi pentru Oameni"
+      },
+      {
+        "cui": "49301944",
+        "name": "Transilvania Epică"
+      },
+      {
+        "cui": "49252868",
+        "name": "Visează, plănuiește, învață, clãdește"
+      },
+      {
+        "cui": "46335152",
+        "name": "Voluntarul din Noi"
+      },
+      {
+        "cui": "14388574",
+        "name": "YMCA Baia Mare"
+      }
+    ]
+  },
+  {
+    "name": "SCA1 - ARC",
+    "startDate": "2025-02-14",
+    "endDate": "2026-03-25",
+    "phases": [
+      {
+        "title": "Etapa inițială",
+        "startDate": "2025-02-14",
+        "endDate": "2025-04-15"
+      }
+    ],
+    "ongs": [
+      {
+        "cui": "11074704",
+        "name": "Fundația pentru Copii Ronald McDonald"
+      },
+      {
+        "cui": "37987890",
+        "name": "Asociația Apulum Forum"
+      },
+      {
+        "cui": "35246467",
+        "name": "Asociația MozaiQ"
+      },
+      {
+        "cui": "10981730",
+        "name": "Fundatia Regala Margareta a Romaniei"
+      },
+      {
+        "cui": "29472532",
+        "name": "Fundația Comunitară București"
+      },
+      {
+        "cui": "34113543",
+        "name": "Asociația Parcul Natural Văcărești"
+      },
+      {
+        "cui": "5481584",
+        "name": "Fundatia Serviciilor Sociale Bethany"
+      },
+      {
+        "cui": "13658793",
+        "name": "Fundația Missio Link Internațional"
+      },
+      {
+        "cui": "41211994",
+        "name": "Asociatia Sache"
+      },
+      {
+        "cui": "RO42157184",
+        "name": "Narada"
+      },
+      {
+        "cui": "31137149",
+        "name": "Asociatia De-a arhitectura"
+      },
+      {
+        "cui": "41746440",
+        "name": "ASOCIAȚIA ȘCOALA ÎNCREDERII"
+      },
+      {
+        "cui": "32085641",
+        "name": "Fundația Comunitară Țara Făgărașului"
+      },
+      {
+        "cui": "32800486",
+        "name": "Asociatia Club Sportiv Climb Again"
+      },
+      {
+        "cui": "34786990",
+        "name": "Fundația Comunitară Brașov"
+      },
+      {
+        "cui": "29368257",
+        "name": "Asociația Mișcare de Tabără Yuppi"
+      },
+      {
+        "cui": "27626490",
+        "name": "Asociatia Centrul Cultural Clujean"
+      },
+      {
+        "cui": "35152184",
+        "name": "Fundatia Comunitara Galati"
+      },
+      {
+        "cui": "5990766",
+        "name": "Organizatia Nationala Cercetasii Romaniei"
+      },
+      {
+        "cui": "10405052",
+        "name": "Asociatia Centrul Step by Step Pentru Educatie si Dezvoltare Profesionala"
+      },
+      {
+        "cui": "9019287",
+        "name": "Asociatia FDP Protagonisti in educatie"
+      },
+      {
+        "cui": "RO38075655",
+        "name": "Asociatia GO-AHEAD"
+      },
+      {
+        "cui": "33619209",
+        "name": "Asociația SEXUL vs BARZA"
+      },
+      {
+        "cui": "28342119",
+        "name": "World Animal Veterinary Emissaries"
+      },
+      {
+        "cui": "31464990",
+        "name": "Organizatia Crestina Something New"
+      },
+      {
+        "cui": "36329161",
+        "name": "Asociația Pădurea Copiilor"
+      },
+      {
+        "cui": "43260055",
+        "name": "Asociația pastel"
+      },
+      {
+        "cui": "35219470",
+        "name": "Asociația eematico"
+      },
+      {
+        "cui": "46165376",
+        "name": "FUNDATIA ACASA IN MUSCEL"
+      },
+      {
+        "cui": "41898490",
+        "name": "Asociatia de conștientizare a industriei agricole"
+      },
+      {
+        "cui": "37012802",
+        "name": "Asociaţia Designers Thinkers Makers"
+      },
+      {
+        "cui": "44530831",
+        "name": "Pentru Viață, Fără Frontiere"
+      },
+      {
+        "cui": "42593353",
+        "name": "Asociația Pirita Children"
+      },
+      {
+        "cui": "48268483",
+        "name": "Asociatia Studiogovora"
+      },
+      {
+        "cui": "4849743",
+        "name": "Asociatia Caritas Bucuresti"
+      },
+      {
+        "cui": "25308368",
+        "name": "Asociatia Impact Bistrita"
+      },
+      {
+        "cui": "41457930",
+        "name": "Fundatia Comunitara Valcea"
+      },
+      {
+        "cui": "49895197",
+        "name": "Asociatia Red Panda"
+      },
+      {
+        "cui": "27253331",
+        "name": "Fundatia Inovatii Sociale Regina Maria"
+      },
+      {
+        "cui": "18837820",
+        "name": "Asociația Diakoniewerk International"
+      },
+      {
+        "cui": "41937262",
+        "name": "Fundația Comunitară Buzău"
+      },
+      {
+        "cui": "25835660",
+        "name": "APROAPE DE TINERI"
+      },
+      {
+        "cui": "43533953",
+        "name": "Asociația Teona Ariana Suceava"
+      },
+      {
+        "cui": "35617603",
+        "name": "Asociația Sus Inima"
+      },
+      {
+        "cui": "14597970",
+        "name": "Asociația Pro Ruralis"
+      },
+      {
+        "cui": "42640420",
+        "name": "Asociatia CAPACE  CU SUFLET"
+      },
+      {
+        "cui": "36627664",
+        "name": "Asociatia Fabrica de Fapte Bune"
+      },
+      {
+        "cui": "42126234",
+        "name": "ASOCIATIA VETERINARUL"
+      },
+      {
+        "cui": "39575152",
+        "name": "Asociatia Social Innovation Solutions"
+      },
+      {
+        "cui": "35326507",
+        "name": "Asociatia Parentis"
+      },
+      {
+        "cui": "41044128",
+        "name": "Organizația Națională Cercetașii României Filiala Aetos Drobeta Turnu Severin"
+      },
+      {
+        "cui": "14635453",
+        "name": "Fundația Entreprenation"
+      },
+      {
+        "cui": "26333718",
+        "name": "Asociația „Angel Dog” Satu Mare"
+      },
+      {
+        "cui": "RO5221142",
+        "name": "ORGANIZAȚIA UMANITARĂ CONCORDIA"
+      },
+      {
+        "cui": "RO13705208",
+        "name": "Fundația Noi Orizonturi"
+      },
+      {
+        "cui": "11182595",
+        "name": "Fundația Openfields"
+      },
+      {
+        "cui": "32120145",
+        "name": "Asociația Educație pentru Viața Reală: AEVR"
+      },
+      {
+        "cui": "40693046",
+        "name": "Asociatia Aliat pentru Sanatate Mintala"
+      },
+      {
+        "cui": "34946217",
+        "name": "Federația Coaliția pentru Educație"
+      },
+      {
+        "cui": "25964257",
+        "name": "Asociatia Carpaterra"
+      },
+      {
+        "cui": "52163817",
+        "name": "Asociația pentru sprijinirea femeii însărcinate și a familiei (Centrele Roua)"
+      },
+      {
+        "cui": "50027304",
+        "name": "Asociația ABILITATEA INVINGE DIZABILITATEA"
+      },
+      {
+        "cui": "32590589",
+        "name": "Teach for Romania"
+      },
+      {
+        "cui": "26781002",
+        "name": "Asociatia Scoala de Valori"
+      },
+      {
+        "cui": "-",
+        "name": "Centrul Educational Knowledge Tree"
+      },
+      {
+        "cui": "32512874",
+        "name": "Asociatia de dezvoltare personala Grigore Popa"
+      },
+      {
+        "cui": "45573474",
+        "name": "Organizația pentru Protecția Mediului și combaterea braconajului"
+      }
+    ]
+  },
+  {
+    "name": "BRD HUB START - Generația 1",
+    "startDate": "2025-09-17",
+    "endDate": "2026-12-31",
+    "phases": [
+      {
+        "title": "Etapa inițială",
+        "startDate": "2026-08-12",
+        "endDate": "2026-08-31"
+      },
+      {
+        "title": "Etapa finală",
+        "startDate": "2026-10-08",
+        "endDate": "2026-10-26"
+      }
+    ],
+    "ongs": [
+      {
+        "cui": "13215885",
+        "name": "ASOCIAȚIA ”GRUPUL LOCAL BEST” IAȘI - CONSILIUL STUDENȚILOR EUROPENI ÎN TEHNOLOGIE"
+      },
+      {
+        "cui": "13746534",
+        "name": "Asociația Studenților din Universitatea Suceava"
+      },
+      {
+        "cui": "8977958",
+        "name": "Societatea Studenților în Medicină din Timișoara"
+      },
+      {
+        "cui": "15823595",
+        "name": "Asociația Studenților din Facultatea de Limbi și Literaturi Străine"
+      },
+      {
+        "cui": "46875470",
+        "name": "Asociația Studenților de la Litere și Arte Sibiu"
+      },
+      {
+        "cui": "9673337",
+        "name": "Asociatia Liga Studențească din Bacău"
+      },
+      {
+        "cui": "28099967",
+        "name": "Asociația Studenților Fizicieni a Universității din București"
+      },
+      {
+        "cui": "51012778",
+        "name": "Asociația Studenților Biochimiști, Biologi și Ecologi  (ASB)"
+      },
+      {
+        "cui": "50062069",
+        "name": "Asociația Studențească HISTORIPOL"
+      },
+      {
+        "cui": "17547550",
+        "name": "Asociația Liga Studenților “Pintea Viteazul” Baia Mare"
+      },
+      {
+        "cui": "49452823",
+        "name": "Asociația Studenților și Absolvenților Facultății de Științe și Litere din Târgu Mureș (ASAFSL TGM)"
+      },
+      {
+        "cui": "21577932",
+        "name": "ASOCIATIA STUDENTILOR ARHITECTI A.S.T.A. CLUJ"
+      },
+      {
+        "cui": "38479769",
+        "name": "Asociația Studențească din cadrul Facultății de Științe ale Comunicării - Universitea Polihenica Timișoara"
+      },
+      {
+        "cui": "11290996",
+        "name": "Societatea Studenților Europeniști (SSE)"
+      },
+      {
+        "cui": "11258863",
+        "name": "Liga Studenților din Universitatea \"1 Decembrie 1918\" din Alba Iulia (LSUA)"
+      }
+    ]
+  },
+  {
+    "name": "BRD HUB START - Generația 2",
+    "startDate": "2026-08-01",
+    "endDate": "2027-12-31",
+    "phases": [
+      {
+        "title": "Etapa inițială",
+        "startDate": "2026-08-01",
+        "endDate": "2026-09-30"
+      }
+    ],
+    "ongs": [
+      {
+        "cui": "32356643",
+        "name": "Asociația Liga Studenților \"ETH\" din Iași"
+      },
+      {
+        "cui": "40940235",
+        "name": "Asociația Studenților de la Facultatea de Științe Politice, Administrative și ale Comunicării - StudPAC"
+      },
+      {
+        "cui": "15873488",
+        "name": "Asociația Studenților Informaticieni Ieșeni"
+      },
+      {
+        "cui": "10539526",
+        "name": "Liga Studenților din Facultatea de Electronică și Telecomunicații"
+      },
+      {
+        "cui": "33419499",
+        "name": "Asociația Studenților la Drept"
+      },
+      {
+        "cui": "8903438",
+        "name": "Organizația Studenților Farmaciști Cluj-Napoca"
+      },
+      {
+        "cui": "32503590",
+        "name": "Asociația Tinerilor Basarabeni din Brașov"
+      },
+      {
+        "cui": "47233886",
+        "name": "ASFIZ, Asociația Studenților Fizicieni a Universității “Alexandru Ioan Cuza” din Iași"
+      },
+      {
+        "cui": "37586686",
+        "name": "Asociația Studenților Ingineri din Oradea"
+      },
+      {
+        "cui": "24457590",
+        "name": "Asociația Studenților Geografi"
+      },
+      {
+        "cui": "49130550",
+        "name": "Tomorrow's Architects"
+      },
+      {
+        "cui": "14277339",
+        "name": "Organizația Studenților din Facultatea de Automatică, Calculatoare și Electronică (O.S.A.C.E)"
+      },
+      {
+        "cui": "6456228",
+        "name": "Organizația Studenților Chimiști"
+      },
+      {
+        "cui": "15778109",
+        "name": "Organizația Studenților din Universitatea Tehnică din Cluj-Napoca"
+      },
+      {
+        "cui": "27850828",
+        "name": "ASOCIAȚIA DE LA PATRU"
+      },
+      {
+        "cui": "14622992",
+        "name": "Asociația Studenților în Psihologie Sibiu"
+      },
+      {
+        "cui": "49126231",
+        "name": "Asociația Studenților Facultății de Teatru și Film Cluj-Napoca"
+      },
+      {
+        "cui": "RO18797296",
+        "name": "Asociația Societatea Studenților în Medicină din București"
+      },
+      {
+        "cui": "50585548",
+        "name": "Liga Studenților Mecanici, Mecatroniști, Designeri și Economiști"
+      },
+      {
+        "cui": "51409183",
+        "name": "Breasla Studenților la Psihologie și Pedagogie din Brașov"
+      },
+      {
+        "cui": "15805955",
+        "name": "Asociația Studenților în Științe Politice - Universitatea din București"
+      },
+      {
+        "cui": "17680270",
+        "name": "Liga Studenților Facultății de Automatică și Calculatoare Iași (LSAC)"
+      },
+      {
+        "cui": "8968895",
+        "name": "Liga Studenților din Universitatea „Dunărea de Jos” din Galați"
+      },
+      {
+        "cui": "13746534",
+        "name": "Asociația Studenților din Universitatea Suceava"
+      },
+      {
+        "cui": "55305126",
+        "name": "Liga Studenților de la Filosofie Iași"
+      },
+      {
+        "cui": "24211560",
+        "name": "Asociația Studenților Chimiști a Universității din București"
+      },
+      {
+        "cui": "12365337",
+        "name": "Societatea Studenților în Farmacie București"
+      },
+      {
+        "cui": "25460950",
+        "name": "Asociația Studenților la Matematică și Informatică"
+      },
+      {
+        "cui": "49092171",
+        "name": "Asociația Studenților Facultății dr Drept din cadrul Academiei de Studii Economice din București"
+      },
+      {
+        "cui": "9434305",
+        "name": "ORGANIZAȚIA STUDENȚILOR DIN UNIVERSITATEA BABEȘ-BOLYAI"
+      },
+      {
+        "cui": "40740750",
+        "name": "Asociația Organizația Studențiilor USAB United Students"
+      },
+      {
+        "cui": "24849179",
+        "name": "Asociația Studențiască „PRIME” Iași"
+      },
+      {
+        "cui": "32503523",
+        "name": "Asociația Studențească SOLIDUS Sibiu"
+      },
+      {
+        "cui": "17910558",
+        "name": "Liga Studenților de la Geografie si Geologie"
+      },
+      {
+        "cui": "30816621",
+        "name": "BEST Brașov - Board of European Students of Technology"
+      },
+      {
+        "cui": "11875028",
+        "name": "Voltuntari pentru Idei si Proiecte"
+      },
+      {
+        "cui": "42729383",
+        "name": "Asociația 2SPACE"
+      },
+      {
+        "cui": "22386310",
+        "name": "Asociația Studenților la Construcții București"
+      },
+      {
+        "cui": "31392915",
+        "name": "Asociația Studenților la Comunicare"
+      },
+      {
+        "cui": "8905986",
+        "name": "Sindicatul Studenților din Facultatea de Cibernetică, Statistică și Informatică Economică"
+      },
+      {
+        "cui": "24005129",
+        "name": "Organizatia Studenților pentru Turismul Românesc"
+      },
+      {
+        "cui": "54228670",
+        "name": "Asociația pentru Educație Globală și Experiențe Europene (AEGEE-București)"
+      },
+      {
+        "cui": "28099967",
+        "name": "Asociatia Studentilor Fizicieni a Universitatii Bucuresti"
+      },
+      {
+        "cui": "7262866",
+        "name": "AIESEC Craiova"
+      },
+      {
+        "cui": "21276468",
+        "name": "Asociația Studenților la Psihologie și Științele Educației - București (ASPSE)"
+      },
+      {
+        "cui": "51127360",
+        "name": "Asociația Studenților de la Psihologie și Pedagogie UAIC Iași (ASPP)"
+      },
+      {
+        "cui": "17503120",
+        "name": "ASOCIAȚIA STUDENȚILOR LA ISTORIE ,,DACIA\""
+      },
+      {
+        "cui": "8444963",
+        "name": "BEST Cluj-Napoca"
+      },
+      {
+        "cui": "18845555",
+        "name": "Organizația Studenților Economiști (OSE)"
+      },
+      {
+        "cui": "7267553",
+        "name": "Liga Studenților din Facultatea de Automatică și Calculatoare (Liga AC)"
+      },
+      {
+        "cui": "32298577",
+        "name": "Liga Studenților din Universitatea „Alexandru Ioan Cuza” din Iași (LS IAȘI)"
+      },
+      {
+        "cui": "40639489",
+        "name": "Liga Studenților-Universitatea \"Ovidius\" din Constanța (LSUOC)"
+      },
+      {
+        "cui": "46140614",
+        "name": "Organizația Studenților în Medicină Sibiu (OSM Sibiu)"
+      },
+      {
+        "cui": "45183889",
+        "name": "Asociația Liga Studenților în Științe Politice și Administrative din cadrul SNSPA (LSSPA-SNSPA)"
+      },
+      {
+        "cui": "13806610",
+        "name": "Asociația Studenților în Drept (ASD)"
+      },
+      {
+        "cui": "54844122",
+        "name": "A.T.L.A.S - Asociația Tinerilor Lugojeni pentru Acțiune și Solidaritate"
+      },
+      {
+        "cui": "25219546",
+        "name": "Liga Studenților Români din Străinătate"
+      },
+      {
+        "cui": "27844834",
+        "name": "Asociația de părinți a Colegiului Național “B.P.Hasdeu” Buzău - Echipa de robotică Homosapiens #19053"
+      },
+      {
+        "cui": "51630671",
+        "name": "Association of non-EU foreign Students"
+      },
+      {
+        "cui": "36491286",
+        "name": "UN Youth Association of Romania filiala Cluj-Napoca"
+      },
+      {
+        "cui": "37510386",
+        "name": "Asociația SAIL"
+      },
+      {
+        "cui": "49783657",
+        "name": "Clubul de Robotică Zinca Golescu"
+      }
+    ]
+  }
+]
