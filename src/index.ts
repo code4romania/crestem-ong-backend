@@ -92,6 +92,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::ong.ong.evaluations",
   "api::ong.ong.evaluationDetail",
   "api::ong.ong.evaluationExport",
+  "api::ong.ong.listExport",
   "api::ong.ong.fdscReports",
   "api::ong.ong.createFdscReport",
   "api::ong.ong.deleteFdscReport",

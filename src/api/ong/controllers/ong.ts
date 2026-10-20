@@ -40,6 +40,9 @@ import { decorateBlock } from "../../evaluation/utils/catalog";
 import { programsOfReport } from "../../evaluation/utils/admin-list";
 import { buildEvaluationExport } from "../../report/utils/evaluation-export";
 import { renderEvaluationWorkbook } from "../../report/utils/evaluation-workbook";
+import { renderTableWorkbook } from "../../../utils/xlsx-table";
+import { ongListFilters } from "../utils/list-filters";
+import { buildOngListExport } from "../utils/list-export";
 import { docRef } from "../../../utils/relations";
 import { DIMENSIONS } from "../../../constants/dimensions";
 
@@ -133,16 +136,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     // Search and both filters run here rather than in the browser: the screen
     // loads one page of twenty as it scrolls, so it never holds the whole list
     // to filter against.
-    const filters: Record<string, unknown> = {};
-    if (search) {
-      filters.name = { $containsi: search };
-    }
-    if (judet) {
-      filters.judet = { documentId: judet };
-    }
-    if (program) {
-      filters.programs = { documentId: program };
-    }
+    const filters = ongListFilters({ search, judet, program });
 
     // Anonymized organizations stay listed (BR-33): FDSC must still see that
     // their evaluations were completed, and this list is the only navigation to
@@ -215,6 +209,105 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         };
       }),
     };
+  },
+  /**
+   * "Descarcă lista" — every organization the list's filters match, as an
+   * `.xlsx`. A handful of bulk reads rather than one per organization.
+   */
+  async listExport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const search = textParam(ctx.query.search);
+    const judet = textParam(ctx.query.judet);
+    const program = textParam(ctx.query.program);
+
+    const ongs = (await strapi.documents("api::ong.ong").findMany({
+      filters: ongListFilters({ search, judet, program }),
+      sort: { name: "asc" },
+      populate: {
+        judet: true,
+        localitate: true,
+        programs: true,
+        domeniuPrincipal: true,
+        domeniuSecundar: true,
+      },
+    })) as any[];
+    const ids = ongs.map((ong) => ong.documentId);
+
+    const [members, reports, mentorRows] = await Promise.all([
+      membersByOng(strapi, ids),
+      ids.length
+        ? strapi.documents("api::report.report").findMany({
+            filters: { ong: { documentId: { $in: ids } } },
+            // `dimensions` alone tells a finished respondent; the answers are not needed.
+            populate: {
+              ong: true,
+              phases: true,
+              evaluations: { populate: { dimensions: true } },
+            },
+          })
+        : Promise.resolve([]),
+      ids.length
+        ? strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+            filters: {
+              ong: { documentId: { $in: ids } },
+              ...(program ? { program: { documentId: program } } : {}),
+            },
+            populate: {
+              ong: true,
+              program: { populate: { mentors: true } },
+              mentors: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const reportsByOng = new Map<string, any[]>();
+    for (const report of reports as any[]) {
+      const ongId = report.ong?.documentId;
+      if (!ongId) continue;
+      reportsByOng.set(ongId, [...(reportsByOng.get(ongId) ?? []), report]);
+    }
+
+    // A mentor dropped from the program stays on the `ngo-mentor` row, so keep
+    // only those the program still lists — the rule `ngoMentorsFor` applies.
+    const mentorsByOng = new Map<string, Map<string, any>>();
+    const asList = (value: any) =>
+      Array.isArray(value) ? value : value ? [value] : [];
+    for (const row of mentorRows as any[]) {
+      const inProgram = new Set(
+        asList(row.program).flatMap((p: any) =>
+          asList(p.mentors).map((mentor: any) => mentor.documentId),
+        ),
+      );
+      for (const ong of asList(row.ong)) {
+        const byId = mentorsByOng.get(ong.documentId) ?? new Map();
+        for (const mentor of asList(row.mentors)) {
+          if (inProgram.has(mentor.documentId)) {
+            byId.set(mentor.documentId, mentor);
+          }
+        }
+        mentorsByOng.set(ong.documentId, byId);
+      }
+    }
+
+    const data = buildOngListExport({
+      ongs,
+      members,
+      reportsByOng,
+      mentorsByOng: new Map(
+        [...mentorsByOng].map(([id, byId]) => [id, [...byId.values()]]),
+      ),
+      program,
+      today: todayInBucharest(),
+    });
+    ctx.set(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    ctx.set("Content-Disposition", `attachment; filename="${data.fileName}"`);
+    ctx.body = await renderTableWorkbook(data);
   },
   async detail(ctx: Context) {
     if (!ctx.state.user) {
