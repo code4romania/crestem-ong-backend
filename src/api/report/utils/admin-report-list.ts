@@ -3,6 +3,7 @@ import {
   INDEPENDENT,
   ongAdminEmailClause,
   includesIndependent,
+  programsOfReport,
   type ProgramRef,
 } from "../../evaluation/utils/admin-list";
 import { computeReportScores } from "./scores";
@@ -43,19 +44,6 @@ export interface AdminReportFilters {
   status?: string;
   programs?: string[];
 }
-
-const programsOfReport = (report: any): ProgramRef[] => {
-  const programs: ProgramRef[] = [];
-  for (const phase of (report?.phases ?? []) as any[]) {
-    const program = phase?.program;
-    if (!program) continue;
-    if (programs.some((listed) => listed.documentId === program.documentId)) {
-      continue;
-    }
-    programs.push({ documentId: program.documentId, name: program.name });
-  }
-  return programs;
-};
 
 const toRow = (report: any, today: string): AdminReportRow => {
   const closed = isClosed(report, today);

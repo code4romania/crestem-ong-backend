@@ -37,8 +37,33 @@ import {
   createMentorMeetingSchema,
 } from "../validation/meeting";
 import { decorateBlock } from "../../evaluation/utils/catalog";
+import { programsOfReport } from "../../evaluation/utils/admin-list";
+import { buildEvaluationExport } from "../../report/utils/evaluation-export";
+import { renderEvaluationWorkbook } from "../../report/utils/evaluation-workbook";
 import { docRef } from "../../../utils/relations";
 import { DIMENSIONS } from "../../../constants/dimensions";
+
+/**
+ * A round of the organization with what its detail page and its export read,
+ * or null when it does not exist or belongs to another organization.
+ */
+const loadOngRound = async (
+  strapi: any,
+  ongDocumentId: string,
+  reportDocumentId: string,
+) => {
+  const report = await strapi.documents("api::report.report").findOne({
+    documentId: reportDocumentId,
+    populate: {
+      ong: true,
+      phases: { populate: { program: true } },
+      evaluations: {
+        populate: { dimensions: { populate: { quiz: true } }, user: true },
+      },
+    },
+  });
+  return report && report.ong?.documentId === ongDocumentId ? report : null;
+};
 
 const VALID_DIMENSION_KEYS = new Set(
   DIMENSIONS.map((dimension) => dimension.key),
@@ -1116,17 +1141,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         return ctx.forbidden("Nu ai acces la această organizație");
       }
     }
-    const report = await strapi.documents("api::report.report").findOne({
-      documentId: ctx.params.reportDocumentId,
-      populate: {
-        ong: true,
-        phases: { populate: { program: true } },
-        evaluations: {
-          populate: { dimensions: { populate: { quiz: true } }, user: true },
-        },
-      },
-    });
-    if (!report || report.ong?.documentId !== ctx.params.documentId) {
+    const report = await loadOngRound(
+      strapi,
+      ctx.params.documentId,
+      ctx.params.reportDocumentId,
+    );
+    if (!report) {
       return ctx.badRequest("Evaluarea nu există");
     }
     const today = todayInBucharest();
@@ -1177,6 +1197,60 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         })),
       },
     };
+  },
+  /** "Descarcă evaluarea" — the round as an `.xlsx`, FDSC staff only (route policy). */
+  async evaluationExport(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const report = await loadOngRound(
+      strapi,
+      ctx.params.documentId,
+      ctx.params.reportDocumentId,
+    );
+    if (!report) {
+      return ctx.badRequest("Evaluarea nu există");
+    }
+    const programIds = programsOfReport(report).map(
+      (program) => program.documentId,
+    );
+    const [admin, mentorRows] = await Promise.all([
+      strapi.documents("plugin::users-permissions.user").findFirst({
+        filters: {
+          role: { type: "ngo-admin" },
+          ong: { documentId: report.ong.documentId },
+        },
+      }),
+      programIds.length
+        ? strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+            filters: {
+              ong: { documentId: report.ong.documentId },
+              program: { documentId: { $in: programIds } },
+            },
+            populate: { mentors: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const mentorNames = new Map<string, string>();
+    for (const row of mentorRows as any[]) {
+      for (const mentor of (row.mentors ?? []) as any[]) {
+        mentorNames.set(mentor.documentId, mentor.nume);
+      }
+    }
+    const data = buildEvaluationExport({
+      report,
+      closed: isClosed(report, todayInBucharest()),
+      admin: admin
+        ? { nume: admin.nume, email: admin.email, telefon: admin.telefon }
+        : null,
+      mentorNames: [...mentorNames.values()],
+    });
+    ctx.set(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    ctx.set("Content-Disposition", `attachment; filename="${data.fileName}"`);
+    ctx.body = await renderEvaluationWorkbook(data);
   },
   async meetings(ctx: Context) {
     if (!ctx.state.user) {
