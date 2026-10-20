@@ -57,7 +57,8 @@ const matchesPrograms = (row: AdminEvaluationRow, programs: string[]): boolean =
   (row.independent && programs.includes(INDEPENDENT)) ||
   row.programs.some((listed) => programs.includes(listed.documentId));
 
-const programsOfReport = (report: any): ProgramRef[] => {
+/** A round's programs, once each, in phase order. Shared with the rounds list. */
+export const programsOfReport = (report: any): ProgramRef[] => {
   const programs: ProgramRef[] = [];
   for (const phase of (report?.phases ?? []) as any[]) {
     const program = phase?.program;
