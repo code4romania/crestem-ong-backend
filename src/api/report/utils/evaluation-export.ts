@@ -14,6 +14,8 @@ import { computeReportScores } from "./scores";
 const NOT_AVAILABLE = "NA";
 const MISSING = "—";
 const DELETED_ACCOUNT = "Cont șters";
+const DRAFT_SUFFIX = " (ciornă)";
+const INDEPENDENT = "Independentă";
 
 /** A percentage the workbook writes as a real number with a `%` format. */
 export interface PercentValue {
@@ -27,12 +29,20 @@ export interface GeneralRow {
   value: GeneralValue;
 }
 
-export interface DimensionResult {
+export interface IndicatorResult {
+  /** The question's tag, as the results page labels it. */
   name: string;
   value: GeneralValue;
 }
 
+export interface DimensionResult {
+  name: string;
+  value: GeneralValue;
+  indicators: IndicatorResult[];
+}
+
 export interface RespondentColumn {
+  /** The respondent's name, "Cont șters", or "Evaluator N" with no account. */
   label: string;
   email: string;
 }
@@ -117,13 +127,14 @@ const respondentRows = (evaluations: any[]): RespondentRow[] => {
   const rows: RespondentRow[] = [];
   DIMENSIONS.forEach((dimension, dimensionIndex) => {
     const number = dimensionIndex + 1;
-    // Only submitted dimensions count, as in the scores: a draft is not an answer yet.
-    const blocks = evaluations.map((evaluation) => {
-      const block = ((evaluation.dimensions ?? []) as any[]).find(
-        (b) => b.dimensionKey === dimension.key,
-      );
-      return block?.submitted ? block : null;
-    });
+    // Drafts show what was answered so far, flagged on the dimension row: they
+    // are not final and stay out of every score.
+    const blocks = evaluations.map(
+      (evaluation) =>
+        ((evaluation.dimensions ?? []) as any[]).find(
+          (b) => b.dimensionKey === dimension.key,
+        ) ?? null,
+    );
     const answerOf = (block: any, questionId: string): number | null => {
       const answer = ((block?.quiz ?? []) as any[]).find(
         (q) => q.questionId === questionId,
@@ -144,7 +155,8 @@ const respondentRows = (evaluations: any[]): RespondentRow[] => {
           (sum, question) => sum + (answerOf(block, question.id) ?? 0),
           0,
         );
-        return `${total}/${dimensionMax}`;
+        const points = `${total}/${dimensionMax}`;
+        return block.submitted ? points : `${points}${DRAFT_SUFFIX}`;
       }),
     });
     dimension.quiz.forEach((question, questionIndex) => {
@@ -160,9 +172,11 @@ const respondentRows = (evaluations: any[]): RespondentRow[] => {
     rows.push({
       kind: "comment",
       label: "Argumentare",
-      values: blocks.map((block) =>
-        block ? orMissing(block.comment) : null,
-      ),
+      values: blocks.map((block) => {
+        if (!block) return null;
+        // A draft may simply not have its argument yet.
+        return block.submitted ? orMissing(block.comment) : block.comment?.trim() || null;
+      }),
     });
   });
   return rows;
@@ -181,6 +195,9 @@ export const buildEvaluationExport = ({
   ).length;
   const programs = programsOfReport(report).map((program) => program.name);
   const { startDay, start, end } = period(report, closed);
+  const phases = ((report.phases ?? []) as any[])
+    .map((phase) => phase.title?.trim())
+    .filter(Boolean);
 
   const general: GeneralRow[] = [
     { label: "ID:", value: report.documentId },
@@ -207,31 +224,48 @@ export const buildEvaluationExport = ({
       value: programs.length ? programs.join(", ") : NOT_AVAILABLE,
     },
     {
+      label: "Fază:",
+      value: phases.length ? phases.join(", ") : INDEPENDENT,
+    },
+    {
       label: "Expert alocat (persoană resursă FDSC):",
       value: mentorNames.length ? mentorNames.join(", ") : NOT_AVAILABLE,
     },
   ];
 
-  // Catalog order, as the dimensions appear in the UI.
+  // Catalog order, as the dimensions and their indicators appear in the UI.
   const dimensions: DimensionResult[] = DIMENSIONS.map((dimension) => ({
     name: dimension.name,
     value: percent(scores.dimensions[dimension.key]),
+    indicators: dimension.quiz.map((question) => ({
+      name: (question.tag ?? question.question).trim(),
+      value: percent(scores.questions[question.id]),
+    })),
   }));
 
-  const respondents: RespondentColumn[] = evaluations.map(
-    (evaluation, index) => ({
-      label: `Evaluator ${index + 1}`,
-      email: isAnonymized(evaluation.user)
-        ? DELETED_ACCOUNT
-        : orMissing(evaluation.user?.email),
-    }),
+  // Someone who saved nothing at all gets no column; "Număr completări"
+  // already counts them. Drafts keep theirs.
+  const answered = evaluations.filter(
+    (evaluation) => (evaluation.dimensions ?? []).length > 0,
   );
+  let withoutAccount = 0;
+  const respondents: RespondentColumn[] = answered.map((evaluation) => {
+    const user = evaluation.user;
+    if (!user) {
+      withoutAccount += 1;
+      return { label: `Evaluator ${withoutAccount}`, email: MISSING };
+    }
+    if (isAnonymized(user)) {
+      return { label: DELETED_ACCOUNT, email: MISSING };
+    }
+    return { label: orMissing(user.nume), email: orMissing(user.email) };
+  });
 
   return {
     fileName: exportFileName(report.ong?.name, startDay),
     general,
     dimensions,
     respondents,
-    rows: respondentRows(evaluations),
+    rows: respondentRows(answered),
   };
 };

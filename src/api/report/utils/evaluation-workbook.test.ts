@@ -15,8 +15,19 @@ const data: EvaluationExport = {
     { label: "Număr completări", value: "5/7" },
   ],
   dimensions: [
-    { name: "Guvernanță", value: { percent: 90 } },
-    { name: "Aspecte financiare", value: "—" },
+    {
+      name: "Guvernanță",
+      value: { percent: 90 },
+      indicators: [
+        { name: "Viziune și misiune", value: { percent: 100 } },
+        { name: "Plan strategic", value: { percent: 80 } },
+      ],
+    },
+    {
+      name: "Aspecte financiare",
+      value: "—",
+      indicators: [{ name: "Legislație", value: "—" }],
+    },
   ],
   respondents: [
     { label: "Evaluator 1", email: "a@x.ro" },
@@ -56,8 +67,17 @@ describe("renderEvaluationWorkbook", () => {
     // A blank row, then the per-dimension block.
     expect(sheet.getCell("A6").value).toBe("Rezultate Generale pe dimensiuni");
     expect(sheet.getCell("A7").value).toBe("Guvernanță");
+    expect(sheet.getCell("A7").font?.bold).toBe(true);
     expect(sheet.getCell("B7").value).toBe(0.9);
-    expect(sheet.getCell("B8").value).toBe("—");
+    // Indicators follow their dimension, indented.
+    expect(sheet.getCell("A8").value).toBe("Viziune și misiune");
+    expect(sheet.getCell("A8").alignment?.indent).toBe(2);
+    expect(sheet.getCell("B8").value).toBe(1);
+    expect(sheet.getCell("B8").numFmt).toBe("0.0%");
+    expect(sheet.getCell("A9").value).toBe("Plan strategic");
+    expect(sheet.getCell("A10").value).toBe("Aspecte financiare");
+    expect(sheet.getCell("B10").value).toBe("—");
+    expect(sheet.getCell("A11").value).toBe("Legislație");
   });
 
   it("keeps points as text so Excel does not read them as dates", async () => {

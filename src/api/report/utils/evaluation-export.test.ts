@@ -6,7 +6,7 @@ const [guvernanta, financiar] = DIMENSIONS;
 
 /** A respondent who submitted every dimension, all answers `answer`. */
 const complete = (email: string, answer: number) => ({
-  user: { email, accountStatus: "active" },
+  user: { nume: `Nume ${email}`, email, accountStatus: "active" },
   dimensions: DIMENSIONS.map((dimension) => ({
     dimensionKey: dimension.key,
     submitted: true,
@@ -25,6 +25,7 @@ const programRound = (evaluations: any[]) => ({
   ong: { name: "Asociația Șoimii Ăștia", cui: "RO123" },
   phases: [
     {
+      title: "Etapa inițială",
       startDate: "2026-03-02",
       endDate: "2026-03-30",
       program: { documentId: "p1", name: "SCA" },
@@ -70,6 +71,7 @@ describe("buildEvaluationExport — Date Generale", () => {
     expect(rows["Email persoană de contact organizație:"]).toBe("ana@ong.ro");
     expect(rows["Telefon persoană de contact organizație"]).toBe("0722");
     expect(rows["Program:"]).toBe("SCA");
+    expect(rows["Fază:"]).toBe("Etapa inițială");
     expect(rows["Expert alocat (persoană resursă FDSC):"]).toBe(
       "Ion Mentor, Maria Mentor",
     );
@@ -99,6 +101,7 @@ describe("buildEvaluationExport — Date Generale", () => {
     expect(rows["Dată început"]).toBe("02.03.2026");
     expect(rows["Dată final"]).toBe("10.04.2026");
     expect(rows["Program:"]).toBe("NA");
+    expect(rows["Fază:"]).toBe("Independentă");
     expect(rows["Expert alocat (persoană resursă FDSC):"]).toBe("NA");
     expect(rows["Nume persoană de contact organizație:"]).toBe("—");
     expect(rows["Scor obținut"]).toBe("—");
@@ -139,21 +142,37 @@ describe("buildEvaluationExport — Date Generale", () => {
     expect(result.dimensions.map((d) => d.name)).toEqual(
       DIMENSIONS.map((d) => d.name),
     );
-    expect(result.dimensions[0]).toEqual({
+    expect(result.dimensions[0]).toMatchObject({
       name: guvernanta.name,
       value: { percent: 100 },
     });
-    expect(result.dimensions[1]).toEqual({
+    expect(result.dimensions[1]).toMatchObject({
       name: financiar.name,
       value: { percent: 0 },
     });
     expect(result.dimensions[2].value).toEqual({ percent: 50 });
   });
+
+  it("lists each dimension's indicators by their tag, with the round average", () => {
+    const result = buildEvaluationExport({
+      report: programRound([complete("a@x.ro", 5), complete("b@x.ro", 3)]),
+      closed: false,
+      admin,
+      mentorNames: [],
+    });
+    const [first] = result.dimensions;
+    expect(first.indicators.map((i) => i.name)).toEqual(
+      guvernanta.quiz.map((q) => (q.tag ?? q.question).trim()),
+    );
+    expect(first.indicators[0].name).toBe("Viziune și misiune");
+    // 5/5 (100%) and 3/5 (50%) average to 75%.
+    expect(first.indicators[0].value).toEqual({ percent: 75 });
+  });
 });
 
 describe("buildEvaluationExport — Rezultate evaluări individuale", () => {
   const partial = {
-    user: { email: "partial@x.ro", accountStatus: "active" },
+    user: { nume: "Paul Parțial", email: "partial@x.ro", accountStatus: "active" },
     dimensions: [
       {
         dimensionKey: guvernanta.key,
@@ -165,36 +184,66 @@ describe("buildEvaluationExport — Rezultate evaluări individuale", () => {
         })),
       },
       {
-        // A draft: answered but not submitted, so it stays out.
+        // A draft halfway through: shown, flagged, and without its argument yet.
         dimensionKey: financiar.key,
         submitted: false,
-        comment: "ciornă",
-        quiz: financiar.quiz.map((question) => ({
+        comment: "",
+        quiz: financiar.quiz.slice(0, 2).map((question) => ({
           questionId: question.id,
           answer: 2,
         })),
       },
     ],
   };
+  const draftOnly = {
+    user: { nume: "Dana Ciornă", email: "draft@x.ro", accountStatus: "active" },
+    dimensions: [
+      {
+        dimensionKey: guvernanta.key,
+        submitted: false,
+        comment: "în lucru",
+        quiz: [{ questionId: guvernanta.quiz[0].id, answer: 3 }],
+      },
+    ],
+  };
   const deleted = {
-    user: { email: "deleted-1@anon", accountStatus: "deleted" },
+    user: { nume: "Anonim abc", email: "deleted-1@anon", accountStatus: "deleted" },
+    dimensions: complete("x", 1).dimensions,
+  };
+  const legacy = { user: null, dimensions: complete("y", 2).dimensions };
+  const untouched = {
+    user: { nume: "Nicio Încercare", email: "none@x.ro", accountStatus: "active" },
     dimensions: [],
   };
 
   const result = buildEvaluationExport({
-    report: programRound([complete("full@x.ro", 5), partial, deleted]),
+    report: programRound([
+      complete("full@x.ro", 5),
+      untouched,
+      partial,
+      draftOnly,
+      deleted,
+      legacy,
+    ]),
     closed: false,
     admin,
     mentorNames: [],
   });
   const row = (label: string) => result.rows.find((r) => r.label === label)!;
 
-  it("has one column per invited respondent, whatever their status", () => {
+  it("names a column per respondent who saved anything, in invitation order", () => {
     expect(result.respondents).toEqual([
-      { label: "Evaluator 1", email: "full@x.ro" },
-      { label: "Evaluator 2", email: "partial@x.ro" },
-      { label: "Evaluator 3", email: "Cont șters" },
+      { label: "Nume full@x.ro", email: "full@x.ro" },
+      { label: "Paul Parțial", email: "partial@x.ro" },
+      { label: "Dana Ciornă", email: "draft@x.ro" },
+      { label: "Cont șters", email: "—" },
+      { label: "Evaluator 1", email: "—" },
     ]);
+  });
+
+  it("still counts everyone invited in Număr completări", () => {
+    const rows = Object.fromEntries(result.general.map((r) => [r.label, r.value]));
+    expect(rows["Număr completări"]).toBe("3/6");
   });
 
   it("numbers dimensions and questions in catalog order", () => {
@@ -218,21 +267,38 @@ describe("buildEvaluationExport — Rezultate evaluări individuale", () => {
   });
 
   it("writes points as text out of the maximum", () => {
-    expect(row(`1. ${guvernanta.name}`).values).toEqual(["25/25", "20/25", null]);
-    expect(
-      row(`1.1. ${guvernanta.quiz[0].question.trim()}`).values,
-    ).toEqual(["5/5", "4/5", null]);
+    expect(row(`1. ${guvernanta.name}`).values).toEqual([
+      "25/25",
+      "20/25",
+      "3/25 (ciornă)",
+      "5/25",
+      "10/25",
+    ]);
+    expect(row(`1.1. ${guvernanta.quiz[0].question.trim()}`).values).toEqual([
+      "5/5",
+      "4/5",
+      "3/5",
+      "1/5",
+      "2/5",
+    ]);
     expect(result.rows[guvernanta.quiz.length + 1].values).toEqual([
       `argument ${guvernanta.key}`,
       "doar prima",
-      null,
+      "în lucru",
+      `argument ${guvernanta.key}`,
+      `argument ${guvernanta.key}`,
     ]);
   });
 
-  it("leaves draft dimensions empty", () => {
-    expect(row(`2. ${financiar.name}`).values).toEqual(["25/25", null, null]);
-    expect(
-      row(`2.1. ${financiar.quiz[0].question.trim()}`).values,
-    ).toEqual(["5/5", null, null]);
+  it("shows a draft's answers so far, flagged on the dimension row", () => {
+    expect(row(`2. ${financiar.name}`).values[1]).toBe("4/25 (ciornă)");
+    expect(row(`2.1. ${financiar.quiz[0].question.trim()}`).values[1]).toBe("2/5");
+    expect(row(`2.3. ${financiar.quiz[2].question.trim()}`).values[1]).toBeNull();
+    // No argument written yet: left empty rather than "—".
+    expect(result.rows[2 * (guvernanta.quiz.length + 2) - 1].values[1]).toBeNull();
+  });
+
+  it("leaves dimensions never opened empty", () => {
+    expect(row(`2. ${financiar.name}`).values[2]).toBeNull();
   });
 });
