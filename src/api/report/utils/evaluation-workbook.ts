@@ -53,7 +53,13 @@ const addGeneralSheet = (workbook: ExcelJS.Workbook, data: EvaluationExport) => 
   };
   for (const dimension of data.dimensions) {
     const added = sheet.addRow([dimension.name]);
+    added.font = { bold: true };
     setValue(added.getCell(2), dimension.value);
+    for (const indicator of dimension.indicators) {
+      const row = sheet.addRow([indicator.name]);
+      row.getCell(1).alignment = { indent: 2 };
+      setValue(row.getCell(2), indicator.value);
+    }
   }
 };
 
