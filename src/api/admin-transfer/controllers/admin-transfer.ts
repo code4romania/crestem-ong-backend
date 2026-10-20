@@ -1,7 +1,7 @@
 /**
  * Transfer rol Admin ONG — HTTP layer. The rules live in
  * `../services/transfer-flow.ts`; this file resolves who is asking, for which
- * organization, and maps `{ error }` results onto 400 answers.
+ * organization, and maps `{ error }` results onto 400 answers
  */
 import { Context } from "koa";
 import { requireOng } from "../../../utils/ong-scope";
@@ -40,8 +40,13 @@ const emailSentMessage = (emailSent: boolean, sent: string) =>
     ? sent
     : "Transferul a fost creat, dar emailul nu a putut fi trimis. Folosește „Retrimite”.";
 
-async function passwordMatches(userId: number, password: string): Promise<boolean> {
-  const user = await strapi.db.query(USER_UID).findOne({ where: { id: userId } });
+async function passwordMatches(
+  userId: number,
+  password: string,
+): Promise<boolean> {
+  const user = await strapi.db
+    .query(USER_UID)
+    .findOne({ where: { id: userId } });
   if (!user) return false;
   return strapi
     .plugin("users-permissions")
@@ -52,7 +57,9 @@ async function passwordMatches(userId: number, password: string): Promise<boolea
 /** The ONG admin's pending transfer, only when `:documentId` names it. */
 async function ownPendingTransfer(
   ctx: Context,
-): Promise<{ transfer: TransferRecord } | { status: 400 | 403; message: string }> {
+): Promise<
+  { transfer: TransferRecord } | { status: 400 | 403; message: string }
+> {
   const scope = await requireOng(strapi, ctx);
   if ("error" in scope) return { status: 400, message: scope.error };
   const transfer = await findPendingForOng(deps(), scope.ong.documentId);
@@ -78,7 +85,10 @@ export default {
     const transfer = await findPendingForOng(deps(), scope.ong.documentId);
     return {
       data: transfer
-        ? toTransferView(transfer, canNgoAdminManage(transfer, ctx.state.user.documentId))
+        ? toTransferView(
+            transfer,
+            canNgoAdminManage(transfer, ctx.state.user.documentId),
+          )
         : null,
     };
   },
@@ -100,7 +110,10 @@ export default {
     const { password: _password, ...target } = parsed.data;
     const result = await createTransfer(deps(), {
       ong,
-      initiator: { documentId: ctx.state.user.documentId, nume: scope.user.nume },
+      initiator: {
+        documentId: ctx.state.user.documentId,
+        nume: scope.user.nume,
+      },
       initiatedBy: "ngo-admin",
       // Validated above; `strict: false` only widens zod's inferred type.
       target: target as TransferTarget,
@@ -109,16 +122,26 @@ export default {
     return {
       data: toTransferView(result.data.transfer, true),
       emailSent: result.data.emailSent,
-      message: emailSentMessage(result.data.emailSent, "Propunerea de transfer a fost trimisă."),
+      message: emailSentMessage(
+        result.data.emailSent,
+        "Propunerea de transfer a fost trimisă.",
+      ),
     };
   },
 
   async cancel(ctx: Context) {
     const found = await ownPendingTransfer(ctx);
     if ("message" in found) {
-      return found.status === 403 ? ctx.forbidden(found.message) : ctx.badRequest(found.message);
+      return found.status === 403
+        ? ctx.forbidden(found.message)
+        : ctx.badRequest(found.message);
     }
-    const result = await cancelTransfer(deps(), found.transfer, ctx.state.user.documentId, false);
+    const result = await cancelTransfer(
+      deps(),
+      found.transfer,
+      ctx.state.user.documentId,
+      false,
+    );
     if ("error" in result) return ctx.badRequest(result.error);
     return { message: "Transferul a fost anulat." };
   },
@@ -126,7 +149,9 @@ export default {
   async resend(ctx: Context) {
     const found = await ownPendingTransfer(ctx);
     if ("message" in found) {
-      return found.status === 403 ? ctx.forbidden(found.message) : ctx.badRequest(found.message);
+      return found.status === 403
+        ? ctx.forbidden(found.message)
+        : ctx.badRequest(found.message);
     }
     const result = await resendTransfer(deps(), found.transfer);
     if ("error" in result) return ctx.badRequest(result.error);
@@ -145,7 +170,10 @@ export default {
     if (!ong) return ctx.badRequest(TRANSFER_MESSAGES.ONG_NOT_FOUND);
     const transfer = await findPendingForOng(deps(), ong.documentId);
     const members: any[] = await strapi.documents(USER_UID).findMany({
-      filters: { ong: { documentId: ong.documentId }, role: { type: "ngo-member" } },
+      filters: {
+        ong: { documentId: ong.documentId },
+        role: { type: "ngo-member" },
+      },
       sort: { nume: "asc" },
     });
     return {
@@ -171,7 +199,10 @@ export default {
     if (!ong) return ctx.badRequest(TRANSFER_MESSAGES.ONG_NOT_FOUND);
     const result = await createTransfer(deps(), {
       ong,
-      initiator: { documentId: ctx.state.user.documentId, nume: ctx.state.user.nume },
+      initiator: {
+        documentId: ctx.state.user.documentId,
+        nume: ctx.state.user.nume,
+      },
       initiatedBy: "fdsc",
       target: parsed.data as TransferTarget,
     });
@@ -179,14 +210,22 @@ export default {
     return {
       data: toTransferView(result.data.transfer, true),
       emailSent: result.data.emailSent,
-      message: emailSentMessage(result.data.emailSent, "Propunerea de transfer a fost trimisă."),
+      message: emailSentMessage(
+        result.data.emailSent,
+        "Propunerea de transfer a fost trimisă.",
+      ),
     };
   },
 
   async fdscCancel(ctx: Context) {
     const transfer = await findPendingForOng(deps(), ctx.params.documentId);
     if (!transfer) return ctx.badRequest(TRANSFER_MESSAGES.NO_PENDING);
-    const result = await cancelTransfer(deps(), transfer, ctx.state.user.documentId, true);
+    const result = await cancelTransfer(
+      deps(),
+      transfer,
+      ctx.state.user.documentId,
+      true,
+    );
     if ("error" in result) return ctx.badRequest(result.error);
     return { message: "Transferul a fost anulat." };
   },
@@ -208,7 +247,9 @@ export default {
 
   /** The signed-in member's pending proposal, shown on their profile (D11). */
   async incoming(ctx: Context) {
-    return { data: await findIncomingTransfer(deps(), ctx.state.user.documentId) };
+    return {
+      data: await findIncomingTransfer(deps(), ctx.state.user.documentId),
+    };
   },
 
   async preview(ctx: Context) {
@@ -220,7 +261,11 @@ export default {
   async accept(ctx: Context) {
     const parsed = tokenSchema.safeParse(ctx.request.body);
     if (!parsed.success) return ctx.badRequest(TRANSFER_MESSAGES.INVALID_LINK);
-    const result = await acceptTransfer(deps(), parsed.data.token, ctx.state.user.documentId);
+    const result = await acceptTransfer(
+      deps(),
+      parsed.data.token,
+      ctx.state.user.documentId,
+    );
     if ("error" in result) return ctx.badRequest(result.error);
     return { message: "Ai preluat rolul de administrator al organizației." };
   },
@@ -228,17 +273,27 @@ export default {
   async decline(ctx: Context) {
     const parsed = tokenSchema.safeParse(ctx.request.body);
     if (!parsed.success) return ctx.badRequest(TRANSFER_MESSAGES.INVALID_LINK);
-    const result = await declineTransfer(deps(), parsed.data.token, ctx.state.user.documentId);
+    const result = await declineTransfer(
+      deps(),
+      parsed.data.token,
+      ctx.state.user.documentId,
+    );
     if ("error" in result) return ctx.badRequest(result.error);
     return { message: "Ai refuzat propunerea." };
   },
 
   async acceptNew(ctx: Context) {
-    const parsed = await acceptNewAccountSchema.safeParseAsync(ctx.request.body);
+    const parsed = await acceptNewAccountSchema.safeParseAsync(
+      ctx.request.body,
+    );
     if (!parsed.success) {
       return ctx.badRequest("Date invalide: ", parsed.error.flatten());
     }
-    const result = await acceptNewAccount(deps(), parsed.data.token, parsed.data.password);
+    const result = await acceptNewAccount(
+      deps(),
+      parsed.data.token,
+      parsed.data.password,
+    );
     if ("error" in result) return ctx.badRequest(result.error);
 
     // US-3 step 8: the new admin lands in the ONG dashboard already signed in.
@@ -246,7 +301,10 @@ export default {
     const refreshToken = await (
       strapi.service("api::refresh-token.refresh-token") as RefreshTokenService
     ).issue(userId, ctx.request.header["user-agent"]);
-    const jwt = strapi.plugin("users-permissions").service("jwt").issue({ id: userId });
+    const jwt = strapi
+      .plugin("users-permissions")
+      .service("jwt")
+      .issue({ id: userId });
     return {
       jwt,
       refreshToken,
