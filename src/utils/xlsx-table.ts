@@ -23,10 +23,18 @@ export interface TableColumn {
 
 export type TableCell = string | number | null;
 
+/** A record row nested under the row above it, collapsible with Excel's +/−. */
+export interface GroupedRow {
+  cells: TableCell[];
+  outlineLevel: number;
+}
+
+export type TableRow = TableCell[] | GroupedRow;
+
 export interface TableExport {
   sheetName: string;
   columns: TableColumn[];
-  rows: TableCell[][];
+  rows: TableRow[];
 }
 
 /**
@@ -62,6 +70,8 @@ export const renderTableWorkbook = async ({
   workbook.creator = "Creștem ONG";
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: "frozen", ySplit: 1 }],
+    // A group's +/− sits on the row it hangs from, above its nested rows.
+    properties: { outlineProperties: { summaryBelow: false } } as any,
   });
   sheet.columns = columns.map((column) => ({
     width: column.width,
@@ -84,10 +94,14 @@ export const renderTableWorkbook = async ({
   };
 
   for (const row of rows) {
+    const cells = Array.isArray(row) ? row : row.cells;
     const added = sheet.addRow(
-      row.map((value, index) => cellValue(value, columns[index]?.type)),
+      cells.map((value, index) => cellValue(value, columns[index]?.type)),
     );
     added.height = DATA_ROW_HEIGHT;
+    if (!Array.isArray(row) && row.outlineLevel > 0) {
+      added.outlineLevel = row.outlineLevel;
+    }
   }
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
