@@ -1,6 +1,11 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { DATE_FORMAT, renderTableWorkbook } from "./xlsx-table";
+import {
+  DATA_ROW_HEIGHT,
+  DATE_FORMAT,
+  PERCENT_FORMAT,
+  renderTableWorkbook,
+} from "./xlsx-table";
 
 const readBack = async () => {
   const buffer = await renderTableWorkbook({
@@ -36,8 +41,28 @@ describe("renderTableWorkbook", () => {
     expect(cell.numFmt).toBe(DATE_FORMAT);
   });
 
+  it("keeps every record row one line tall, multi-line cells included", async () => {
+    const sheet = await readBack();
+    expect(sheet.getRow(2).height).toBe(DATA_ROW_HEIGHT);
+    expect(sheet.getRow(3).height).toBe(DATA_ROW_HEIGHT);
+  });
+
   it("keeps a placeholder in a date column as text", async () => {
     expect((await readBack()).getCell("B3").value).toBe("—");
+  });
+
+  it("turns 0–100 into a formatted percentage, keeping placeholders as text", async () => {
+    const buffer = await renderTableWorkbook({
+      sheetName: "Runde",
+      columns: [{ header: "Scor (%)", width: 10, type: "percent" }],
+      rows: [[72.5], ["—"]],
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const sheet = workbook.getWorksheet("Runde")!;
+    expect(sheet.getCell("A2").value).toBe(0.725);
+    expect(sheet.getCell("A2").numFmt).toBe(PERCENT_FORMAT);
+    expect(sheet.getCell("A3").value).toBe("—");
   });
 
   it("keeps numbers numeric and slashes as text", async () => {

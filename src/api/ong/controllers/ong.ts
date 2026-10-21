@@ -43,6 +43,7 @@ import { renderEvaluationWorkbook } from "../../report/utils/evaluation-workbook
 import { renderTableWorkbook } from "../../../utils/xlsx-table";
 import { ongListFilters } from "../utils/list-filters";
 import { buildOngListExport } from "../utils/list-export";
+import { assignedMentorsByOng, mentorsAcross } from "../../../utils/ngo-mentors";
 import { docRef } from "../../../utils/relations";
 import { DIMENSIONS } from "../../../constants/dimensions";
 
@@ -235,7 +236,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     })) as any[];
     const ids = ongs.map((ong) => ong.documentId);
 
-    const [members, reports, mentorRows] = await Promise.all([
+    const [members, reports, mentorsByProgram] = await Promise.all([
       membersByOng(strapi, ids),
       ids.length
         ? strapi.documents("api::report.report").findMany({
@@ -248,19 +249,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
             },
           })
         : Promise.resolve([]),
-      ids.length
-        ? strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
-            filters: {
-              ong: { documentId: { $in: ids } },
-              ...(program ? { program: { documentId: program } } : {}),
-            },
-            populate: {
-              ong: true,
-              program: { populate: { mentors: true } },
-              mentors: true,
-            },
-          })
-        : Promise.resolve([]),
+      assignedMentorsByOng(strapi, ids, program),
     ]);
 
     const reportsByOng = new Map<string, any[]>();
@@ -270,34 +259,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       reportsByOng.set(ongId, [...(reportsByOng.get(ongId) ?? []), report]);
     }
 
-    // A mentor dropped from the program stays on the `ngo-mentor` row, so keep
-    // only those the program still lists — the rule `ngoMentorsFor` applies.
-    const mentorsByOng = new Map<string, Map<string, any>>();
-    const asList = (value: any) =>
-      Array.isArray(value) ? value : value ? [value] : [];
-    for (const row of mentorRows as any[]) {
-      const inProgram = new Set(
-        asList(row.program).flatMap((p: any) =>
-          asList(p.mentors).map((mentor: any) => mentor.documentId),
-        ),
-      );
-      for (const ong of asList(row.ong)) {
-        const byId = mentorsByOng.get(ong.documentId) ?? new Map();
-        for (const mentor of asList(row.mentors)) {
-          if (inProgram.has(mentor.documentId)) {
-            byId.set(mentor.documentId, mentor);
-          }
-        }
-        mentorsByOng.set(ong.documentId, byId);
-      }
-    }
-
     const data = buildOngListExport({
       ongs,
       members,
       reportsByOng,
       mentorsByOng: new Map(
-        [...mentorsByOng].map(([id, byId]) => [id, [...byId.values()]]),
+        ids.map((id) => [id, mentorsAcross(mentorsByProgram.get(id))]),
       ),
       program,
       today: todayInBucharest(),

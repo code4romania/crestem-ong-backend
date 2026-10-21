@@ -1,5 +1,5 @@
 import { DIMENSIONS } from "../../../constants/dimensions";
-import { toDateString } from "../../../utils/date";
+import { bucharestDay } from "../../../utils/date";
 import type { TableCell, TableColumn, TableExport } from "../../../utils/xlsx-table";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { isClosed } from "../../report/utils/lifecycle";
@@ -12,7 +12,6 @@ import { isClosed } from "../../report/utils/lifecycle";
 
 const MISSING = "—";
 const RETIRED_SUFFIX = " (Retras)";
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export const ONG_LIST_COLUMNS: TableColumn[] = [
   { header: "CIF", width: 14 },
@@ -56,14 +55,6 @@ const text = (value: unknown): string => {
   return trimmed || MISSING;
 };
 
-/** The Bucharest calendar day of a date or datetime. */
-const dayOf = (value: unknown): string | null => {
-  if (!value) return null;
-  if (typeof value === "string" && DATE_ONLY.test(value)) return value;
-  const date = new Date(value as string);
-  return Number.isNaN(date.getTime()) ? null : toDateString(date);
-};
-
 /**
  * When the latest finished round closed: its `finishedAt`, or the end of its
  * last phase for a round that closed on its own. Same rule as the overview.
@@ -73,9 +64,9 @@ export const lastEvaluationDay = (reports: any[], today: string) =>
     .filter((report) => isClosed(report, today))
     .map(
       (report) =>
-        dayOf(report.finishedAt) ??
+        bucharestDay(report.finishedAt) ??
         ((report.phases ?? []) as any[])
-          .map((phase) => dayOf(phase.endDate))
+          .map((phase) => bucharestDay(phase.endDate))
           .filter(Boolean)
           .sort()
           .pop() ??
@@ -122,7 +113,7 @@ const ongRow = (ong: any, input: OngListExportInput): TableCell[] => {
     programs.length
       ? programs.map((program) => program.name).join(", ")
       : MISSING,
-    dayOf(ong.createdAt) ?? MISSING,
+    bucharestDay(ong.createdAt) ?? MISSING,
     lastEvaluation ?? MISSING,
     reports.length,
     completedEvaluations(reports, input.today),

@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "program_enrollments",
+  "info": {
+    "singularName": "program-enrollment",
+    "pluralName": "program-enrollments",
+    "displayName": "ProgramEnrollment",
+    "description": "When an organization was added to a program. Membership itself stays on program.ongs; this only dates it."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "ong": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ong.ong"
+    },
+    "program": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::program.program"
+    },
+    "joinedAt": {
+      "type": "datetime",
+      "required": true
+    }
+  }
+}
