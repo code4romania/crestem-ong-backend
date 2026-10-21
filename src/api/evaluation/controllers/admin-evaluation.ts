@@ -2,8 +2,10 @@ import { Context } from "koa";
 import { pageSlice } from "../../../utils/pagination";
 import {
   ADMIN_EVALUATION_POPULATE,
+  ADMIN_EVALUATION_SCOPE_QUERY,
   adminEvaluationDbFilters,
   buildAdminEvaluationRows,
+  inOrder,
   needsInMemoryPagination,
   paginate,
 } from "../utils/admin-list";
@@ -41,11 +43,27 @@ export default {
       });
 
     if (needsInMemoryPagination({ status, programs })) {
-      const evaluations = await strapi
+      // Cut the page on light rows, then load the answers for the responses on
+      // it alone.
+      const scope = await strapi
         .documents("api::evaluation.evaluation")
-        .findMany({ filters, populate: ADMIN_EVALUATION_POPULATE });
-      const { data, pagination } = paginate(rowsOf(evaluations), page, PAGE_SIZE);
-      return { data, meta: { pagination } };
+        .findMany({ filters, ...(ADMIN_EVALUATION_SCOPE_QUERY as any) });
+      const { data: picked, pagination } = paginate(
+        rowsOf(scope),
+        page,
+        PAGE_SIZE,
+      );
+      const ids = picked.map((row) => row.documentId);
+      const evaluations = ids.length
+        ? await strapi.documents("api::evaluation.evaluation").findMany({
+            filters: { documentId: { $in: ids } },
+            populate: ADMIN_EVALUATION_POPULATE,
+          })
+        : [];
+      const rows = buildAdminEvaluationRows(evaluations as any[], {
+        today: todayInBucharest(),
+      });
+      return { data: inOrder(ids, rows), meta: { pagination } };
     }
 
     const [evaluations, total] = await Promise.all([

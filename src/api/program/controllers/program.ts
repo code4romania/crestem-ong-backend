@@ -36,6 +36,10 @@ import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
+import {
+  recordEnrollments,
+  removeEnrollments,
+} from "../../../utils/program-enrollments";
 import { isAnonymized } from "../../../utils/anonymize";
 
 const ongView = (ong: any) => ({
@@ -879,6 +883,7 @@ export default factories.createCoreController(
         data: { ongs: { connect: docRefs(ongIds) } },
         populate: { ongs: true },
       });
+      await recordEnrollments(strapi, program.documentId, ongIds);
       for (const pick of picks) {
         const phase = phaseByOng.get(pick.ong);
         await strapi.documents("api::report.report").update({
@@ -1100,6 +1105,7 @@ export default factories.createCoreController(
         documentId: program.documentId,
         data: { ongs: { disconnect: docRefs(ongIds) } },
       });
+      await removeEnrollments(strapi, program.documentId, ongIds);
       return { message: "Organizațiile au fost eliminate din program" };
     },
   }),

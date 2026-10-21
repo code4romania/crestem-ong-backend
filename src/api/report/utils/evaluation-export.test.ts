@@ -52,6 +52,25 @@ describe("exportFileName", () => {
 });
 
 describe("buildEvaluationExport — Date Generale", () => {
+  it("puts one line per program, its phase on the matching line", () => {
+    const report = programRound([]);
+    report.phases = [
+      {
+        title: "Etapa inițială",
+        startDate: "2026-03-05",
+        endDate: "2026-04-04",
+        program: { documentId: "p2", name: "SCA1 - ARC" },
+      } as any,
+      ...report.phases,
+    ];
+    const rows = general(
+      buildEvaluationExport({ report, closed: false, admin, mentorNames: [] }),
+    );
+    // Ordered by phase start: SCA (2 March) before SCA1 - ARC (5 March).
+    expect(rows["Program:"]).toBe("SCA\nSCA1 - ARC");
+    expect(rows["Fază:"]).toBe("Etapa inițială\nEtapa inițială");
+  });
+
   it("fills the round, organization, contact, program and experts", () => {
     const result = buildEvaluationExport({
       report: programRound([complete("a@x.ro", 5), complete("b@x.ro", 3)]),

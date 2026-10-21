@@ -17,6 +17,41 @@ export const ADMIN_EVALUATION_POPULATE = {
   },
 } as const;
 
+/**
+ * Just what the status and the program filter read — submitted flags, the
+ * round's closing state and phases — for cutting a page when either filter is
+ * applied. No answers: loading every response's fifty of them to keep twenty
+ * rows is what made those filters slow. The page's rows then load with
+ * `ADMIN_EVALUATION_POPULATE`.
+ */
+export const ADMIN_EVALUATION_SCOPE_QUERY = {
+  fields: ["createdAt"],
+  populate: {
+    dimensions: { fields: ["dimensionKey", "submitted"] },
+    user: { fields: ["nume"] },
+    report: {
+      fields: ["finished", "createdAt"],
+      populate: {
+        phases: {
+          fields: ["endDate"],
+          populate: { program: { fields: ["name"] } },
+        },
+      },
+    },
+  },
+} as const;
+
+/** `rows` in the order of `documentIds`, dropping any that did not load. */
+export const inOrder = <T extends { documentId: string }>(
+  documentIds: string[],
+  rows: T[],
+): T[] => {
+  const byId = new Map(rows.map((row) => [row.documentId, row]));
+  return documentIds
+    .map((documentId) => byId.get(documentId))
+    .filter((row): row is T => Boolean(row));
+};
+
 /** The program-filter entry that selects the rounds outside every program. */
 export const INDEPENDENT = "independent";
 

@@ -152,6 +152,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   // rounds. Read-only, so the editor keeps them too.
   "api::evaluation.admin-evaluation.list",
   "api::report.admin-report.list",
+  "api::report.admin-report.exportList",
   // The options behind that screen's multi-select filters.
   "api::ong.filter-options.ongs",
   "api::ong.filter-options.programs",

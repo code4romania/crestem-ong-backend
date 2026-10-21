@@ -1437,6 +1437,38 @@ export interface ApiPhasePhase extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiProgramEnrollmentProgramEnrollment
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'program_enrollments';
+  info: {
+    description: 'When an organization was added to a program. Membership itself stays on program.ongs; this only dates it.';
+    displayName: 'ProgramEnrollment';
+    pluralName: 'program-enrollments';
+    singularName: 'program-enrollment';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    joinedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::program-enrollment.program-enrollment'
+    > &
+      Schema.Attribute.Private;
+    ong: Schema.Attribute.Relation<'manyToOne', 'api::ong.ong'>;
+    program: Schema.Attribute.Relation<'manyToOne', 'api::program.program'>;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiProgramProgram extends Struct.CollectionTypeSchema {
   collectionName: 'programs';
   info: {
@@ -2127,6 +2159,7 @@ declare module '@strapi/strapi' {
       'api::ong.ong': ApiOngOng;
       'api::page.page': ApiPagePage;
       'api::phase.phase': ApiPhasePhase;
+      'api::program-enrollment.program-enrollment': ApiProgramEnrollmentProgramEnrollment;
       'api::program.program': ApiProgramProgram;
       'api::refresh-token.refresh-token': ApiRefreshTokenRefreshToken;
       'api::report.report': ApiReportReport;
