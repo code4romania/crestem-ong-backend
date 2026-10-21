@@ -20,6 +20,21 @@ export const ADMIN_REPORT_POPULATE = {
   evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
 } as const;
 
+/**
+ * Just what the round status and the program filter read, for cutting a page
+ * when either is applied: no respondents, no answers. The page's rows then load
+ * with `ADMIN_REPORT_POPULATE`.
+ */
+export const ADMIN_REPORT_SCOPE_QUERY = {
+  fields: ["finished", "createdAt"],
+  populate: {
+    phases: {
+      fields: ["endDate"],
+      populate: { program: { fields: ["name"] } },
+    },
+  },
+} as const;
+
 /** A round is running until it is finished by hand or its phases have all ended. */
 export type RoundStatus = "in_desfasurare" | "finalizata";
 

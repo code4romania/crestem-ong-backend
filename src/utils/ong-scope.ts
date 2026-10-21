@@ -65,8 +65,20 @@ export const requestedOng = (ctx: Context): string | undefined => {
 export const getOngAdminNames = async (
   strapi: any,
   ongDocumentIds: string[],
-): Promise<Map<string, string>> => {
-  const map = new Map<string, string>();
+): Promise<Map<string, string>> =>
+  new Map(
+    [...(await getOngAdmins(strapi, ongDocumentIds))].map(([ongId, admin]) => [
+      ongId,
+      admin.nume,
+    ]),
+  );
+
+/** Each organization's admin account, in one read for all of them. */
+export const getOngAdmins = async (
+  strapi: any,
+  ongDocumentIds: string[],
+): Promise<Map<string, any>> => {
+  const map = new Map<string, any>();
   if (ongDocumentIds.length === 0) {
     return map;
   }
@@ -82,7 +94,7 @@ export const getOngAdminNames = async (
   for (const admin of admins as any[]) {
     for (const ong of (admin.ong ?? []) as any[]) {
       if (ong?.documentId && !map.has(ong.documentId)) {
-        map.set(ong.documentId, admin.nume);
+        map.set(ong.documentId, admin);
       }
     }
   }

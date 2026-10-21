@@ -2,7 +2,6 @@ import { DIMENSIONS } from "../../../constants/dimensions";
 import { toDateString, toDisplayDate } from "../../../utils/date";
 import { isAnonymized } from "../../../utils/anonymize";
 import { computeProgress } from "../../evaluation/utils/progress";
-import { programsOfReport } from "../../evaluation/utils/admin-list";
 import { computeReportScores } from "./scores";
 
 /**
@@ -193,11 +192,14 @@ export const buildEvaluationExport = ({
   const completed = evaluations.filter(
     (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
   ).length;
-  const programs = programsOfReport(report).map((program) => program.name);
   const { startDay, start, end } = period(report, closed);
-  const phases = ((report.phases ?? []) as any[])
-    .map((phase) => phase.title?.trim())
-    .filter(Boolean);
+  // One line per program, the phase on the same line of the next row, for a
+  // round that sits in several programs at once.
+  const phases = [...((report.phases ?? []) as any[])].sort((a, b) =>
+    `${a.startDate ?? ""}`.localeCompare(`${b.startDate ?? ""}`),
+  );
+  const programs = phases.map((phase) => orMissing(phase.program?.name));
+  const phaseTitles = phases.map((phase) => orMissing(phase.title));
 
   const general: GeneralRow[] = [
     { label: "ID:", value: report.documentId },
@@ -221,11 +223,11 @@ export const buildEvaluationExport = ({
     },
     {
       label: "Program:",
-      value: programs.length ? programs.join(", ") : NOT_AVAILABLE,
+      value: programs.length ? programs.join("\n") : NOT_AVAILABLE,
     },
     {
       label: "Fază:",
-      value: phases.length ? phases.join(", ") : INDEPENDENT,
+      value: phaseTitles.length ? phaseTitles.join("\n") : INDEPENDENT,
     },
     {
       label: "Expert alocat (persoană resursă FDSC):",

@@ -28,6 +28,10 @@ const WRAP_TOP: Partial<ExcelJS.Alignment> = {
 const setValue = (cell: ExcelJS.Cell, value: GeneralValue) => {
   if (typeof value === "string") {
     cell.value = value;
+    // One line per program for a round in several.
+    if (value.includes("\n")) {
+      cell.alignment = { wrapText: true, vertical: "top" };
+    }
     return;
   }
   cell.value = value.percent / 100;

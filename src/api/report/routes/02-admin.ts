@@ -7,5 +7,11 @@ export default {
       // Both FDSC accounts read this screen; it carries no write action.
       config: { policies: ["global::is-fdsc-staff"] },
     },
+    {
+      method: "GET",
+      path: "/admin/reports/export",
+      handler: "admin-report.exportList",
+      config: { policies: ["global::is-fdsc-staff"] },
+    },
   ],
 };

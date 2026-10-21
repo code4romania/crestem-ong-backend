@@ -53,3 +53,78 @@ export async function ngoMentorsFor(
     .map(mentorView)
     .filter((mentor) => programMentorIds.has(mentor.documentId));
 }
+
+const asList = (value: any): any[] =>
+  Array.isArray(value) ? value : value ? [value] : [];
+
+/**
+ * Every assigned mentor of the given organizations, per organization and per
+ * program, in a handful of reads rather than one per organization. Like
+ * `ngoMentorsFor`, a mentor dropped from the program itself is left out even
+ * though the `ngo-mentor` row still lists them. `programDocumentId` narrows the
+ * read to one program.
+ */
+export async function assignedMentorsByOng(
+  strapi: any,
+  ongDocumentIds: string[],
+  programDocumentId?: string,
+): Promise<Map<string, Map<string, any[]>>> {
+  const byOng = new Map<string, Map<string, Map<string, any>>>();
+  if (ongDocumentIds.length > 0) {
+    const rows = await strapi.documents("api::ngo-mentor.ngo-mentor").findMany({
+      filters: {
+        ong: { documentId: { $in: ongDocumentIds } },
+        ...(programDocumentId
+          ? { program: { documentId: programDocumentId } }
+          : {}),
+      },
+      populate: {
+        ong: true,
+        program: { populate: { mentors: true } },
+        mentors: true,
+      },
+    });
+    for (const row of rows as any[]) {
+      for (const program of asList(row.program)) {
+        const inProgram = new Set(
+          asList(program.mentors).map((mentor) => mentor.documentId),
+        );
+        for (const ong of asList(row.ong)) {
+          const byProgram = byOng.get(ong.documentId) ?? new Map();
+          const mentors = byProgram.get(program.documentId) ?? new Map();
+          for (const mentor of asList(row.mentors)) {
+            if (inProgram.has(mentor.documentId)) {
+              mentors.set(mentor.documentId, mentor);
+            }
+          }
+          byProgram.set(program.documentId, mentors);
+          byOng.set(ong.documentId, byProgram);
+        }
+      }
+    }
+  }
+  return new Map(
+    [...byOng].map(([ongId, byProgram]) => [
+      ongId,
+      new Map(
+        [...byProgram].map(([programId, mentors]) => [
+          programId,
+          [...mentors.values()],
+        ]),
+      ),
+    ]),
+  );
+}
+
+/** One organization's mentors across the given programs (all when omitted), once each. */
+export const mentorsAcross = (
+  byProgram: Map<string, any[]> | undefined,
+  programDocumentIds?: string[],
+): any[] => {
+  const unique = new Map<string, any>();
+  for (const [programId, mentors] of byProgram ?? []) {
+    if (programDocumentIds && !programDocumentIds.includes(programId)) continue;
+    for (const mentor of mentors) unique.set(mentor.documentId, mentor);
+  }
+  return [...unique.values()];
+};

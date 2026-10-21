@@ -6,14 +6,15 @@ import ExcelJS from "exceljs";
  * its own two-sheet layout in `report/utils/evaluation-workbook.ts`.
  */
 
-export type TableColumnType = "text" | "number" | "date";
+export type TableColumnType = "text" | "number" | "date" | "percent";
 
 export interface TableColumn {
   header: string;
   width: number;
   /**
    * `date` cells take a `YYYY-MM-DD` calendar day and become real Excel dates;
-   * any other string in them (e.g. "—") is written as text.
+   * `percent` cells take 0–100 and become fractions with a `%` format. Any
+   * other string in either (e.g. "—") is written as text.
    */
   type?: TableColumnType;
   /** Multi-line cells, e.g. one entry per line. */
@@ -28,7 +29,15 @@ export interface TableExport {
   rows: TableCell[][];
 }
 
+/**
+ * Every record row is one line tall, whatever its longest cell: a long argument
+ * would otherwise make Excel stretch the row to fit it. Wrapping stays on, so
+ * "AutoFit Row Height" still shows the whole text; the formula bar always does.
+ */
+export const DATA_ROW_HEIGHT = 15;
+
 export const DATE_FORMAT = "dd.mm.yyyy";
+export const PERCENT_FORMAT = "0.0%";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -37,6 +46,9 @@ const cellValue = (value: TableCell, type: TableColumnType | undefined) => {
     // Midnight UTC: exceljs converts dates to serials in UTC, so this lands on
     // the same calendar day whatever the server's time zone.
     return new Date(`${value}T00:00:00.000Z`);
+  }
+  if (type === "percent" && typeof value === "number") {
+    return value / 100;
   }
   return value;
 };
@@ -55,8 +67,10 @@ export const renderTableWorkbook = async ({
     width: column.width,
     style:
       column.type === "date"
-        ? { numFmt: DATE_FORMAT, alignment: { horizontal: "left" } }
-        : column.wrap
+        ? { numFmt: DATE_FORMAT, alignment: { horizontal: "left", vertical: "top" } }
+        : column.type === "percent"
+          ? { numFmt: PERCENT_FORMAT, alignment: { horizontal: "left", vertical: "top" } }
+          : column.wrap
           ? { alignment: { wrapText: true, vertical: "top" } }
           : { alignment: { vertical: "top" } },
   }));
@@ -70,7 +84,10 @@ export const renderTableWorkbook = async ({
   };
 
   for (const row of rows) {
-    sheet.addRow(row.map((value, index) => cellValue(value, columns[index]?.type)));
+    const added = sheet.addRow(
+      row.map((value, index) => cellValue(value, columns[index]?.type)),
+    );
+    added.height = DATA_ROW_HEIGHT;
   }
 
   return Buffer.from(await workbook.xlsx.writeBuffer());
