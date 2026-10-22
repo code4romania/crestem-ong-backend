@@ -65,6 +65,22 @@ describe("renderTableWorkbook", () => {
     expect(sheet.getCell("A3").value).toBe("—");
   });
 
+  it("nests grouped rows under the row above them", async () => {
+    const buffer = await renderTableWorkbook({
+      sheetName: "Runde",
+      columns: [{ header: "ID", width: 10 }],
+      rows: [["r1"], { cells: ["e1"], outlineLevel: 1 }, ["r2"]],
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const sheet = workbook.getWorksheet("Runde")!;
+    expect(sheet.getCell("A3").value).toBe("e1");
+    expect(sheet.getRow(2).outlineLevel ?? 0).toBe(0);
+    expect(sheet.getRow(3).outlineLevel).toBe(1);
+    expect(sheet.getRow(4).outlineLevel ?? 0).toBe(0);
+    expect(sheet.getRow(3).height).toBe(DATA_ROW_HEIGHT);
+  });
+
   it("keeps numbers numeric and slashes as text", async () => {
     const sheet = await readBack();
     expect(sheet.getCell("C2").value).toBe(4);

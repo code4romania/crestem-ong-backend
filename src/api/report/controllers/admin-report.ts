@@ -13,8 +13,8 @@ import { todayInBucharest } from "../../../utils/date";
 import { getOngAdmins } from "../../../utils/ong-scope";
 import { assignedMentorsByOng } from "../../../utils/ngo-mentors";
 import { enrollmentDates } from "../../../utils/program-enrollments";
-import { renderTableWorkbook, type TableCell } from "../../../utils/xlsx-table";
-import { ROUNDS_COLUMNS, roundRow, roundsFileName } from "../utils/rounds-export";
+import { renderTableWorkbook, type TableRow } from "../../../utils/xlsx-table";
+import { ROUNDS_COLUMNS, roundRows, roundsFileName } from "../utils/rounds-export";
 
 const PAGE_SIZE = 20;
 
@@ -32,7 +32,12 @@ const ROUNDS_EXPORT_POPULATE = {
     },
   },
   phases: { populate: { program: true } },
-  evaluations: { populate: { dimensions: { populate: { quiz: true } } } },
+  evaluations: {
+    populate: {
+      dimensions: { populate: { quiz: true } },
+      user: true,
+    },
+  },
 } as const;
 
 export default {
@@ -110,7 +115,8 @@ export default {
 
   /**
    * "Descarcă lista" on the rounds tab: every round its filters match, in the
-   * list's order, as an `.xlsx`. The rounds are picked on light rows, then read
+   * list's order, as an `.xlsx`, each followed by its respondents' own rows.
+   * The rounds are picked on light rows, then read
    * with their answers a batch at a time, so memory stays flat however many
    * there are.
    */
@@ -135,7 +141,7 @@ export default {
       programs,
     }).map((row) => row.documentId);
 
-    const rows: TableCell[][] = [];
+    const rows: TableRow[] = [];
     for (let start = 0; start < ids.length; start += EXPORT_BATCH_SIZE) {
       const batch = ids.slice(start, start + EXPORT_BATCH_SIZE);
       const reports = (await strapi.documents("api::report.report").findMany({
@@ -153,7 +159,7 @@ export default {
         enrollmentDates(strapi, ongIds),
       ]);
       for (const report of inOrder(batch, reports)) {
-        rows.push(roundRow(report, { admins, mentors, enrollments, today }));
+        rows.push(...roundRows(report, { admins, mentors, enrollments, today }));
       }
     }
 

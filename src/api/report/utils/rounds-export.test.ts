@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DIMENSIONS } from "../../../constants/dimensions";
 import { enrollmentKey } from "../../../utils/program-enrollments";
-import { ROUNDS_COLUMNS, roundRow, roundsFileName } from "./rounds-export";
+import {
+  ROUNDS_COLUMNS,
+  respondentRows,
+  roundRow,
+  roundRows,
+  roundsFileName,
+} from "./rounds-export";
 
 const TODAY = "2026-10-21";
 const [guvernanta] = DIMENSIONS;
@@ -109,23 +115,8 @@ describe("roundRow", () => {
     expect(row[column("Scor Viziune și misiune (%)")]).toBe(75);
   });
 
-  it("collects the arguments sent, one per line, skipping blanks and drafts", () => {
-    const withDraft = {
-      ...programRound,
-      evaluations: [
-        ...programRound.evaluations,
-        {
-          completedAt: null,
-          dimensions: [
-            { dimensionKey: guvernanta.key, submitted: false, comment: "ciornă", quiz: [] },
-          ],
-        },
-        respondent(4, "2026-03-15T08:00:00.000Z", "Plan nou."),
-      ],
-    };
-    expect(roundRow(withDraft, context)[column("Comentarii Guvernanță")]).toBe(
-      "Avem viziune.\nPlan nou.",
-    );
+  it("leaves the arguments to the respondents' rows", () => {
+    expect(row[column("Comentarii Guvernanță")]).toBe("—");
     expect(row[column("Comentarii Aspecte financiare")]).toBe("—");
   });
 
@@ -169,6 +160,86 @@ describe("roundRow", () => {
     expect(result[column("Dată final evaluare")]).toBe("—");
     expect(result[column("Scor total obținut (%)")]).toBe("—");
     expect(result[column("Număr de completări")]).toBe("0/1");
+  });
+});
+
+describe("respondentRows", () => {
+  const draft = {
+    documentId: "eval-draft",
+    completedAt: null,
+    createdAt: "2026-03-03T08:00:00.000Z",
+    user: null,
+    dimensions: [
+      {
+        dimensionKey: guvernanta.key,
+        submitted: true,
+        comment: "Doar guvernanța.",
+        quiz: guvernanta.quiz.map((question) => ({ questionId: question.id, answer: 5 })),
+      },
+      { dimensionKey: DIMENSIONS[1].key, submitted: false, comment: "ciornă", quiz: [] },
+    ],
+  };
+  const evaluations = [
+    { ...respondent(3, "2026-03-20T22:30:00.000Z"), documentId: "eval-late", user: { nume: "Maria", email: "maria@a.ro" } },
+    draft,
+    { completedAt: null, dimensions: [], documentId: "eval-none", user: null },
+    { ...respondent(5, "2026-03-10T08:00:00.000Z", "Avem viziune."), documentId: "eval-early", user: { nume: "Ana Pop", email: "ana@a.ro" } },
+    { ...respondent(4, "2026-03-15T08:00:00.000Z"), documentId: "eval-gone", user: { nume: "Anonim x", email: "deleted-x@anonim.local", accountStatus: "deleted" } },
+  ];
+  const rows = respondentRows(evaluations, "RO123");
+
+  it("lists who saved anything, in completion order, drafts last", () => {
+    expect(rows.map((r) => r[column("ID evaluare")])).toEqual([
+      "eval-early",
+      "eval-gone",
+      "eval-late",
+      "eval-draft",
+    ]);
+  });
+
+  it("names each respondent like the per-round export", () => {
+    expect(rows.map((r) => r[column("Nume reprezentant")])).toEqual([
+      "Ana Pop",
+      "Cont șters",
+      "Maria",
+      "Evaluator 1 (ciornă)",
+    ]);
+    expect(rows.map((r) => r[column("Email reprezentant")])).toEqual([
+      "ana@a.ro",
+      "—",
+      "maria@a.ro",
+      "—",
+    ]);
+  });
+
+  it("scores and comments each respondent alone", () => {
+    const [early, , late, partial] = rows;
+    expect(early[column("Scor total obținut (%)")]).toBe(100);
+    expect(late[column("Scor total obținut (%)")]).toBe(50);
+    expect(early[column("Comentarii Guvernanță")]).toBe("Avem viziune.");
+    expect(late[column("Comentarii Guvernanță")]).toBe("—");
+    // A draft scores only what it sent, and has no total yet.
+    expect(partial[column("Scor Guvernanță (%)")]).toBe(100);
+    expect(partial[column("Comentarii Guvernanță")]).toBe("Doar guvernanța.");
+    expect(partial[column("Scor Aspecte financiare (%)")]).toBe("—");
+    expect(partial[column("Scor total obținut (%)")]).toBe("—");
+  });
+
+  it("keeps the fiscal code and leaves every other organization column empty", () => {
+    expect(rows.every((r) => r[column("CIF")] === "RO123")).toBe(true);
+    for (const header of ["Nume ONG", "Program(e)", "Dată final evaluare", "Număr de completări"]) {
+      expect(rows[0][column(header)]).toBeNull();
+    }
+    expect(rows[0]).toHaveLength(ROUNDS_COLUMNS.length);
+  });
+});
+
+describe("roundRows", () => {
+  it("groups the respondents under their round", () => {
+    const [first, ...rest] = roundRows(programRound, context);
+    expect(Array.isArray(first) && first[column("ID evaluare")]).toBe("round-1");
+    expect(rest).toHaveLength(2);
+    expect(rest.every((r) => !Array.isArray(r) && r.outlineLevel === 1)).toBe(true);
   });
 });
 
