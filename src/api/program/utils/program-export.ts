@@ -1,10 +1,6 @@
+import type ExcelJS from "exceljs";
 import { toDateString, toDisplayDate } from "../../../utils/date";
-import {
-  DATE_FORMAT,
-  addTableSheet,
-  newWorkbook,
-  type TableRow,
-} from "../../../utils/xlsx-table";
+import { DATE_FORMAT, startTableSheet } from "../../../utils/xlsx-table";
 import { fileSlug } from "../../report/utils/evaluation-export";
 import { PROGRAM_ROUNDS_COLUMNS } from "../../report/utils/rounds-export";
 
@@ -56,17 +52,15 @@ const excelDate = (value: string) => new Date(`${toDateString(value)}T00:00:00.0
 export const programExportFileName = (programName: string, today: string) =>
   `program-${fileSlug(programName, "program")}-${today}.xlsx`;
 
-export const renderProgramWorkbook = async (
-  rows: TableRow[],
-  summary: ProgramSummary,
-): Promise<Buffer> => {
-  const workbook = newWorkbook();
-  addTableSheet(workbook, {
-    sheetName: LIST_SHEET,
-    columns: PROGRAM_ROUNDS_COLUMNS,
-    rows,
-  });
+/** The "Lista" sheet, for the controller to fill with `addTableRow`. */
+export const startListSheet = (workbook: ExcelJS.Workbook) =>
+  startTableSheet(workbook, { sheetName: LIST_SHEET, columns: PROGRAM_ROUNDS_COLUMNS });
 
+/**
+ * The "Program" sheet, after "Lista": its counts are tallied while the list
+ * is written.
+ */
+export const addProgramSheet = (workbook: ExcelJS.Workbook, summary: ProgramSummary) => {
   const sheet = workbook.addWorksheet(PROGRAM_SHEET);
   sheet.columns = [30, 24, 16, 16, 16, 16, 16].map((width) => ({ width }));
 
@@ -102,6 +96,5 @@ export const renderProgramWorkbook = async (
       phase.hasEvaluation ? "Da" : "Nu",
     ]);
   }
-
-  return Buffer.from(await workbook.xlsx.writeBuffer());
+  sheet.commit();
 };

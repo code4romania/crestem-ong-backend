@@ -1,22 +1,28 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { DATE_FORMAT } from "../../../utils/xlsx-table";
+import { buffer as readAll } from "stream/consumers";
+import { DATE_FORMAT, addTableRow, streamWorkbook } from "../../../utils/xlsx-table";
 import { PROGRAM_ROUNDS_COLUMNS } from "../../report/utils/rounds-export";
 import {
   LIST_SHEET,
   PROGRAM_SHEET,
+  addProgramSheet,
   programExportFileName,
-  renderProgramWorkbook,
+  startListSheet,
 } from "./program-export";
 
+/** Written the way the controller streams it. */
 const readBack = async () => {
   const row = PROGRAM_ROUNDS_COLUMNS.map(() => null);
-  const buffer = await renderProgramWorkbook(
-    [
-      ["round-1", ...row.slice(1)],
-      { cells: ["eval-1", ...row.slice(1)], outlineLevel: 1 },
-    ],
-    {
+  const stream = streamWorkbook(async (workbook) => {
+    const list = startListSheet(workbook);
+    addTableRow(list, PROGRAM_ROUNDS_COLUMNS, ["round-1", ...row.slice(1)]);
+    addTableRow(list, PROGRAM_ROUNDS_COLUMNS, {
+      cells: ["eval-1", ...row.slice(1)],
+      outlineLevel: 1,
+    });
+    list.commit();
+    addProgramSheet(workbook, {
       name: "SCA-FDSC2",
       startDate: "2025-03-21",
       endDate: "2025-12-31",
@@ -29,14 +35,14 @@ const readBack = async () => {
         { title: "Faza finală", startDate: "2025-09-01", endDate: "2025-12-31", hasEvaluation: false },
         { title: "Faza inițială", startDate: "2025-03-21", endDate: "2025-06-30", hasEvaluation: true },
       ],
-    },
-  );
+    });
+  });
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+  await workbook.xlsx.load((await readAll(stream)) as any);
   return workbook;
 };
 
-describe("renderProgramWorkbook", () => {
+describe("program workbook", () => {
   it("lists the rounds first, respondents grouped under them", async () => {
     const workbook = await readBack();
     expect(workbook.worksheets.map((s) => s.name)).toEqual([LIST_SHEET, PROGRAM_SHEET]);

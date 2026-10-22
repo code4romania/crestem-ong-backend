@@ -41,13 +41,14 @@ import {
   removeEnrollments,
 } from "../../../utils/program-enrollments";
 import { isAnonymized } from "../../../utils/anonymize";
-import type { TableRow } from "../../../utils/xlsx-table";
+import { addTableRow, streamWorkbook } from "../../../utils/xlsx-table";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { programRoundsLayout, roundRows } from "../../report/utils/rounds-export";
 import { forEachExportRound } from "../../report/utils/rounds-export-loader";
 import {
+  addProgramSheet,
   programExportFileName,
-  renderProgramWorkbook,
+  startListSheet,
 } from "../utils/program-export";
 
 /**
@@ -518,26 +519,8 @@ export default factories.createCoreController(
         sort: { createdAt: "desc" },
       });
 
-      const layout = programRoundsLayout(program.documentId);
-      const rows: TableRow[] = [];
-      let completed = 0;
-      let invited = 0;
-      await forEachExportRound(
-        strapi,
-        (rounds as any[]).map((round) => round.documentId),
-        today,
-        (report, context) => {
-          rows.push(...roundRows(report, context, layout));
-          for (const evaluation of (report.evaluations ?? []) as any[]) {
-            invited += 1;
-            if (computeProgress(evaluation.dimensions).complete) {
-              completed += 1;
-            }
-          }
-        },
-      );
-
       const counters = await programCounters(strapi, program, today);
+      const layout = programRoundsLayout(program.documentId);
 
       const fileName = programExportFileName(program.name, today);
       ctx.set(
@@ -545,21 +528,44 @@ export default factories.createCoreController(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       ctx.set("Content-Disposition", `attachment; filename="${fileName}"`);
-      ctx.body = await renderProgramWorkbook(rows, {
-        name: program.name,
-        startDate: `${program.startDate}`,
-        endDate: `${program.endDate}`,
-        ongsCount: counters.ongsCount,
-        completed,
-        invited,
-        finalizedEvaluation: counters.finalizedEvaluation,
-        mentorsCount: counters.mentorsCount,
-        phases: ((program.phases ?? []) as any[]).map((phase) => ({
-          title: phase.title,
-          startDate: `${phase.startDate}`,
-          endDate: `${phase.endDate}`,
-          hasEvaluation: !!phase.hasEvaluation,
-        })),
+      ctx.body = streamWorkbook(async (workbook) => {
+        const list = startListSheet(workbook);
+        let completed = 0;
+        let invited = 0;
+        await forEachExportRound(
+          strapi,
+          (rounds as any[]).map((round) => round.documentId),
+          today,
+          (report, context) => {
+            for (const row of roundRows(report, context, layout)) {
+              addTableRow(list, layout.columns, row);
+            }
+            for (const evaluation of (report.evaluations ?? []) as any[]) {
+              invited += 1;
+              if (computeProgress(evaluation.dimensions).complete) {
+                completed += 1;
+              }
+            }
+          },
+        );
+        list.commit();
+
+        addProgramSheet(workbook, {
+          name: program.name,
+          startDate: `${program.startDate}`,
+          endDate: `${program.endDate}`,
+          ongsCount: counters.ongsCount,
+          completed,
+          invited,
+          finalizedEvaluation: counters.finalizedEvaluation,
+          mentorsCount: counters.mentorsCount,
+          phases: ((program.phases ?? []) as any[]).map((phase) => ({
+            title: phase.title,
+            startDate: `${phase.startDate}`,
+            endDate: `${phase.endDate}`,
+            hasEvaluation: !!phase.hasEvaluation,
+          })),
+        });
       });
     },
     async mentors(ctx: Context) {

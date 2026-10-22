@@ -1,32 +1,52 @@
 import ExcelJS from "exceljs";
+import { buffer as readAll } from "stream/consumers";
 import { describe, expect, it } from "vitest";
 import {
   DATA_ROW_HEIGHT,
   DATE_FORMAT,
   PERCENT_FORMAT,
+  addTableSheet,
   renderTableWorkbook,
+  streamWorkbook,
+  type TableExport,
 } from "./xlsx-table";
 
-const readBack = async () => {
-  const buffer = await renderTableWorkbook({
-    sheetName: "Organizații",
-    columns: [
-      { header: "Nume", width: 30 },
-      { header: "Dată", width: 12, type: "date" },
-      { header: "Nr.", width: 8, type: "number" },
-      { header: "Listă", width: 30, wrap: true },
-    ],
-    rows: [
-      ["Asociația A", "2025-07-03", 4, "Ion: Guvernanță\nMaria: Leadership"],
-      ["Asociația B", "—", 0, "1/2"],
-    ],
-  });
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
-  return workbook.getWorksheet("Organizații")!;
-};
+/** Both ways out: built in memory, and streamed as the big exports are. */
+const WRITERS: [string, (table: TableExport) => Promise<Buffer>][] = [
+  ["renderTableWorkbook", renderTableWorkbook],
+  [
+    "streamWorkbook",
+    (table) =>
+      readAll(
+        streamWorkbook(async (workbook) => {
+          addTableSheet(workbook, table);
+        }),
+      ),
+  ],
+];
 
-describe("renderTableWorkbook", () => {
+describe.each(WRITERS)("%s", (_, write) => {
+  const sheetOf = async (table: TableExport) => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load((await write(table)) as any);
+    return workbook.getWorksheet(table.sheetName)!;
+  };
+
+  const readBack = () =>
+    sheetOf({
+      sheetName: "Organizații",
+      columns: [
+        { header: "Nume", width: 30 },
+        { header: "Dată", width: 12, type: "date" },
+        { header: "Nr.", width: 8, type: "number" },
+        { header: "Listă", width: 30, wrap: true },
+      ],
+      rows: [
+        ["Asociația A", "2025-07-03", 4, "Ion: Guvernanță\nMaria: Leadership"],
+        ["Asociația B", "—", 0, "1/2"],
+      ],
+    });
+
   it("writes a bold, filterable header row", async () => {
     const sheet = await readBack();
     expect(sheet.getRow(1).values).toEqual([, "Nume", "Dată", "Nr.", "Listă"]);
@@ -52,44 +72,36 @@ describe("renderTableWorkbook", () => {
   });
 
   it("turns 0–100 into a formatted percentage, keeping placeholders as text", async () => {
-    const buffer = await renderTableWorkbook({
+    const sheet = await sheetOf({
       sheetName: "Runde",
       columns: [{ header: "Scor (%)", width: 10, type: "percent" }],
       rows: [[72.5], ["—"]],
     });
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.getWorksheet("Runde")!;
     expect(sheet.getCell("A2").value).toBe(0.725);
     expect(sheet.getCell("A2").numFmt).toBe(PERCENT_FORMAT);
     expect(sheet.getCell("A3").value).toBe("—");
   });
 
   it("nests grouped rows under the row above them", async () => {
-    const buffer = await renderTableWorkbook({
+    const sheet = await sheetOf({
       sheetName: "Runde",
       columns: [{ header: "ID", width: 10 }],
       rows: [["r1"], { cells: ["e1"], outlineLevel: 1 }, ["r2"]],
     });
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.getWorksheet("Runde")!;
     expect(sheet.getCell("A3").value).toBe("e1");
     expect(sheet.getRow(2).outlineLevel ?? 0).toBe(0);
     expect(sheet.getRow(3).outlineLevel).toBe(1);
     expect(sheet.getRow(4).outlineLevel ?? 0).toBe(0);
     expect(sheet.getRow(3).height).toBe(DATA_ROW_HEIGHT);
+    expect((sheet.properties as any).outlineProperties?.summaryBelow).toBe(false);
   });
 
   it("writes links as clickable cells", async () => {
-    const buffer = await renderTableWorkbook({
+    const sheet = await sheetOf({
       sheetName: "Jurnal",
       columns: [{ header: "Raport", width: 20 }],
       rows: [[{ text: "raport.pdf", url: "https://cdn.example/raport.pdf" }], ["—"]],
     });
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.getWorksheet("Jurnal")!;
     expect(sheet.getCell("A2").value).toEqual({
       text: "raport.pdf",
       hyperlink: "https://cdn.example/raport.pdf",
@@ -104,5 +116,10 @@ describe("renderTableWorkbook", () => {
     expect(sheet.getCell("C3").value).toBe(0);
     expect(sheet.getCell("D3").type).toBe(ExcelJS.ValueType.String);
     expect(sheet.getCell("D2").value).toBe("Ion: Guvernanță\nMaria: Leadership");
+  });
+
+  it("freezes the header row", async () => {
+    const sheet = await readBack();
+    expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
   });
 });
