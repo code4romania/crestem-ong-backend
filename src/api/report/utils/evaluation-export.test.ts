@@ -172,7 +172,7 @@ describe("buildEvaluationExport — Date Generale", () => {
     expect(result.dimensions[2].value).toEqual({ percent: 50 });
   });
 
-  it("lists each dimension's indicators by their tag, with the round average", () => {
+  it("lists each dimension's indicators by number and tag, with the round average", () => {
     const result = buildEvaluationExport({
       report: programRound([complete("a@x.ro", 5), complete("b@x.ro", 3)]),
       closed: false,
@@ -181,9 +181,13 @@ describe("buildEvaluationExport — Date Generale", () => {
     });
     const [first] = result.dimensions;
     expect(first.indicators.map((i) => i.name)).toEqual(
-      guvernanta.quiz.map((q) => (q.tag ?? q.question).trim()),
+      guvernanta.quiz.map((q, index) => `1.${index + 1}. ${(q.tag ?? q.question).trim()}`),
     );
-    expect(first.indicators[0].name).toBe("Viziune și misiune");
+    expect(first.indicators[0].name).toBe("1.1. Viziune și misiune");
+    // Two indicators of "Monitorizare și evaluare" share a tag; the number tells them apart.
+    const names = result.dimensions.flatMap((d) => d.indicators.map((i) => i.name));
+    expect(names).toContain("4.2. Practici M&E");
+    expect(names).toContain("4.3. Practici M&E");
     // 5/5 (100%) and 3/5 (50%) average to 75%.
     expect(first.indicators[0].value).toEqual({ percent: 75 });
   });

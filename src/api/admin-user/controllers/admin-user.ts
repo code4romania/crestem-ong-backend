@@ -10,6 +10,17 @@ import {
   canEditUser,
   resolveAdminUserRoleFilter,
 } from "../utils/access";
+import {
+  EMPTY_EXPORT,
+  HELD_STATUS,
+  MEETINGS_COLUMNS,
+  meetingRow,
+  meetingsFileName,
+} from "../utils/meetings-export";
+import { isAnonymized } from "../../../utils/anonymize";
+import { todayInBucharest } from "../../../utils/date";
+import { textParam } from "../../../utils/query-params";
+import { renderTableWorkbook } from "../../../utils/xlsx-table";
 
 const PAGE_SIZE = 20;
 const EDITABLE_ROLES = ["mentor", "super-admin", "editor-fdsc"] as const;
@@ -269,5 +280,77 @@ export default {
       .edit(user.id, parsed.data);
 
     return { message: "Utilizatorul a fost actualizat cu succes." };
+  },
+
+  /**
+   * "Descarcă jurnalul" on "Persoane resursă": every meeting held, newest
+   * first, as an `.xlsx`. With `mentor`, that resource person's meetings with
+   * every organization and in every program; otherwise everyone's, under the
+   * screen's search (as `list` matches it) and program filter.
+   */
+  async exportMeetings(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+
+    const search = textParam(ctx.query.search);
+    const program = textParam(ctx.query.program);
+    const mentorId = textParam(ctx.query.mentor);
+
+    const filters: Record<string, unknown> = { status: HELD_STATUS };
+    let mentorName: string | undefined;
+    if (mentorId) {
+      const mentor = await strapi
+        .documents("plugin::users-permissions.user")
+        .findOne({ documentId: mentorId, populate: { role: true } });
+      if (!mentor || mentor.role?.type !== "mentor") {
+        return ctx.badRequest("Persoana resursă nu există");
+      }
+      mentorName = isAnonymized(mentor) ? "cont sters" : mentor.nume;
+      filters.mentor = { documentId: mentorId };
+    } else {
+      if (search) {
+        filters.mentor = {
+          $or: [
+            { nume: { $containsi: search } },
+            { ong: { cui: { $containsi: search } } },
+          ],
+        };
+      }
+      if (program) {
+        filters.program = { documentId: program };
+      }
+    }
+
+    const meetings = await strapi.documents("api::meeting.meeting").findMany({
+      filters,
+      sort: { dataOra: "desc" },
+      populate: { ong: true, mentor: true, program: true, report: true },
+    });
+
+    if (meetings.length === 0) {
+      // Not a failure: the screen shows it as information, not as an error.
+      return ctx.notFound(
+        mentorId
+          ? "Această persoană resursă nu are încă întâlniri efectuate."
+          : "Nu există întâlniri efectuate pentru filtrele selectate.",
+        { reason: EMPTY_EXPORT },
+      );
+    }
+
+    const today = todayInBucharest();
+    const fileName = meetingsFileName(today, mentorName);
+    ctx.set(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    ctx.set("Content-Disposition", `attachment; filename="${fileName}"`);
+    ctx.body = await renderTableWorkbook({
+      sheetName: "Jurnal de activitate",
+      columns: MEETINGS_COLUMNS,
+      rows: (meetings as any[]).map((meeting) =>
+        meetingRow(meeting, ctx.request.origin),
+      ),
+    });
   },
 };

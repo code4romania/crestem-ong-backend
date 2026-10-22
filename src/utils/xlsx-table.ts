@@ -21,7 +21,18 @@ export interface TableColumn {
   wrap?: boolean;
 }
 
-export type TableCell = string | number | null;
+/** A clickable cell: `text` shows, `url` opens. */
+export interface TableLink {
+  text: string;
+  url: string;
+}
+
+export type TableCell = string | number | null | TableLink;
+
+const LINK_FONT: Partial<ExcelJS.Font> = {
+  color: { argb: "FF0563C1" },
+  underline: true,
+};
 
 /** A record row nested under the row above it, collapsible with Excel's +/−. */
 export interface GroupedRow {
@@ -50,6 +61,9 @@ export const PERCENT_FORMAT = "0.0%";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const cellValue = (value: TableCell, type: TableColumnType | undefined) => {
+  if (value !== null && typeof value === "object") {
+    return { text: value.text, hyperlink: value.url };
+  }
   if (type === "date" && typeof value === "string" && DAY.test(value)) {
     // Midnight UTC: exceljs converts dates to serials in UTC, so this lands on
     // the same calendar day whatever the server's time zone.
@@ -61,13 +75,23 @@ const cellValue = (value: TableCell, type: TableColumnType | undefined) => {
   return value;
 };
 
-export const renderTableWorkbook = async ({
-  sheetName,
-  columns,
-  rows,
-}: TableExport): Promise<Buffer> => {
+/** A workbook to add sheets to, for exports with more than the one table. */
+export const newWorkbook = () => {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Creștem ONG";
+  return workbook;
+};
+
+export const renderTableWorkbook = async (table: TableExport): Promise<Buffer> => {
+  const workbook = newWorkbook();
+  addTableSheet(workbook, table);
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+};
+
+export const addTableSheet = (
+  workbook: ExcelJS.Workbook,
+  { sheetName, columns, rows }: TableExport,
+): ExcelJS.Worksheet => {
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: "frozen", ySplit: 1 }],
     // A group's +/− sits on the row it hangs from, above its nested rows.
@@ -99,10 +123,14 @@ export const renderTableWorkbook = async ({
       cells.map((value, index) => cellValue(value, columns[index]?.type)),
     );
     added.height = DATA_ROW_HEIGHT;
+    cells.forEach((value, index) => {
+      if (value !== null && typeof value === "object") {
+        added.getCell(index + 1).font = LINK_FONT;
+      }
+    });
     if (!Array.isArray(row) && row.outlineLevel > 0) {
       added.outlineLevel = row.outlineLevel;
     }
   }
-
-  return Buffer.from(await workbook.xlsx.writeBuffer());
+  return sheet;
 };
