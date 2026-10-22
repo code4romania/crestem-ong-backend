@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { DIMENSIONS } from "../../../constants/dimensions";
 import { enrollmentKey } from "../../../utils/program-enrollments";
 import {
+  PROGRAM_ROUNDS_COLUMNS,
   ROUNDS_COLUMNS,
+  programRoundsLayout,
   respondentRows,
   roundRow,
   roundRows,
   roundsFileName,
 } from "./rounds-export";
+import { computeEvaluationScores } from "./scores";
 
 const TODAY = "2026-10-21";
 const [guvernanta] = DIMENSIONS;
@@ -72,7 +75,7 @@ describe("ROUNDS_COLUMNS", () => {
   it("has the 18 base columns, then 7 per dimension", () => {
     expect(ROUNDS_COLUMNS).toHaveLength(18 + DIMENSIONS.length * 7);
     expect(ROUNDS_COLUMNS[18].header).toBe("Scor Guvernanță (%)");
-    expect(ROUNDS_COLUMNS[19].header).toBe("Scor Viziune și misiune (%)");
+    expect(ROUNDS_COLUMNS[19].header).toBe("Scor 1.1. Viziune și misiune (%)");
     expect(ROUNDS_COLUMNS[24].header).toBe("Comentarii Guvernanță");
   });
 });
@@ -112,7 +115,7 @@ describe("roundRow", () => {
     expect(row[column("Scor total obținut (%)")]).toBe(75);
     expect(row[column("Număr de completări")]).toBe("2/3");
     expect(row[column("Scor Guvernanță (%)")]).toBe(75);
-    expect(row[column("Scor Viziune și misiune (%)")]).toBe(75);
+    expect(row[column("Scor 1.1. Viziune și misiune (%)")]).toBe(75);
   });
 
   it("leaves the arguments to the respondents' rows", () => {
@@ -225,6 +228,29 @@ describe("respondentRows", () => {
     expect(partial[column("Scor total obținut (%)")]).toBe("—");
   });
 
+  it("files each indicator under its own column, tags shared or not", () => {
+    const varied = {
+      documentId: "eval-varied",
+      completedAt: "2026-03-10T08:00:00.000Z",
+      user: null,
+      dimensions: DIMENSIONS.map((dimension) => ({
+        dimensionKey: dimension.key,
+        submitted: true,
+        quiz: dimension.quiz.map((question, index) => ({
+          questionId: question.id,
+          answer: question.options[index % question.options.length].value,
+        })),
+      })),
+    };
+    const [result] = respondentRows([varied], "RO123");
+    const scores = computeEvaluationScores(varied);
+    ROUNDS_COLUMNS.forEach((c, index) => {
+      if (c.key.startsWith("question:")) {
+        expect(result[index]).toBe(scores.questions[c.key.slice("question:".length)] ?? "—");
+      }
+    });
+  });
+
   it("keeps the fiscal code and leaves every other organization column empty", () => {
     expect(rows.every((r) => r[column("CIF")] === "RO123")).toBe(true);
     for (const header of ["Nume ONG", "Program(e)", "Dată final evaluare", "Număr de completări"]) {
@@ -240,6 +266,76 @@ describe("roundRows", () => {
     expect(Array.isArray(first) && first[column("ID evaluare")]).toBe("round-1");
     expect(rest).toHaveLength(2);
     expect(rest.every((r) => !Array.isArray(r) && r.outlineLevel === 1)).toBe(true);
+  });
+});
+
+describe("program layout", () => {
+  const programColumn = (header: string) => {
+    const index = PROGRAM_ROUNDS_COLUMNS.findIndex((c) => c.header === header);
+    if (index < 0) throw new Error(`no column ${header}`);
+    return index;
+  };
+  const twoPrograms = {
+    ...programRound,
+    phases: [
+      programRound.phases[0],
+      {
+        title: "Etapa finală",
+        startDate: "2026-03-05",
+        endDate: "2026-04-04",
+        program: { documentId: "p2", name: "SCA1 - ARC" },
+      },
+    ],
+  };
+  const withPhone = {
+    ...context,
+    admins: new Map([["ong-1", { nume: "Ana Pop", email: "ana@a.ro", telefon: "0722" }]]),
+  };
+  const layout = programRoundsLayout("p2");
+
+  it("drops the program column and puts the phone after the email", () => {
+    const headers = PROGRAM_ROUNDS_COLUMNS.map((c) => c.header);
+    expect(headers).not.toContain("Program(e)");
+    expect(headers.slice(3, 6)).toEqual([
+      "Nume reprezentant",
+      "Email reprezentant",
+      "Telefon reprezentant",
+    ]);
+    expect(PROGRAM_ROUNDS_COLUMNS).toHaveLength(ROUNDS_COLUMNS.length);
+    const keys = PROGRAM_ROUNDS_COLUMNS.map((c) => c.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    // Numbered indicators: no two columns share a title any more.
+    expect(new Set(headers).size).toBe(headers.length);
+    expect(headers).toContain("Scor 4.2. Practici M&E (%)");
+    expect(headers).toContain("Scor 4.3. Practici M&E (%)");
+  });
+
+  it("describes only the exported program", () => {
+    const row = roundRow(twoPrograms, withPhone, layout);
+    expect(row).toHaveLength(PROGRAM_ROUNDS_COLUMNS.length);
+    expect(row[programColumn("Telefon reprezentant")]).toBe("0722");
+    expect(row[programColumn("Fază program")]).toBe("Etapa finală");
+    expect(row[programColumn("Perioada fazei din program")]).toBe("05.03.2026 – 04.04.2026");
+    // Joined p1 only; p2 predates the enrollments.
+    expect(row[programColumn("Dată intrare program")]).toBe("—");
+    expect(row[programColumn("Persoană resursă alocată")]).toBe("N/A");
+  });
+
+  it("gives respondents their own phone, or a dash", () => {
+    const rows = respondentRows(
+      [
+        { ...respondent(5, "2026-03-10T08:00:00.000Z"), documentId: "e1", user: { nume: "Ana", email: "a@a.ro", telefon: "0733" } },
+        { ...respondent(5, "2026-03-11T08:00:00.000Z"), documentId: "e2", user: { nume: "Ion", email: "i@a.ro" } },
+      ],
+      "RO123",
+      PROGRAM_ROUNDS_COLUMNS,
+    );
+    expect(rows.map((r) => r[programColumn("Telefon reprezentant")])).toEqual(["0733", "—"]);
+    expect(rows[0]).toHaveLength(PROGRAM_ROUNDS_COLUMNS.length);
+  });
+
+  it("keeps the rounds export without a phone column", () => {
+    expect(ROUNDS_COLUMNS.map((c) => c.header)).not.toContain("Telefon reprezentant");
   });
 });
 

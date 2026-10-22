@@ -41,6 +41,67 @@ import {
   removeEnrollments,
 } from "../../../utils/program-enrollments";
 import { isAnonymized } from "../../../utils/anonymize";
+import type { TableRow } from "../../../utils/xlsx-table";
+import { computeProgress } from "../../evaluation/utils/progress";
+import { programRoundsLayout, roundRows } from "../../report/utils/rounds-export";
+import { forEachExportRound } from "../../report/utils/rounds-export-loader";
+import {
+  programExportFileName,
+  renderProgramWorkbook,
+} from "../utils/program-export";
+
+/**
+ * Mentors who deleted their account stay assigned so their history stays
+ * readable (BR-34), but they are nobody's resource any more — counting them
+ * would show a program as staffed when it is not.
+ */
+const activeMentorsCount = (program: any) =>
+  ((program.mentors ?? []) as any[]).filter((mentor) => !isAnonymized(mentor))
+    .length;
+
+/**
+ * The program page's cards, which the program export repeats so the two
+ * always agree. `program` needs `ongs` and `mentors`.
+ */
+const programCounters = async (strapi: any, program: any, today: string) => {
+  const ongIds = ((program.ongs ?? []) as any[]).map((ong) => ong.documentId);
+
+  const reports = await reportsInProgram(strapi, program.documentId);
+  const reportsByOng = new Map<string, any[]>();
+  for (const report of reports) {
+    const ongId = report.ong?.documentId;
+    if (!ongId) {
+      continue;
+    }
+    if (!reportsByOng.has(ongId)) {
+      reportsByOng.set(ongId, []);
+    }
+    reportsByOng.get(ongId).push(report);
+  }
+
+  // Per ONG: an open report means it's still being evaluated; once every
+  // report is closed, the ONG counts as "finalized".
+  let inEvaluation = 0;
+  let finalizedEvaluation = 0;
+  for (const ongId of ongIds) {
+    const ongReports = reportsByOng.get(ongId) ?? [];
+    if (ongReports.length === 0) {
+      continue;
+    }
+    if (ongReports.some((report) => !isClosed(report, today))) {
+      inEvaluation += 1;
+      continue;
+    }
+    finalizedEvaluation += 1;
+  }
+
+  return {
+    ongsCount: ongIds.length,
+    mentorsCount: activeMentorsCount(program),
+    inEvaluation,
+    finalizedEvaluation,
+  };
+};
 
 const ongView = (ong: any) => ({
   documentId: ong.documentId,
@@ -430,53 +491,76 @@ export default factories.createCoreController(
       if (!program) {
         return ctx.badRequest("Programul nu există");
       }
+      return {
+        data: await programCounters(strapi, program, todayInBucharest()),
+      };
+    },
+    /**
+     * "Descarcă evaluările": every round run in the program, newest first, each
+     * followed by its respondents, plus a sheet about the program — the
+     * client's model `4. Export Programe.xlsx`.
+     */
+    async exportEvaluations(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const program = await strapi.documents("api::program.program").findOne({
+        documentId: ctx.params.documentId,
+        populate: { ongs: true, mentors: true, phases: true },
+      });
+      if (!program) {
+        return ctx.badRequest("Programul nu există");
+      }
       const today = todayInBucharest();
-      const ongIds = ((program.ongs ?? []) as any[]).map(
-        (ong) => ong.documentId,
+      const rounds = await strapi.documents("api::report.report").findMany({
+        filters: { phases: { program: { documentId: program.documentId } } },
+        fields: ["documentId"],
+        sort: { createdAt: "desc" },
+      });
+
+      const layout = programRoundsLayout(program.documentId);
+      const rows: TableRow[] = [];
+      let completed = 0;
+      let invited = 0;
+      await forEachExportRound(
+        strapi,
+        (rounds as any[]).map((round) => round.documentId),
+        today,
+        (report, context) => {
+          rows.push(...roundRows(report, context, layout));
+          for (const evaluation of (report.evaluations ?? []) as any[]) {
+            invited += 1;
+            if (computeProgress(evaluation.dimensions).complete) {
+              completed += 1;
+            }
+          }
+        },
       );
 
-      const reports = await reportsInProgram(strapi, program.documentId);
-      const reportsByOng = new Map<string, any[]>();
-      for (const report of reports) {
-        const ongId = report.ong?.documentId;
-        if (!ongId) {
-          continue;
-        }
-        if (!reportsByOng.has(ongId)) {
-          reportsByOng.set(ongId, []);
-        }
-        reportsByOng.get(ongId).push(report);
-      }
+      const counters = await programCounters(strapi, program, today);
 
-      // Per ONG: an open report means it's still being evaluated; once every
-      // report is closed, the ONG counts as "finalized".
-      let inEvaluation = 0;
-      let finalizedEvaluation = 0;
-      for (const ongId of ongIds) {
-        const ongReports = reportsByOng.get(ongId) ?? [];
-        if (ongReports.length === 0) {
-          continue;
-        }
-        if (ongReports.some((report) => !isClosed(report, today))) {
-          inEvaluation += 1;
-          continue;
-        }
-        finalizedEvaluation += 1;
-      }
-
-      return {
-        data: {
-          ongsCount: ongIds.length,
-          // Mentors who deleted their account stay assigned so their history
-          // stays readable (BR-34), but they are nobody's resource any more —
-          // counting them would show a program as staffed when it is not.
-          mentorsCount: ((program.mentors ?? []) as any[]).filter(
-            (mentor) => !isAnonymized(mentor),
-          ).length,
-          inEvaluation,
-          finalizedEvaluation,
-        },
-      };
+      const fileName = programExportFileName(program.name, today);
+      ctx.set(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      ctx.set("Content-Disposition", `attachment; filename="${fileName}"`);
+      ctx.body = await renderProgramWorkbook(rows, {
+        name: program.name,
+        startDate: `${program.startDate}`,
+        endDate: `${program.endDate}`,
+        ongsCount: counters.ongsCount,
+        completed,
+        invited,
+        finalizedEvaluation: counters.finalizedEvaluation,
+        mentorsCount: counters.mentorsCount,
+        phases: ((program.phases ?? []) as any[]).map((phase) => ({
+          title: phase.title,
+          startDate: `${phase.startDate}`,
+          endDate: `${phase.endDate}`,
+          hasEvaluation: !!phase.hasEvaluation,
+        })),
+      });
     },
     async mentors(ctx: Context) {
       if (!ctx.state.user) {
