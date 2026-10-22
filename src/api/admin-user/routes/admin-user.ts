@@ -7,6 +7,14 @@ export default {
       config: { policies: ["global::is-fdsc-staff"] },
     },
     {
+      // "Descarcă jurnalul" on "Persoane resursă": read-only, so the editor
+      // keeps it.
+      method: "GET",
+      path: "/admin/meetings/export",
+      handler: "admin-user.exportMeetings",
+      config: { policies: ["global::is-fdsc-staff"] },
+    },
+    {
       method: "GET",
       path: "/admin/users/:documentId",
       handler: "admin-user.findOne",

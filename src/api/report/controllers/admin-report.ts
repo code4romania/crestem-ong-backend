@@ -10,35 +10,11 @@ import {
 import { inOrder, paginate } from "../../evaluation/utils/admin-list";
 import { csvParam, pageParam, textParam } from "../../../utils/query-params";
 import { todayInBucharest } from "../../../utils/date";
-import { getOngAdmins } from "../../../utils/ong-scope";
-import { assignedMentorsByOng } from "../../../utils/ngo-mentors";
-import { enrollmentDates } from "../../../utils/program-enrollments";
 import { renderTableWorkbook, type TableRow } from "../../../utils/xlsx-table";
 import { ROUNDS_COLUMNS, roundRows, roundsFileName } from "../utils/rounds-export";
+import { forEachExportRound } from "../utils/rounds-export-loader";
 
 const PAGE_SIZE = 20;
-
-/** Rounds read with their answers at a time by the export, to keep memory flat. */
-const EXPORT_BATCH_SIZE = 50;
-
-/** What a row of the export reads, on top of the round itself. */
-const ROUNDS_EXPORT_POPULATE = {
-  ong: {
-    populate: {
-      judet: true,
-      localitate: true,
-      domeniuPrincipal: true,
-      domeniuSecundar: true,
-    },
-  },
-  phases: { populate: { program: true } },
-  evaluations: {
-    populate: {
-      dimensions: { populate: { quiz: true } },
-      user: true,
-    },
-  },
-} as const;
 
 export default {
   /**
@@ -142,26 +118,9 @@ export default {
     }).map((row) => row.documentId);
 
     const rows: TableRow[] = [];
-    for (let start = 0; start < ids.length; start += EXPORT_BATCH_SIZE) {
-      const batch = ids.slice(start, start + EXPORT_BATCH_SIZE);
-      const reports = (await strapi.documents("api::report.report").findMany({
-        filters: { documentId: { $in: batch } },
-        populate: ROUNDS_EXPORT_POPULATE,
-      })) as any[];
-      const ongIds = [
-        ...new Set(
-          reports.map((report) => report.ong?.documentId).filter(Boolean),
-        ),
-      ] as string[];
-      const [admins, mentors, enrollments] = await Promise.all([
-        getOngAdmins(strapi, ongIds),
-        assignedMentorsByOng(strapi, ongIds),
-        enrollmentDates(strapi, ongIds),
-      ]);
-      for (const report of inOrder(batch, reports)) {
-        rows.push(...roundRows(report, { admins, mentors, enrollments, today }));
-      }
-    }
+    await forEachExportRound(strapi, ids, today, (report, context) => {
+      rows.push(...roundRows(report, context));
+    });
 
     const fileName = roundsFileName(today);
     ctx.set(

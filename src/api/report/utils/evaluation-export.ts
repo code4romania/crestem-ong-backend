@@ -29,7 +29,7 @@ export interface GeneralRow {
 }
 
 export interface IndicatorResult {
-  /** The question's tag, as the results page labels it. */
+  /** The question's number and tag, e.g. "4.2. Practici M&E". */
   name: string;
   value: GeneralValue;
 }
@@ -82,20 +82,18 @@ const orMissing = (value: string | null | undefined) =>
 const maxOption = (question: (typeof DIMENSIONS)[number]["quiz"][number]) =>
   Math.max(...question.options.map((option) => option.value));
 
-/**
- * `evaluare-<nume-ong>-<YYYY-MM-DD>.xlsx`, ASCII only so the name survives
- * every download path; the date is the round's start.
- */
-export const exportFileName = (ongName: string, startDay: string) => {
-  const slug =
-    (ongName ?? "")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "ong";
-  return `evaluare-${slug}-${startDay}.xlsx`;
-};
+/** A name as ASCII words joined by dashes, so a file name survives every download path. */
+export const fileSlug = (name: string, fallback: string) =>
+  (name ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || fallback;
+
+/** `evaluare-<nume-ong>-<YYYY-MM-DD>.xlsx`; the date is the round's start. */
+export const exportFileName = (ongName: string, startDay: string) =>
+  `evaluare-${fileSlug(ongName, "ong")}-${startDay}.xlsx`;
 
 /**
  * Start and end as the rounds table shows them: the first evaluation phase's
@@ -236,11 +234,13 @@ export const buildEvaluationExport = ({
   ];
 
   // Catalog order, as the dimensions and their indicators appear in the UI.
-  const dimensions: DimensionResult[] = DIMENSIONS.map((dimension) => ({
+  // Indicators are numbered like their questions ("4.2."): a few share their
+  // tag with another in the same dimension.
+  const dimensions: DimensionResult[] = DIMENSIONS.map((dimension, dimensionIndex) => ({
     name: dimension.name,
     value: percent(scores.dimensions[dimension.key]),
-    indicators: dimension.quiz.map((question) => ({
-      name: (question.tag ?? question.question).trim(),
+    indicators: dimension.quiz.map((question, questionIndex) => ({
+      name: `${dimensionIndex + 1}.${questionIndex + 1}. ${(question.tag ?? question.question).trim()}`,
       value: percent(scores.questions[question.id]),
     })),
   }));

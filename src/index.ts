@@ -74,6 +74,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::program.program.list",
   "api::program.program.detail",
   "api::program.program.stats",
+  "api::program.program.exportEvaluations",
   "api::program.program.createOne",
   "api::program.program.updateOne",
   "api::program.program.deleteOne",
@@ -148,6 +149,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::admin-user.admin-user.list",
   "api::admin-user.admin-user.findOne",
   "api::admin-user.admin-user.update",
+  "api::admin-user.admin-user.exportMeetings",
   // The platform-wide "Evaluări" screen, one action per tab: responses and
   // rounds. Read-only, so the editor keeps them too.
   "api::evaluation.admin-evaluation.list",

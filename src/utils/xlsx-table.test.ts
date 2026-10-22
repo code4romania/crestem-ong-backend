@@ -81,6 +81,23 @@ describe("renderTableWorkbook", () => {
     expect(sheet.getRow(3).height).toBe(DATA_ROW_HEIGHT);
   });
 
+  it("writes links as clickable cells", async () => {
+    const buffer = await renderTableWorkbook({
+      sheetName: "Jurnal",
+      columns: [{ header: "Raport", width: 20 }],
+      rows: [[{ text: "raport.pdf", url: "https://cdn.example/raport.pdf" }], ["—"]],
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const sheet = workbook.getWorksheet("Jurnal")!;
+    expect(sheet.getCell("A2").value).toEqual({
+      text: "raport.pdf",
+      hyperlink: "https://cdn.example/raport.pdf",
+    });
+    expect(sheet.getCell("A2").font?.underline).toBe(true);
+    expect(sheet.getCell("A3").value).toBe("—");
+  });
+
   it("keeps numbers numeric and slashes as text", async () => {
     const sheet = await readBack();
     expect(sheet.getCell("C2").value).toBe(4);

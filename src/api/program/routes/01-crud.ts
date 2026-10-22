@@ -19,6 +19,12 @@ export default {
       config: { policies: ["global::is-fdsc-staff"] },
     },
     {
+      method: "GET",
+      path: "/programs/:documentId/export",
+      handler: "program.exportEvaluations",
+      config: { policies: ["global::is-fdsc-staff"] },
+    },
+    {
       method: "POST",
       path: "/programs",
       handler: "program.createOne",
