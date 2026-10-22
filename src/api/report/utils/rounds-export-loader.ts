@@ -18,13 +18,63 @@ const ROUNDS_EXPORT_POPULATE = {
     },
   },
   phases: { populate: { program: true } },
-  evaluations: {
-    populate: {
-      dimensions: { populate: { quiz: true } },
-      user: true,
-    },
-  },
+  // The answers come from `attachDimensions`, not from a populate.
+  evaluations: { populate: { user: true } },
 } as const;
+
+/**
+ * Sets each evaluation's `dimensions` (with `quiz`), shaped as the populate
+ * would, read straight from the component tables. A full export reads well
+ * over 100,000 answers, and Strapi turns each component row into a whole
+ * entity: that alone took most of the export's time. These are the columns
+ * the scores and the arguments read.
+ */
+export async function attachDimensions(strapi: any, evaluations: any[]): Promise<void> {
+  if (evaluations.length === 0) return;
+  const knex = strapi.db.connection;
+
+  const blocks = (await knex("evaluations_cmps as link")
+    .join("components_evaluation_dimensions as block", "block.id", "link.cmp_id")
+    .whereIn("link.entity_id", evaluations.map((evaluation) => evaluation.id))
+    .where({ "link.field": "dimensions", "link.component_type": "evaluation.dimension" })
+    .orderBy(["link.entity_id", "link.order"])
+    .select(
+      "link.entity_id as evaluationId",
+      "block.id",
+      "block.dimension_key as dimensionKey",
+      "block.comment",
+      "block.submitted",
+    )) as any[];
+
+  const answers = blocks.length
+    ? ((await knex("components_evaluation_dimensions_cmps as link")
+        .join("components_evaluation_questions as question", "question.id", "link.cmp_id")
+        .whereIn("link.entity_id", blocks.map((block) => block.id))
+        .where({ "link.field": "quiz", "link.component_type": "evaluation.question" })
+        .orderBy(["link.entity_id", "link.order"])
+        .select(
+          "link.entity_id as blockId",
+          "question.question_id as questionId",
+          "question.answer",
+        )) as any[])
+    : [];
+
+  const quizByBlock = new Map<number, any[]>();
+  for (const { blockId, ...answer } of answers) {
+    const quiz = quizByBlock.get(blockId) ?? [];
+    quiz.push(answer);
+    quizByBlock.set(blockId, quiz);
+  }
+  const dimensionsByEvaluation = new Map<number, any[]>();
+  for (const { evaluationId, ...block } of blocks) {
+    const dimensions = dimensionsByEvaluation.get(evaluationId) ?? [];
+    dimensions.push({ ...block, quiz: quizByBlock.get(block.id) ?? [] });
+    dimensionsByEvaluation.set(evaluationId, dimensions);
+  }
+  for (const evaluation of evaluations) {
+    evaluation.dimensions = dimensionsByEvaluation.get(evaluation.id) ?? [];
+  }
+}
 
 /**
  * Reads the given rounds with everything an export row needs, a batch at a
@@ -50,6 +100,10 @@ export async function forEachExportRound(
       getOngAdmins(strapi, ongIds),
       assignedMentorsByOng(strapi, ongIds),
       enrollmentDates(strapi, ongIds),
+      attachDimensions(
+        strapi,
+        reports.flatMap((report) => report.evaluations ?? []),
+      ),
     ]);
     for (const report of inOrder(batch, reports)) {
       visit(report, { admins, mentors, enrollments, today });
