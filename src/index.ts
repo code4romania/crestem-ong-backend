@@ -60,8 +60,6 @@ const FDSC_ADMIN_TRANSFER_ACTIONS = [
   "api::admin-transfer.admin-transfer.fdscResend",
 ];
 
-const PROGRAM_RESTRUCTURE_ACTION = "api::program.program-restructure.run";
-
 const SUPER_ADMIN_PERMISSIONS = [
   "api::dashboard.dashboard.fdsc",
   "api::auth.auth.me",
@@ -162,9 +160,6 @@ const SUPER_ADMIN_PERMISSIONS = [
   // "Schimbă administratorul" (US-5). The route policy is `is-super-admin`
   // too; the editor is denied below.
   ...FDSC_ADMIN_TRANSFER_ACTIONS,
-  // Temporary: the October 2026 restructure of SCA and BRD HUB START, run
-  // once from Postman. Super admin only; the editor is denied below.
-  PROGRAM_RESTRUCTURE_ACTION,
 ];
 
 /**
@@ -179,7 +174,6 @@ const EDITOR_FDSC_DENIED_ACTIONS = [
   "api::auth.auth.resendMentorInvite",
   "api::admin-user.admin-user.update",
   ...FDSC_ADMIN_TRANSFER_ACTIONS,
-  PROGRAM_RESTRUCTURE_ACTION,
 ];
 
 const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(

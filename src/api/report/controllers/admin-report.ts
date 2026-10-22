@@ -10,7 +10,7 @@ import {
 import { inOrder, paginate } from "../../evaluation/utils/admin-list";
 import { csvParam, pageParam, textParam } from "../../../utils/query-params";
 import { todayInBucharest } from "../../../utils/date";
-import { renderTableWorkbook, type TableRow } from "../../../utils/xlsx-table";
+import { addTableRow, startTableSheet, streamWorkbook } from "../../../utils/xlsx-table";
 import { ROUNDS_COLUMNS, roundRows, roundsFileName } from "../utils/rounds-export";
 import { forEachExportRound } from "../utils/rounds-export-loader";
 
@@ -92,9 +92,9 @@ export default {
   /**
    * "Descarcă lista" on the rounds tab: every round its filters match, in the
    * list's order, as an `.xlsx`, each followed by its respondents' own rows.
-   * The rounds are picked on light rows, then read
-   * with their answers a batch at a time, so memory stays flat however many
-   * there are.
+   * The rounds are picked on light rows, then read with their answers a batch
+   * at a time and streamed out as they come, so memory stays flat however
+   * many there are.
    */
   async exportList(ctx: Context) {
     if (!ctx.state.user) {
@@ -117,21 +117,22 @@ export default {
       programs,
     }).map((row) => row.documentId);
 
-    const rows: TableRow[] = [];
-    await forEachExportRound(strapi, ids, today, (report, context) => {
-      rows.push(...roundRows(report, context));
-    });
-
     const fileName = roundsFileName(today);
     ctx.set(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     ctx.set("Content-Disposition", `attachment; filename="${fileName}"`);
-    ctx.body = await renderTableWorkbook({
-      sheetName: "Evaluări",
-      columns: ROUNDS_COLUMNS,
-      rows,
+    ctx.body = streamWorkbook(async (workbook) => {
+      const sheet = startTableSheet(workbook, {
+        sheetName: "Evaluări",
+        columns: ROUNDS_COLUMNS,
+      });
+      await forEachExportRound(strapi, ids, today, (report, context) => {
+        for (const row of roundRows(report, context)) {
+          addTableRow(sheet, ROUNDS_COLUMNS, row);
+        }
+      });
     });
   },
 };

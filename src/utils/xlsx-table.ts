@@ -1,3 +1,4 @@
+import { PassThrough } from "stream";
 import ExcelJS from "exceljs";
 
 /**
@@ -88,9 +89,44 @@ export const renderTableWorkbook = async (table: TableExport): Promise<Buffer> =
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
 
+/**
+ * A workbook sent as it is written, for the exports too big to build in memory
+ * first: the response body, while `write` adds sheets and rows. Rows go out as
+ * they are committed, so memory stays flat and bytes keep flowing to the
+ * proxies in front. Once streaming has begun a failure can only cut the
+ * download short, so `write` should run its checks before.
+ */
+export const streamWorkbook = (
+  write: (workbook: ExcelJS.Workbook) => Promise<void>,
+): PassThrough => {
+  const body = new PassThrough();
+  const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+    stream: body,
+    useStyles: true,
+    useSharedStrings: false,
+  });
+  workbook.creator = "Creștem ONG";
+  write(workbook)
+    .then(() => workbook.commit())
+    .catch((error) => body.destroy(error));
+  return body;
+};
+
 export const addTableSheet = (
   workbook: ExcelJS.Workbook,
-  { sheetName, columns, rows }: TableExport,
+  { rows, ...table }: TableExport,
+): ExcelJS.Worksheet => {
+  const sheet = startTableSheet(workbook, table);
+  for (const row of rows) {
+    addTableRow(sheet, table.columns, row);
+  }
+  return sheet;
+};
+
+/** The sheet with its header row, ready for `addTableRow`. */
+export const startTableSheet = (
+  workbook: ExcelJS.Workbook,
+  { sheetName, columns }: Omit<TableExport, "rows">,
 ): ExcelJS.Worksheet => {
   const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -116,21 +152,28 @@ export const addTableSheet = (
     from: { row: 1, column: 1 },
     to: { row: 1, column: columns.length },
   };
-
-  for (const row of rows) {
-    const cells = Array.isArray(row) ? row : row.cells;
-    const added = sheet.addRow(
-      cells.map((value, index) => cellValue(value, columns[index]?.type)),
-    );
-    added.height = DATA_ROW_HEIGHT;
-    cells.forEach((value, index) => {
-      if (value !== null && typeof value === "object") {
-        added.getCell(index + 1).font = LINK_FONT;
-      }
-    });
-    if (!Array.isArray(row) && row.outlineLevel > 0) {
-      added.outlineLevel = row.outlineLevel;
-    }
-  }
+  header.commit();
   return sheet;
+};
+
+/** One record row; committed, so a streamed sheet sends it right away. */
+export const addTableRow = (
+  sheet: ExcelJS.Worksheet,
+  columns: TableColumn[],
+  row: TableRow,
+) => {
+  const cells = Array.isArray(row) ? row : row.cells;
+  const added = sheet.addRow(
+    cells.map((value, index) => cellValue(value, columns[index]?.type)),
+  );
+  added.height = DATA_ROW_HEIGHT;
+  cells.forEach((value, index) => {
+    if (value !== null && typeof value === "object") {
+      added.getCell(index + 1).font = LINK_FONT;
+    }
+  });
+  if (!Array.isArray(row) && row.outlineLevel > 0) {
+    added.outlineLevel = row.outlineLevel;
+  }
+  added.commit();
 };
