@@ -13,6 +13,8 @@ import { todayInBucharest } from "../../../utils/date";
 import { addTableRow, startTableSheet, streamWorkbook } from "../../../utils/xlsx-table";
 import { ROUNDS_COLUMNS, roundRows, roundsFileName } from "../utils/rounds-export";
 import { forEachExportRound } from "../utils/rounds-export-loader";
+import { findOpenReport } from "../utils/association";
+import { adminCloseError, adminReopenError } from "../utils/lifecycle";
 
 const PAGE_SIZE = 20;
 
@@ -134,5 +136,72 @@ export default {
         }
       });
     });
+  },
+  /**
+   * "Închide evaluarea" — the FDSC Admin closes any round under way, program or
+   * independent, before its phase ends. Saved as a manual close, the same as an
+   * organization's own: who closed it is deliberately not recorded.
+   */
+  async close(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const report = await strapi.documents("api::report.report").findOne({
+      documentId: ctx.params.documentId,
+      populate: { phases: true },
+    });
+    if (!report) {
+      return ctx.badRequest("Evaluarea nu există");
+    }
+    const error = adminCloseError(report, todayInBucharest());
+    if (error) {
+      return ctx.badRequest(error);
+    }
+    const updated = await strapi.documents("api::report.report").update({
+      documentId: report.documentId,
+      data: {
+        finished: true,
+        finishedAt: new Date().toISOString(),
+        closedBy: "manual",
+      },
+    });
+    return {
+      data: { documentId: updated.documentId, finished: updated.finished },
+    };
+  },
+  /**
+   * "Redeschide evaluarea" — the FDSC Admin reopens a finished round while one
+   * of its phases still runs. Answers already given stay; respondents who had
+   * not finished can carry on.
+   */
+  async reopen(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    const report = await strapi.documents("api::report.report").findOne({
+      documentId: ctx.params.documentId,
+      populate: { ong: true, phases: true },
+    });
+    if (!report) {
+      return ctx.badRequest("Evaluarea nu există");
+    }
+    const open = report.ong
+      ? await findOpenReport(strapi, report.ong.documentId)
+      : null;
+    const error = adminReopenError(
+      report,
+      todayInBucharest(),
+      Boolean(open && open.documentId !== report.documentId),
+    );
+    if (error) {
+      return ctx.badRequest(error);
+    }
+    const updated = await strapi.documents("api::report.report").update({
+      documentId: report.documentId,
+      data: { finished: false, finishedAt: null, closedBy: null },
+    });
+    return {
+      data: { documentId: updated.documentId, finished: updated.finished },
+    };
   },
 };
