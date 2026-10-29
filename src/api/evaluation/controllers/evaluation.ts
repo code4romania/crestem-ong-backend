@@ -7,7 +7,7 @@ import { normalizeBlocks } from "../utils/normalize";
 import { decorateBlock } from "../utils/catalog";
 import { allPhasesEnded } from "../../report/utils/association";
 import { memberView } from "../../report/utils/members";
-import { isClosed } from "../../report/utils/lifecycle";
+import { isClosed, ROUND_CLOSED } from "../../report/utils/lifecycle";
 import { todayInBucharest } from "../../../utils/date";
 import { belongsToOng, loadUserWithOngs } from "../../../utils/ong-scope";
 import {
@@ -327,11 +327,11 @@ export default factories.createCoreController(
         return ctx.forbidden("Nu ai acces la această evaluare");
       }
       if (existing.report?.finished) {
-        return ctx.badRequest("Runda de evaluare este închisă");
+        return ctx.badRequest("Runda de evaluare este închisă", ROUND_CLOSED);
       }
       const today = todayIso();
       if (allPhasesEnded(existing.report, today)) {
-        return ctx.badRequest("Termenul fazei de evaluare a expirat");
+        return ctx.badRequest("Termenul fazei de evaluare a expirat", ROUND_CLOSED);
       }
       if (existing.completedAt) {
         return ctx.badRequest("Evaluarea a fost deja finalizată");
@@ -392,11 +392,11 @@ export default factories.createCoreController(
         return ctx.forbidden("Nu ai acces la această evaluare");
       }
       if (existing.report?.finished) {
-        return ctx.badRequest("Runda de evaluare este închisă");
+        return ctx.badRequest("Runda de evaluare este închisă", ROUND_CLOSED);
       }
       const today = todayIso();
       if (allPhasesEnded(existing.report, today)) {
-        return ctx.badRequest("Termenul fazei de evaluare a expirat");
+        return ctx.badRequest("Termenul fazei de evaluare a expirat", ROUND_CLOSED);
       }
       if (existing.completedAt) {
         return ctx.badRequest("Evaluarea a fost deja finalizată");

@@ -11,7 +11,7 @@ import {
   computeReportScores,
 } from "../../report/utils/scores";
 import { phaseOfSameProgram, programOfReport } from "../../report/utils/association";
-import { isClosed } from "../../report/utils/lifecycle";
+import { adminReopenError, isClosed } from "../../report/utils/lifecycle";
 import { toDateString, todayInBucharest } from "../../../utils/date";
 import { computeProgramStatus } from "../../program/utils/status";
 import { isAnonymized } from "../../../utils/anonymize";
@@ -1219,6 +1219,9 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         finished: isClosed(report, today),
         finishedAt: report.finishedAt,
         closedBy: report.closedBy,
+        // Whether "Redeschide evaluarea" applies; another round under way is
+        // only checked when the FDSC Admin presses it.
+        reopenable: adminReopenError(report, today, false) === null,
         ong: { documentId: report.ong.documentId, name: report.ong.name },
         phases: ((report.phases ?? []) as any[]).map((phase) => ({
           documentId: phase.documentId,

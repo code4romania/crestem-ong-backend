@@ -60,6 +60,12 @@ const FDSC_ADMIN_TRANSFER_ACTIONS = [
   "api::admin-transfer.admin-transfer.fdscResend",
 ];
 
+/** Close and reopen an organization's round: the FDSC Admin only. */
+const FDSC_ADMIN_REPORT_ACTIONS = [
+  "api::report.admin-report.close",
+  "api::report.admin-report.reopen",
+];
+
 const SUPER_ADMIN_PERMISSIONS = [
   "api::dashboard.dashboard.fdsc",
   "api::auth.auth.me",
@@ -153,6 +159,9 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::evaluation.admin-evaluation.list",
   "api::report.admin-report.list",
   "api::report.admin-report.exportList",
+  // "Închide evaluarea" / "Redeschide evaluarea": FDSC Admin only, the editor
+  // is denied below.
+  ...FDSC_ADMIN_REPORT_ACTIONS,
   // The options behind that screen's multi-select filters.
   "api::ong.filter-options.ongs",
   "api::ong.filter-options.programs",
@@ -174,6 +183,7 @@ const EDITOR_FDSC_DENIED_ACTIONS = [
   "api::auth.auth.resendMentorInvite",
   "api::admin-user.admin-user.update",
   ...FDSC_ADMIN_TRANSFER_ACTIONS,
+  ...FDSC_ADMIN_REPORT_ACTIONS,
 ];
 
 const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
