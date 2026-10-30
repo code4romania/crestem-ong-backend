@@ -134,3 +134,74 @@ export const sendInvites = async (
   }
   return { emailSent: failed.length === 0, failed };
 };
+
+/**
+ * Why the ONG admin cannot send a reminder for this evaluation, or `null` when
+ * they can. No rate limit: the admin may remind as often as they like.
+ * `completed` is the evaluation's own progress, read with the round open.
+ */
+export const reminderBlocker = (
+  evaluation: any,
+  callerDocumentId: string,
+  ongDocumentId: string,
+  completed: boolean,
+): string | null => {
+  const member = evaluation.user;
+  // Same reason `sendInvites` skips them: an ngo-admin respondent is the admin
+  // themselves, and the member wizard link does not resolve for their role.
+  if (
+    member.documentId === callerDocumentId ||
+    member.role?.type === "ngo-admin"
+  ) {
+    return "Nu îți poți trimite reminder ție";
+  }
+  if (completed) {
+    return "Membrul a completat deja evaluarea";
+  }
+  if (member.accountStatus === "deleted") {
+    return `Utilizatorul ${member.nume} și-a șters contul`;
+  }
+  if (
+    !((member.ong ?? []) as any[]).some(
+      (ong: any) => ong?.documentId === ongDocumentId,
+    )
+  ) {
+    return `Utilizatorul ${member.nume} nu mai este membru al organizației`;
+  }
+  if (member.blocked) {
+    return `Utilizatorul ${member.nume} este blocat`;
+  }
+  return null;
+};
+
+export const sendReminder = async (
+  strapi: any,
+  evaluation: any,
+  ongName: string,
+  ongDocumentId: string,
+  deadline?: string,
+): Promise<{ emailSent: boolean }> => {
+  try {
+    await (
+      strapi.service("api::email.email") as EmailService
+    ).sendEvaluationReminder({
+      to: evaluation.user.email,
+      nume: evaluation.user.nume,
+      ongName,
+      link: buildEvaluationLink(ongDocumentId, evaluation.documentId),
+      deadline,
+    });
+  } catch (error) {
+    console.error("evaluation reminder email delivery failed", error);
+    return { emailSent: false };
+  }
+  try {
+    await strapi.documents("api::evaluation.evaluation").update({
+      documentId: evaluation.documentId,
+      data: { notificationSentAt: new Date().toISOString() },
+    });
+  } catch (error) {
+    console.error("evaluation reminder timestamp update failed", error);
+  }
+  return { emailSent: true };
+};
