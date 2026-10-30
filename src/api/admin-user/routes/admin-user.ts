@@ -28,5 +28,25 @@ export default {
       // "Persoane resursă" screen is read-only.
       config: { policies: ["global::is-super-admin"] },
     },
+    // Resend / change email / delete: FDSC Admin only, like the PUT above; the
+    // editor stays read-only.
+    {
+      method: "POST",
+      path: "/admin/users/:documentId/resend-invite",
+      handler: "admin-user.resendInvite",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
+      method: "POST",
+      path: "/admin/users/:documentId/email",
+      handler: "admin-user.changeEmail",
+      config: { policies: ["global::is-super-admin"] },
+    },
+    {
+      method: "DELETE",
+      path: "/admin/users/:documentId",
+      handler: "admin-user.remove",
+      config: { policies: ["global::is-super-admin"] },
+    },
   ],
 };

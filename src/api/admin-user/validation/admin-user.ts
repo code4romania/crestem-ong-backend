@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { DIMENSIONS } from "../../../constants/dimensions";
 import { stripHtml } from "../../../utils/rich-text";
+import { emailFormatSchema } from "../../auth/validation/auth";
 
 const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
 
@@ -36,6 +37,9 @@ export const updateMentorSchema = z.object({
     .max(20, "Poți adăuga maxim 20 de arii de expertiză")
     .optional(),
 });
+
+/** FDSC admin changing a mentor's address (trimmed and lowercased by the shared schema). */
+export const adminChangeEmailSchema = z.object({ email: emailFormatSchema });
 
 /** FDSC staff accounts (super-admin / editor-fdsc): only the name is editable. */
 export const updateStaffSchema = z.object({

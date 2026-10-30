@@ -44,6 +44,9 @@ export interface SendEmailChangeConfirmationArgs {
   link: string;
 }
 
+export type SendAdminEmailChangeConfirmationArgs =
+  SendEmailChangeConfirmationArgs;
+
 export interface SendEvaluationInviteArgs {
   to: string;
   nume: string;
@@ -68,6 +71,9 @@ export interface EmailService {
   sendOngDeleted(args: SendOngDeletedArgs): Promise<void>;
   sendEmailChangeConfirmation(
     args: SendEmailChangeConfirmationArgs,
+  ): Promise<void>;
+  sendAdminEmailChangeConfirmation(
+    args: SendAdminEmailChangeConfirmationArgs,
   ): Promise<void>;
 }
 
@@ -268,6 +274,30 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "",
           "Adresa contului se schimbă doar după ce deschizi linkul. Până atunci rămâi cu cea veche.",
           "Dacă nu ai cerut tu schimbarea, ignoră acest email și schimbă-ți parola.",
+        ]),
+      });
+  },
+  async sendAdminEmailChangeConfirmation({
+    to,
+    nume,
+    link,
+  }: SendAdminEmailChangeConfirmationArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: "Confirmă noua adresă de email",
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          "Echipa FDSC a actualizat adresa contului tău de persoană resursă pe platforma Creștem ONG la aceasta.",
+          "Pentru a confirma schimbarea, accesează linkul de mai jos:",
+          "",
+          link,
+          "",
+          "Linkul este valabil 7 zile. Până la confirmare, contul rămâne pe adresa veche.",
+          "Dacă nu te așteptai la această schimbare, contactează echipa FDSC.",
         ]),
       });
   },

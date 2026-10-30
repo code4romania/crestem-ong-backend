@@ -102,7 +102,7 @@ const meetingMentorView = (mentor: any) =>
         isDeleted: isAnonymized(mentor),
       }
     : null;
-import { pageParam, textParam } from "../../../utils/query-params";
+import { dayParam, pageParam, textParam } from "../../../utils/query-params";
 import { performOngDeletion } from "../services/delete-ong";
 import { authorizeOngDeletion } from "../utils/delete-access";
 import { deleteUploadedFile } from "../../../utils/media";
@@ -133,11 +133,19 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const search = textParam(ctx.query.search);
     const judet = textParam(ctx.query.judet);
     const program = textParam(ctx.query.program);
+    const inscrisDe = dayParam(ctx.query.inscrisDe);
+    const inscrisPana = dayParam(ctx.query.inscrisPana);
 
-    // Search and both filters run here rather than in the browser: the screen
+    // Search and the filters run here rather than in the browser: the screen
     // loads one page of twenty as it scrolls, so it never holds the whole list
     // to filter against.
-    const filters = ongListFilters({ search, judet, program });
+    const filters = ongListFilters({
+      search,
+      judet,
+      program,
+      inscrisDe,
+      inscrisPana,
+    });
 
     // Anonymized organizations stay listed (BR-33): FDSC must still see that
     // their evaluations were completed, and this list is the only navigation to
@@ -192,6 +200,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
           dataInfiintare: ong.dataInfiintare,
           domeniuActivitate: ong.domeniuPrincipal?.name ?? null,
           descriere: ong.descriere ?? null,
+          createdAt: ong.createdAt,
           memberCount,
           admin: admin ? { nume: admin.nume } : null,
           programs: ((ong.programs ?? []) as any[]).map((program) => ({
@@ -222,9 +231,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     const search = textParam(ctx.query.search);
     const judet = textParam(ctx.query.judet);
     const program = textParam(ctx.query.program);
+    const inscrisDe = dayParam(ctx.query.inscrisDe);
+    const inscrisPana = dayParam(ctx.query.inscrisPana);
 
     const ongs = (await strapi.documents("api::ong.ong").findMany({
-      filters: ongListFilters({ search, judet, program }),
+      filters: ongListFilters({
+        search,
+        judet,
+        program,
+        inscrisDe,
+        inscrisPana,
+      }),
       sort: { name: "asc" },
       populate: {
         judet: true,

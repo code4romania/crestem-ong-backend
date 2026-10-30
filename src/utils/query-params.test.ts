@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvParam, pageParam, textParam } from "./query-params";
+import { csvParam, dayParam, pageParam, textParam } from "./query-params";
 
 describe("textParam", () => {
   it("trims a string value", () => {
@@ -42,5 +42,19 @@ describe("pageParam", () => {
     expect(pageParam("-2")).toBe(1);
     expect(pageParam("abc")).toBe(1);
     expect(pageParam("2.5")).toBe(1);
+  });
+});
+
+describe("dayParam", () => {
+  it("accepts a real calendar day", () => {
+    expect(dayParam(" 2026-10-12 ")).toBe("2026-10-12");
+    expect(dayParam("2028-02-29")).toBe("2028-02-29");
+  });
+
+  it("is empty for anything else", () => {
+    expect(dayParam(undefined)).toBe("");
+    expect(dayParam("2026-02-30")).toBe("");
+    expect(dayParam("12.10.2026")).toBe("");
+    expect(dayParam(["2026-10-12"])).toBe("");
   });
 });

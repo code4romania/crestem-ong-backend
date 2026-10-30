@@ -20,7 +20,7 @@ const DIMENSION_KEYS = DIMENSIONS.map((dimension) => dimension.key);
  * the latter is a format check, not a transform, and rejected any capital
  * letter with zod's English "Invalid lowercase" message.
  */
-const emailFormatSchema = z
+export const emailFormatSchema = z
   .string({ message: "Adresa de email este obligatorie" })
   .trim()
   .pipe(

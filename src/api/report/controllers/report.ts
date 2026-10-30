@@ -1,7 +1,6 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
-import { collectAnonymousComments } from "../utils/comments";
 import { buildProgramRounds, reportView } from "../utils/rounds";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { hasResponses, isClosed, isProgramReport } from "../utils/lifecycle";
@@ -133,11 +132,13 @@ export default factories.createCoreController(
       if (open) {
         return ctx.badRequest("Ai deja o evaluare în desfășurare");
       }
-      const resolved = await resolveMembers(
-        strapi,
-        ong.documentId,
-        parsed.data.members,
-      );
+      // The admin starting the round is always one of its respondents, so it
+      // can be started — and filled in — without inviting anyone else.
+      // `resolveMembers` dedupes, and `sendInvites` skips the ngo-admin.
+      const resolved = await resolveMembers(strapi, ong.documentId, [
+        scope.user.documentId,
+        ...parsed.data.members,
+      ]);
       if ("error" in resolved) {
         return ctx.badRequest(resolved.error);
       }
@@ -344,7 +345,8 @@ export default factories.createCoreController(
               (evaluation) =>
                 computeProgress(evaluation.dimensions, closed).complete,
             ).length,
-            scores: computeReportScores(evaluations),
+            // Scores stay null until the round closes, as on `detail`.
+            scores: computeReportScores(closed ? evaluations : []),
           };
         }),
       };
@@ -472,8 +474,9 @@ export default factories.createCoreController(
           completedCount: evaluations.filter(
             (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
           ).length,
-          scores: computeReportScores(evaluations),
-          comments: collectAnonymousComments(evaluations),
+          // The ONG admin sees scores only once the round closes, and never the
+          // members' arguments — those could reveal who wrote them.
+          scores: computeReportScores(closed ? evaluations : []),
         },
       };
     },
