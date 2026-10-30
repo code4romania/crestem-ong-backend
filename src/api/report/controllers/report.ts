@@ -132,11 +132,13 @@ export default factories.createCoreController(
       if (open) {
         return ctx.badRequest("Ai deja o evaluare în desfășurare");
       }
-      const resolved = await resolveMembers(
-        strapi,
-        ong.documentId,
-        parsed.data.members,
-      );
+      // The admin starting the round is always one of its respondents, so it
+      // can be started — and filled in — without inviting anyone else.
+      // `resolveMembers` dedupes, and `sendInvites` skips the ngo-admin.
+      const resolved = await resolveMembers(strapi, ong.documentId, [
+        scope.user.documentId,
+        ...parsed.data.members,
+      ]);
       if ("error" in resolved) {
         return ctx.badRequest(resolved.error);
       }

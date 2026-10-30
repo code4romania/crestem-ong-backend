@@ -76,6 +76,21 @@ export const signEmailChangeToken = (userId: number, newEmail: string) =>
     } as jwt.SignOptions,
   );
 
+/**
+ * Same purpose and secret as the self-service token, so `/schimbare-email`
+ * confirms it unchanged; only the lifetime differs, because the person has to
+ * notice an email they did not ask for. Shares `ACTIVATION_TTL` with the
+ * invitation link: both are links FDSC sends on someone's behalf.
+ */
+export const signAdminEmailChangeToken = (userId: number, newEmail: string) =>
+  jwt.sign(
+    { id: userId, purpose: EMAIL_CHANGE_PURPOSE, newEmail },
+    getEmailLinkSecret(),
+    {
+      expiresIn: process.env.ACTIVATION_TTL || "7d",
+    } as jwt.SignOptions,
+  );
+
 export const buildEmailChangeLink = (token: string) => {
   const base = process.env.FRONTEND_URL || "http://localhost:1337";
   return `${base.replace(/\/+$/, "")}${EMAIL_CHANGE_PATH}?token=${encodeURIComponent(token)}`;

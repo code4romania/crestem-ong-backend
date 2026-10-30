@@ -76,3 +76,27 @@ describe("sendMemberActivation", () => {
     );
   });
 });
+
+describe("sendAdminEmailChangeConfirmation", () => {
+  const args = {
+    to: "nou@example.ro",
+    nume: "Maria",
+    link: "https://app.crestem-ong.ro/schimbare-email?token=abc",
+  };
+
+  it("mails the new address with the link and the 7-day validity", async () => {
+    const h = harness();
+    await h.service.sendAdminEmailChangeConfirmation(args);
+    const payload = h.send.mock.calls[0][0];
+    expect(payload.to).toBe("nou@example.ro");
+    expect(payload.subject).toBe("Confirmă noua adresă de email");
+    expect(payload.text).toContain(args.link);
+    expect(payload.text).toContain("7 zile");
+  });
+
+  it("does not claim the recipient asked for the change", async () => {
+    const h = harness();
+    await h.service.sendAdminEmailChangeConfirmation(args);
+    expect(h.send.mock.calls[0][0].text).not.toContain("Ai cerut");
+  });
+});

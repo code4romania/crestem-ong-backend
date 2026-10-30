@@ -216,6 +216,17 @@ describe("performAccountDeletion", () => {
     expect(data.password.length).toBeGreaterThanOrEqual(32);
   });
 
+  it("clears the mentor profile and location fields", async () => {
+    const h = harness({ ...activeMember, role: { type: "mentor" }, ong: [] });
+    await performAccountDeletion(h.strapi, 7, { currentPassword: "correct" });
+    const { data } = h.edits[0];
+    expect(data.bio).toBeNull();
+    expect(data.dimensiuni).toEqual([]);
+    expect(data.ariiDeExpertiza).toEqual([]);
+    expect(data.judet).toBeNull();
+    expect(data.localitate).toBeNull();
+  });
+
   it("runs the whole cascade inside a single database transaction", async () => {
     const h = harness({ ...activeMember, avatar: { id: 9, provider: "local" } });
     await performAccountDeletion(h.strapi, 7, { currentPassword: "correct" });

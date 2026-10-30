@@ -233,29 +233,6 @@ export default {
       return ctx.badRequest(error.message);
     }
   },
-  async resendMentorInvite(ctx: Context) {
-    try {
-      const userId = Number(ctx.params.id);
-
-      if (!Number.isInteger(userId) || userId <= 0) {
-        return ctx.badRequest("Identificator invalid");
-      }
-
-      const result = await (
-        strapi.service("api::auth.auth") as AuthService
-      ).resendMentorInvite(userId);
-
-      return {
-        message: result.emailSent
-          ? "Invitația a fost retrimisă."
-          : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
-        emailSent: result.emailSent,
-      };
-    } catch (error) {
-      console.error("resendMentorInvite failed", error);
-      return ctx.badRequest(error.message);
-    }
-  },
   async resendMemberInvite(ctx: Context) {
     try {
       const userId = Number(ctx.params.id);

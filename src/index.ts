@@ -66,11 +66,10 @@ const FDSC_ADMIN_REPORT_ACTIONS = [
   "api::report.admin-report.reopen",
 ];
 
-const SUPER_ADMIN_PERMISSIONS = [
+export const SUPER_ADMIN_PERMISSIONS = [
   "api::dashboard.dashboard.fdsc",
   "api::auth.auth.me",
   "api::auth.auth.registerMentor",
-  "api::auth.auth.resendMentorInvite",
   "api::auth.auth.registerStaff",
   "api::auth.auth.changePassword",
   "api::auth.auth.deleteAccount",
@@ -153,6 +152,9 @@ const SUPER_ADMIN_PERMISSIONS = [
   "api::admin-user.admin-user.list",
   "api::admin-user.admin-user.findOne",
   "api::admin-user.admin-user.update",
+  "api::admin-user.admin-user.resendInvite",
+  "api::admin-user.admin-user.changeEmail",
+  "api::admin-user.admin-user.remove",
   "api::admin-user.admin-user.exportMeetings",
   // The platform-wide "Evaluări" screen, one action per tab: responses and
   // rounds. Read-only, so the editor keeps them too.
@@ -180,13 +182,15 @@ const SUPER_ADMIN_PERMISSIONS = [
 const EDITOR_FDSC_DENIED_ACTIONS = [
   "api::auth.auth.registerStaff",
   "api::auth.auth.registerMentor",
-  "api::auth.auth.resendMentorInvite",
   "api::admin-user.admin-user.update",
+  "api::admin-user.admin-user.resendInvite",
+  "api::admin-user.admin-user.changeEmail",
+  "api::admin-user.admin-user.remove",
   ...FDSC_ADMIN_TRANSFER_ACTIONS,
   ...FDSC_ADMIN_REPORT_ACTIONS,
 ];
 
-const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
+export const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
   (action) => !EDITOR_FDSC_DENIED_ACTIONS.includes(action),
 );
 
