@@ -1,6 +1,7 @@
 import { Context } from "koa";
 import { pageSlice } from "../../../utils/pagination";
 import {
+  adminChangeEmailSchema,
   updateMentorSchema,
   updateStaffSchema,
 } from "../validation/admin-user";
@@ -17,6 +18,12 @@ import {
   meetingRow,
   meetingsFileName,
 } from "../utils/meetings-export";
+import {
+  changeMentorEmail,
+  deleteMentor,
+  resendMentorInvitation,
+  type MentorAdminError,
+} from "../services/mentor-admin";
 import { isAnonymized } from "../../../utils/anonymize";
 import { todayInBucharest } from "../../../utils/date";
 import { textParam } from "../../../utils/query-params";
@@ -81,6 +88,12 @@ export async function resolveProgramsByMentor(mentorIds: string[]) {
     }
   }
   return programsByMentor;
+}
+
+function respondWithMentorError(ctx: Context, failure: MentorAdminError) {
+  return failure.status === 404
+    ? ctx.notFound(failure.error)
+    : ctx.badRequest(failure.error);
 }
 
 function mapUser(user: any, programs: ProgramWithOngs[]) {
@@ -280,6 +293,88 @@ export default {
       .edit(user.id, parsed.data);
 
     return { message: "Utilizatorul a fost actualizat cu succes." };
+  },
+
+  /** "Retrimite invitația" on a pending resource person. */
+  async resendInvite(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    if (!canEditUser(ctx.state.user.role?.type)) {
+      return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
+    }
+
+    const result = await resendMentorInvitation(
+      strapi,
+      ctx.params.documentId as string,
+    );
+    if ("error" in result) return respondWithMentorError(ctx, result);
+
+    return {
+      message: result.emailSent
+        ? "Invitația a fost retrimisă."
+        : "Invitația a fost regenerată, dar emailul nu a putut fi trimis.",
+      emailSent: result.emailSent,
+    };
+  },
+
+  /** "Schimbă emailul": re-invites a pending account, asks an active one to confirm. */
+  async changeEmail(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    if (!canEditUser(ctx.state.user.role?.type)) {
+      return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
+    }
+
+    const parsed = await adminChangeEmailSchema.safeParseAsync(
+      ctx.request.body,
+    );
+    if (!parsed.success) {
+      return ctx.badRequest("Date invalide: ", parsed.error.flatten());
+    }
+
+    const result = await changeMentorEmail(
+      strapi,
+      ctx.params.documentId as string,
+      parsed.data.email,
+    );
+    if ("error" in result) return respondWithMentorError(ctx, result);
+
+    // The edit and token are already saved, so a failed send is still a 200;
+    // the frontend turns `emailSent: false` into an error.
+    // A pending swap has already moved the address, so "try again" would be
+    // wrong there: the retry is the "Retrimite invitația" action.
+    const message =
+      result.mode === "invite-resent"
+        ? result.emailSent
+          ? "Adresa a fost schimbată și invitația a fost retrimisă."
+          : "Adresa a fost schimbată, dar invitația nu a putut fi trimisă. Folosește „Retrimite invitația”."
+        : result.emailSent
+          ? "Am trimis un link de confirmare pe noua adresă."
+          : "Emailul nu a putut fi trimis. Încearcă din nou.";
+    return { message, mode: result.mode, emailSent: result.emailSent };
+  },
+
+  /** "Șterge": drops a pending invitation, anonymizes anyone with history. */
+  async remove(ctx: Context) {
+    if (!ctx.state.user) {
+      return ctx.unauthorized();
+    }
+    if (!canEditUser(ctx.state.user.role?.type)) {
+      return ctx.forbidden(ADMIN_USER_FORBIDDEN_MESSAGE);
+    }
+
+    const result = await deleteMentor(strapi, ctx.params.documentId as string);
+    if ("error" in result) return respondWithMentorError(ctx, result);
+
+    return {
+      message:
+        result.mode === "deleted"
+          ? "Invitația a fost ștearsă."
+          : "Persoana resursă a fost ștearsă.",
+      mode: result.mode,
+    };
   },
 
   /**

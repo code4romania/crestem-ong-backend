@@ -2,6 +2,8 @@
  * Account deletion is a soft delete (BR-24): the user row survives so that
  * evaluations, messages and reports keep a valid relation, while every
  * identifying field is overwritten with a value derived from the documentId.
+ * The same data serves the self-service deletion and the super-admin deletion
+ * of a mentor, so both clear the mentor profile and location fields.
  *
  * `email` and `username` are `unique` in the schema, so they cannot be nulled —
  * overwriting them with a placeholder is what actually frees the real address
@@ -30,6 +32,11 @@ export interface AnonymizedUserData {
   avatar: null;
   mentorJobTitle: null;
   mentorOrganization: null;
+  bio: null;
+  dimensiuni: [];
+  ariiDeExpertiza: [];
+  judet: null;
+  localitate: null;
   resetPasswordToken: null;
   confirmationToken: null;
   emailChangeToken: null;
@@ -46,6 +53,11 @@ export function buildAnonymizedUserData(documentId: string): AnonymizedUserData 
     avatar: null,
     mentorJobTitle: null,
     mentorOrganization: null,
+    bio: null,
+    dimensiuni: [],
+    ariiDeExpertiza: [],
+    judet: null,
+    localitate: null,
     resetPasswordToken: null,
     confirmationToken: null,
     emailChangeToken: null,

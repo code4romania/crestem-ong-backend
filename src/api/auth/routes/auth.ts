@@ -28,12 +28,6 @@ export default {
     },
     {
       method: "POST",
-      path: "/auth/register/mentor/:id/resend",
-      handler: "auth.resendMentorInvite",
-      config: { policies: ["global::is-super-admin"] },
-    },
-    {
-      method: "POST",
       path: "/auth/register/staff",
       handler: "auth.registerStaff",
       config: { policies: ["global::is-super-admin"] },
