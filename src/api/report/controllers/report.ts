@@ -1,7 +1,6 @@
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
 import { computeReportScores } from "../utils/scores";
-import { collectAnonymousComments } from "../utils/comments";
 import { buildProgramRounds, reportView } from "../utils/rounds";
 import { computeProgress } from "../../evaluation/utils/progress";
 import { hasResponses, isClosed, isProgramReport } from "../utils/lifecycle";
@@ -344,7 +343,8 @@ export default factories.createCoreController(
               (evaluation) =>
                 computeProgress(evaluation.dimensions, closed).complete,
             ).length,
-            scores: computeReportScores(evaluations),
+            // Scores stay null until the round closes, as on `detail`.
+            scores: computeReportScores(closed ? evaluations : []),
           };
         }),
       };
@@ -472,8 +472,9 @@ export default factories.createCoreController(
           completedCount: evaluations.filter(
             (evaluation) => computeProgress(evaluation.dimensions, closed).complete,
           ).length,
-          scores: computeReportScores(evaluations),
-          comments: collectAnonymousComments(evaluations),
+          // The ONG admin sees scores only once the round closes, and never the
+          // members' arguments — those could reveal who wrote them.
+          scores: computeReportScores(closed ? evaluations : []),
         },
       };
     },
