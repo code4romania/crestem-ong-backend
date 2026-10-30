@@ -20,3 +20,12 @@ export const pageParam = (value: unknown): number => {
   const parsed = Number(textParam(value));
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 };
+
+/** A real calendar day as `YYYY-MM-DD`, or "" for anything else. */
+export const dayParam = (value: unknown): string => {
+  const text = textParam(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
+  const [year, month, day] = text.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.toISOString().slice(0, 10) === text ? text : "";
+};
