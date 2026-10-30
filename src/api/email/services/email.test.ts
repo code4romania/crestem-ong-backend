@@ -115,7 +115,7 @@ describe("sendEvaluationReminder", () => {
     const payload = h.send.mock.calls[0][0];
     expect(payload.to).toBe("ana@example.ro");
     expect(payload.subject).toBe(
-      "Reamintire: evaluarea pentru Asociația Exemplu te așteaptă",
+      "Reminder: evaluarea pentru Asociația Exemplu te așteaptă",
     );
     expect(payload.text).toContain("Îți reamintim");
     expect(payload.text).toContain(args.link);
