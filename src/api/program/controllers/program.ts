@@ -39,7 +39,7 @@ import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { newlyAssignedMentors, notifyMentorAssigned, notifyOngAddedToProgram } from "../../notification/utils/events";
-import { ACTIVE_NOT_BLOCKED } from "../../notification/utils/recipients";
+import { ongAdminContacts } from "../../notification/utils/recipients";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
 import {
@@ -1013,17 +1013,7 @@ export default factories.createCoreController(
       let emailSent = true;
       for (const ong of ongs) {
         try {
-          const admins = await strapi
-            .documents("plugin::users-permissions.user")
-            .findMany({
-              filters: {
-                ongs: { documentId: ong.documentId },
-                role: { type: "ngo-admin" },
-                accountStatus: "active",
-                // Legacy-imported admins have `blocked` NULL; they still get the email.
-                ...ACTIVE_NOT_BLOCKED,
-              },
-            });
+          const admins = await ongAdminContacts(strapi, ong.documentId);
           for (const admin of admins) {
             try {
               await (
