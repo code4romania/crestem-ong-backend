@@ -64,6 +64,24 @@ export const ongAdmins = async (
   return ids(rows);
 };
 
+/**
+ * Active Admin ONG users of one organization, with the fields an email needs.
+ * The user's relation to its organization is `ong` (not `ongs`).
+ */
+export const ongAdminContacts = (
+  strapi: any,
+  ongDocumentId: string,
+): Promise<Array<{ email: string; nume: string }>> =>
+  strapi.documents(USER_UID).findMany({
+    filters: {
+      ong: { documentId: ongDocumentId },
+      role: { type: "ngo-admin" },
+      ...ACTIVE,
+    },
+    fields: ["email", "nume"],
+    limit: -1,
+  });
+
 /** The subset of the given user ids that are active (not pending, not blocked). */
 export const activeAmong = async (
   strapi: any,
