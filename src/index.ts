@@ -6,6 +6,7 @@ import { seedMenus } from "./utils/seed-menus";
 import { seedFooter } from "./utils/seed-footer";
 import { seedHomepage } from "./utils/seed-homepage";
 import { migratePageStare } from "./utils/migrate-page-stare";
+import { backfillPhaseEndNotified } from "./api/notification/utils/phase-ended";
 import { slugify } from "./api/media-tag/utils/slug";
 
 /**
@@ -66,6 +67,14 @@ const FDSC_ADMIN_REPORT_ACTIONS = [
   "api::report.admin-report.reopen",
 ];
 
+/** The in-app notification feed: FDSC staff, ONG admin and mentor. */
+const NOTIFICATION_ACTIONS = [
+  "api::notification.notification.list",
+  "api::notification.notification.unreadCount",
+  "api::notification.notification.markRead",
+  "api::notification.notification.markAllRead",
+];
+
 export const SUPER_ADMIN_PERMISSIONS = [
   "api::dashboard.dashboard.fdsc",
   "api::auth.auth.me",
@@ -102,6 +111,8 @@ export const SUPER_ADMIN_PERMISSIONS = [
   "api::ong.ong.deleteFdscReport",
   "api::ong.ong.mentors",
   "api::ong.ong.meetings",
+  "api::ong.ong.createMeeting",
+  "api::ong.ong.updateMeeting",
   "plugin::upload.content-api.upload",
   "api::ong.ong.list",
   "api::ong.ong.listActive",
@@ -168,6 +179,7 @@ export const SUPER_ADMIN_PERMISSIONS = [
   "api::ong.filter-options.ongs",
   "api::ong.filter-options.programs",
   "plugin::upload.content-api.upload",
+  ...NOTIFICATION_ACTIONS,
   // "Schimbă administratorul" (US-5). The route policy is `is-super-admin`
   // too; the editor is denied below.
   ...FDSC_ADMIN_TRANSFER_ACTIONS,
@@ -194,7 +206,7 @@ export const EDITOR_FDSC_PERMISSIONS = SUPER_ADMIN_PERMISSIONS.filter(
   (action) => !EDITOR_FDSC_DENIED_ACTIONS.includes(action),
 );
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
   "super-admin": SUPER_ADMIN_PERMISSIONS,
   "editor-fdsc": EDITOR_FDSC_PERMISSIONS,
   "ngo-admin": [
@@ -255,6 +267,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::conversation.conversation.sendMessage",
     "api::article-read.article-read.markRead",
     "api::article-read.article-read.me",
+    ...NOTIFICATION_ACTIONS,
   ],
   "ngo-member": [
     "api::auth.auth.me",
@@ -308,6 +321,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::mentor.mentor.me",
     "api::mentor.mentor.updateMe",
     "plugin::upload.content-api.upload",
+    ...NOTIFICATION_ACTIONS,
   ],
   individual: [
     "api::auth.auth.me",
@@ -374,6 +388,7 @@ export default {
     await seedMenus(strapi);
     await seedFooter(strapi);
     await seedHomepage(strapi);
+    await backfillPhaseEndNotified(strapi);
   },
 };
 

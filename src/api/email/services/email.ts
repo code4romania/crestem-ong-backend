@@ -268,7 +268,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       .service("email")
       .send({
         to,
-        subject: `Reamintire: evaluarea pentru ${ongName} te așteaptă`,
+        subject: `Reminder: evaluarea pentru ${ongName} te așteaptă`,
         ...renderEmail([
           `Bună, ${nume},`,
           "",

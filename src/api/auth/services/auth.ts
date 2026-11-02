@@ -24,6 +24,7 @@ import { setNgoMemberRole } from "../../../utils/membership";
 import { EmailService } from "../../email/services/email";
 import { RefreshTokenService } from "../../refresh-token/services/refresh-token";
 import { performAccountDeletion } from "./delete-account";
+import { notifyAccountActivated, notifyOngRegistered } from "../../notification/utils/events";
 import {
   ACTIVATION_PURPOSE,
   ActivationTokenPayload,
@@ -101,8 +102,9 @@ export interface AuthService {
 
 export default ({ strapi }: { strapi: Core.Strapi }) => ({
   async createNgo(data: NgoCreatePayload) {
+    let created: { documentId: string; name: string };
     try {
-      return await strapi.db.transaction(async () => {
+      created = await strapi.db.transaction(async () => {
         // Get the roles
         const role = await strapi.db
           .query("plugin::users-permissions.role")
@@ -142,12 +144,17 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
             ong: [ong.id],
           });
 
-        return true;
+        return { documentId: ong.documentId, name: data.numeOng };
       });
     } catch (error) {
       console.error("createNgo failed", error);
       throw new Error("A apărut o eroare necunoscută");
     }
+
+    // After the commit, so a rollback never leaves a notification behind.
+    // Never throws; createNgo's result is unchanged.
+    await notifyOngRegistered(strapi, { ong: created });
+    return true;
   },
   async createIndividual(data: IndividualCreatePayload) {
     try {
@@ -428,7 +435,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
 
     const user = await strapi.db
       .query("plugin::users-permissions.user")
-      .findOne({ where: { id: payload.id }, populate: ["role"] });
+      .findOne({ where: { id: payload.id }, populate: ["role", "ong"] });
 
     if (
       !user ||
@@ -454,6 +461,9 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           "api::refresh-token.refresh-token",
         ) as RefreshTokenService
       ).revokeAllForUser(user.id);
+
+      // Never throws: a failed notification must not fail the activation.
+      await notifyAccountActivated(strapi, user);
 
       return true;
     } catch (error) {

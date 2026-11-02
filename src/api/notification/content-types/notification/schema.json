@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "notifications",
+  "info": {
+    "singularName": "notification",
+    "pluralName": "notifications",
+    "displayName": "Notification",
+    "description": "Notificări în aplicație, câte un rând pe destinatar"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "recipient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "account-activated",
+        "member-joined",
+        "admin-transfer",
+        "evaluation-completed",
+        "meeting-created",
+        "meeting-updated",
+        "meeting-cancelled",
+        "phase-ended",
+        "mentor-assigned",
+        "ong-added-to-program",
+        "ong-registered"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "body": {
+      "type": "text",
+      "required": true
+    },
+    "link": {
+      "type": "string"
+    },
+    "readAt": {
+      "type": "datetime"
+    }
+  }
+}

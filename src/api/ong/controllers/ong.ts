@@ -36,6 +36,10 @@ import {
   createMeetingSchema,
   createMentorMeetingSchema,
 } from "../validation/meeting";
+import {
+  notifyMeetingCreated,
+  notifyMeetingUpdated,
+} from "../../notification/utils/events";
 import { decorateBlock } from "../../evaluation/utils/catalog";
 import { programsOfReport } from "../../evaluation/utils/admin-list";
 import { buildEvaluationExport } from "../../report/utils/evaluation-export";
@@ -1495,6 +1499,14 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       populate: { mentor: true, program: true, activityType: true },
     });
 
+    // Never throws: a failed notification must not fail the create.
+    await notifyMeetingCreated(strapi, {
+      ongDocumentId: ong.documentId,
+      author: ctx.state.user.nume,
+      dataOra: created.dataOra,
+      subiect: created.subiect,
+    });
+
     return {
       data: {
         documentId: created.documentId,
@@ -1624,6 +1636,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         activityType: data.activityType ? docRef(data.activityType) : null,
       },
       populate: { mentor: true, program: true, activityType: true },
+    });
+
+    // Never throws: a failed notification must not fail the update.
+    await notifyMeetingUpdated(strapi, {
+      ongDocumentId: ong.documentId,
+      before: { status: meeting.status, dataOra: meeting.dataOra },
+      after: {
+        status: updated.status,
+        dataOra: updated.dataOra,
+        subiect: updated.subiect,
+      },
     });
 
     return {
@@ -1915,6 +1938,14 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       populate: { ong: true, mentor: true, program: true, activityType: true },
     });
 
+    // Never throws: a failed notification must not fail the create.
+    await notifyMeetingCreated(strapi, {
+      ongDocumentId: ong.documentId,
+      author: ctx.state.user.nume,
+      dataOra: created.dataOra,
+      subiect: created.subiect,
+    });
+
     return { data: mentorMeetingView({ ...created, report: null }) };
   },
 
@@ -1999,6 +2030,17 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
       },
     });
 
+    // Never throws: a failed notification must not fail the update.
+    await notifyMeetingUpdated(strapi, {
+      ongDocumentId: meeting.ong?.documentId,
+      before: { status: meeting.status, dataOra: meeting.dataOra },
+      after: {
+        status: updated.status,
+        dataOra: updated.dataOra,
+        subiect: updated.subiect,
+      },
+    });
+
     return { data: mentorMeetingView(updated) };
   },
 
@@ -2008,7 +2050,7 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     }
     const meeting = await strapi.documents("api::meeting.meeting").findOne({
       documentId: ctx.params.meetingDocumentId,
-      populate: { mentor: true },
+      populate: { mentor: true, ong: true },
     });
     if (!meeting || meeting.mentor?.documentId !== ctx.state.user.documentId) {
       return ctx.badRequest("Întâlnirea nu există");
@@ -2035,6 +2077,18 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
         "Întâlnirea a fost modificată între timp. Reîncarcă pagina și încearcă din nou.",
       );
     }
+
+    // Never throws: a failed notification must not fail the cancel.
+    await notifyMeetingUpdated(strapi, {
+      ongDocumentId: meeting.ong?.documentId,
+      before: { status: meeting.status, dataOra: meeting.dataOra },
+      after: {
+        status: updated.status,
+        dataOra: updated.dataOra,
+        subiect: updated.subiect,
+      },
+    });
+
     return { data: mentorMeetingView(updated) };
   },
 
