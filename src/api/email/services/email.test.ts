@@ -55,7 +55,10 @@ describe("sendAccountActivation", () => {
 
   it("leaves the note out of a staff invitation", async () => {
     const h = harness();
-    await h.service.sendAccountActivation({ ...args, roleLabel: "editor FDSC" });
+    await h.service.sendAccountActivation({
+      ...args,
+      roleLabel: "editor FDSC",
+    });
     expect(h.send.mock.calls[0][0].text).not.toContain(TERMS_NOTE);
   });
 });
