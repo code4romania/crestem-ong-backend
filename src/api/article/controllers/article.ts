@@ -4,7 +4,10 @@
 
 import { factories } from "@strapi/strapi";
 import { Context } from "koa";
-import { createArticleSchema, updateArticleSchema } from "../validation/article";
+import {
+  createArticleSchema,
+  updateArticleSchema,
+} from "../validation/article";
 import { articlePath } from "../utils/path";
 import { nextDataPublicarii } from "../utils/publish";
 import { canView } from "../../page/utils/visibility";
@@ -18,7 +21,7 @@ const UID = "api::article.article";
 const CATEGORY_UID = "api::library-category.library-category";
 
 /**
- * Declared outside `POPULATE` (and without its own `as const`) on purpose:
+ * Declared outside `POPULATE` (and without its own `as const`) on purpose
  * Strapi's populate typing wants a *mutable* array of specific field-name
  * literals, and `POPULATE`'s `as const` recursively freezes every array/object
  * literal written directly inside it — including one built by spreading a
@@ -31,14 +34,9 @@ const CATEGORY_UID = "api::library-category.library-category";
  * freshly-generated-types type-check catches a mismatch here; a plain
  * `tsc --noEmit` against stale generated types does not.
  */
-const RELATED_ARTICLE_FIELDS: Array<"titlu" | "slug" | "etichete" | "tip" | "stare" | "vizibilitate"> = [
-  "titlu",
-  "slug",
-  "etichete",
-  "tip",
-  "stare",
-  "vizibilitate",
-];
+const RELATED_ARTICLE_FIELDS: Array<
+  "titlu" | "slug" | "etichete" | "tip" | "stare" | "vizibilitate"
+> = ["titlu", "slug", "etichete", "tip", "stare", "vizibilitate"];
 
 /** Two levels of relation, which is exactly what `articlePath` needs. */
 const POPULATE = {
@@ -112,14 +110,18 @@ const detailView = (article: any) => {
  * assembled from the subcategory *and* that subcategory's parent, so a
  * top-level target would produce an unaddressable article.
  */
-async function checkSubcategory(strapi: any, documentId: string): Promise<string | null> {
+async function checkSubcategory(
+  strapi: any,
+  documentId: string,
+): Promise<string | null> {
   const target = await strapi.documents(CATEGORY_UID).findOne({
     documentId,
     populate: { parinte: true },
   });
 
   if (!target) return "Subcategoria nu există";
-  if (!target.parinte) return "Articolul trebuie să fie într-o subcategorie, nu într-o categorie";
+  if (!target.parinte)
+    return "Articolul trebuie să fie într-o subcategorie, nu într-o categorie";
   return null;
 }
 
@@ -129,7 +131,10 @@ async function checkSubcategory(strapi: any, documentId: string): Promise<string
  * write (or silently dropping the id). Exported solely so a unit test can
  * import it directly.
  */
-export async function checkRelatedArticles(strapi: any, ids: string[]): Promise<string | null> {
+export async function checkRelatedArticles(
+  strapi: any,
+  ids: string[],
+): Promise<string | null> {
   if (ids.length === 0) return null;
   const uniqueIds = [...new Set(ids)];
   const found = await strapi.documents(UID).findMany({
@@ -137,7 +142,8 @@ export async function checkRelatedArticles(strapi: any, ids: string[]): Promise<
     fields: ["documentId"],
     limit: -1,
   });
-  if (found.length !== uniqueIds.length) return "Unul dintre articolele relaționate nu există";
+  if (found.length !== uniqueIds.length)
+    return "Unul dintre articolele relaționate nu există";
   return null;
 }
 
@@ -158,12 +164,18 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
    * database clients.
    */
   async list(ctx: Context) {
-    const search = typeof ctx.query.search === "string" ? ctx.query.search.trim() : "";
-    const categorie = typeof ctx.query.categorie === "string" ? ctx.query.categorie.trim() : "";
+    const search =
+      typeof ctx.query.search === "string" ? ctx.query.search.trim() : "";
+    const categorie =
+      typeof ctx.query.categorie === "string" ? ctx.query.categorie.trim() : "";
     const subcategorie =
-      typeof ctx.query.subcategorie === "string" ? ctx.query.subcategorie.trim() : "";
+      typeof ctx.query.subcategorie === "string"
+        ? ctx.query.subcategorie.trim()
+        : "";
     const vizibilitate =
-      typeof ctx.query.vizibilitate === "string" ? ctx.query.vizibilitate.trim() : "";
+      typeof ctx.query.vizibilitate === "string"
+        ? ctx.query.vizibilitate.trim()
+        : "";
     const page = Math.max(1, Number(ctx.query.page) || 1);
     const pageSize = 20;
 
@@ -175,10 +187,23 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
 
     const q = foldText(search);
     const matched = articles.filter((article) => {
-      if (categorie && fold(article.subcategorie?.parinte?.slug) !== fold(categorie)) return false;
-      if (subcategorie && fold(article.subcategorie?.slug) !== fold(subcategorie)) return false;
-      if (vizibilitate && !(article.vizibilitate ?? []).includes(vizibilitate)) return false;
-      if (q && !foldText(article.titlu).includes(q) && !foldText(article.rezumat).includes(q)) {
+      if (
+        categorie &&
+        fold(article.subcategorie?.parinte?.slug) !== fold(categorie)
+      )
+        return false;
+      if (
+        subcategorie &&
+        fold(article.subcategorie?.slug) !== fold(subcategorie)
+      )
+        return false;
+      if (vizibilitate && !(article.vizibilitate ?? []).includes(vizibilitate))
+        return false;
+      if (
+        q &&
+        !foldText(article.titlu).includes(q) &&
+        !foldText(article.rezumat).includes(q)
+      ) {
         return false;
       }
       return true;
@@ -188,7 +213,12 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     return {
       data: matched.slice((page - 1) * pageSize, page * pageSize).map(listView),
       meta: {
-        pagination: { page, pageSize, total, pageCount: Math.ceil(total / pageSize) },
+        pagination: {
+          page,
+          pageSize,
+          total,
+          pageCount: Math.ceil(total / pageSize),
+        },
       },
     };
   },
@@ -211,7 +241,16 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const articles = (await strapi.documents(UID).findMany({
       // `stare` and `vizibilitate` ride along so the builder canvas can mark a
       // card the public will not get. Still no `blocuri`: a row runs to ~1 MB.
-      fields: ["titlu", "slug", "rezumat", "etichete", "tip", "stare", "vizibilitate", "dataPublicarii"],
+      fields: [
+        "titlu",
+        "slug",
+        "rezumat",
+        "etichete",
+        "tip",
+        "stare",
+        "vizibilitate",
+        "dataPublicarii",
+      ],
       populate: {
         subcategorie: {
           fields: ["slug"],
@@ -266,12 +305,19 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const duplicate = await strapi.documents(UID).findFirst({
       filters: { slug: parsed.data.slug },
     });
-    if (duplicate) return ctx.badRequest("Există deja un articol cu acest slug");
+    if (duplicate)
+      return ctx.badRequest("Există deja un articol cu acest slug");
 
-    const subcategoryError = await checkSubcategory(strapi, parsed.data.subcategorie);
+    const subcategoryError = await checkSubcategory(
+      strapi,
+      parsed.data.subcategorie,
+    );
     if (subcategoryError) return ctx.badRequest(subcategoryError);
 
-    const relatedError = await checkRelatedArticles(strapi, parsed.data.articoleRelationate);
+    const relatedError = await checkRelatedArticles(
+      strapi,
+      parsed.data.articoleRelationate,
+    );
     if (relatedError) return ctx.badRequest(relatedError);
 
     const { subcategorie, ...fields } = parsed.data;
@@ -311,14 +357,18 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       const duplicate = await strapi.documents(UID).findFirst({
         filters: { slug: parsed.data.slug },
       });
-      if (duplicate) return ctx.badRequest("Există deja un articol cu acest slug");
+      if (duplicate)
+        return ctx.badRequest("Există deja un articol cu acest slug");
     }
 
     if (parsed.data.articoleRelationate !== undefined) {
       if (parsed.data.articoleRelationate.includes(ctx.params.documentId)) {
         return ctx.badRequest("Un articol nu poate fi relaționat cu el însuși");
       }
-      const relatedError = await checkRelatedArticles(strapi, parsed.data.articoleRelationate);
+      const relatedError = await checkRelatedArticles(
+        strapi,
+        parsed.data.articoleRelationate,
+      );
       if (relatedError) return ctx.badRequest(relatedError);
     }
 
@@ -414,8 +464,12 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const pageSize = 20;
 
     const filters = {
-      categorie: typeof ctx.query.categorie === "string" ? ctx.query.categorie : null,
-      subcategorie: typeof ctx.query.subcategorie === "string" ? ctx.query.subcategorie : null,
+      categorie:
+        typeof ctx.query.categorie === "string" ? ctx.query.categorie : null,
+      subcategorie:
+        typeof ctx.query.subcategorie === "string"
+          ? ctx.query.subcategorie
+          : null,
       tip: typeof ctx.query.tip === "string" ? ctx.query.tip : null,
       q: typeof ctx.query.q === "string" ? ctx.query.q : null,
     };
@@ -504,9 +558,9 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     // not otherwise open (e.g. `publicat` but restricted to `ngo-member`).
     // Editorial reads (`detail`/`createOne`/`updateOne`) intentionally skip
     // this: an editor picking their own draft/restricted articles is expected.
-    (full as any).articoleRelationate = ((full as any).articoleRelationate ?? []).filter(
-      (related: any) => canView(related, roleType),
-    );
+    (full as any).articoleRelationate = (
+      (full as any).articoleRelationate ?? []
+    ).filter((related: any) => canView(related, roleType));
 
     // Pass one: page-backed CTA hrefs, cleared for any target this caller
     // cannot view.

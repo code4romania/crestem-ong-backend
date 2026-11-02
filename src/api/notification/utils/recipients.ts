@@ -6,7 +6,7 @@ import { USER_UID } from "./types";
  * would drop those rows. The clause is an `$or`, so callers needing another
  * `$or` combine them via `$and`.
  */
-const ACTIVE_NOT_BLOCKED = {
+export const ACTIVE_NOT_BLOCKED = {
   $or: [{ blocked: false }, { blocked: { $null: true } }],
 };
 const ACTIVE = { accountStatus: "active", ...ACTIVE_NOT_BLOCKED };
