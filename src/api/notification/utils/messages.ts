@@ -36,7 +36,11 @@ export function accountActivatedMessage(args: {
     link:
       args.roleType === "mentor"
         ? `/dashboard/persoane-resursa/${args.userDocumentId}`
-        : "/dashboard/utilizatori",
+        : // No staff detail page: open the users list already filtered to them.
+          `/dashboard/utilizatori?${new URLSearchParams({
+            search: args.nume,
+            role: args.roleType,
+          })}`,
   };
 }
 
@@ -101,7 +105,9 @@ export function classifyMeetingChange(
   if (after.status === "anulata" && before.status !== "anulata") {
     return "cancelled";
   }
-  if (new Date(before.dataOra).getTime() !== new Date(after.dataOra).getTime()) {
+  if (
+    new Date(before.dataOra).getTime() !== new Date(after.dataOra).getTime()
+  ) {
     return "moved";
   }
   return "updated";

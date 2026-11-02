@@ -57,13 +57,13 @@ describe("message builders", () => {
     });
   });
 
-  it("account-activated: staff roles link to utilizatori", () => {
+  it("account-activated: staff roles link to utilizatori filtered by name and role", () => {
     const editor = accountActivatedMessage({ nume: "Ion", roleType: "editor-fdsc", userDocumentId: "u2" });
-    const admin = accountActivatedMessage({ nume: "Dan", roleType: "super-admin", userDocumentId: "u3" });
+    const admin = accountActivatedMessage({ nume: "Dan Pop & Co", roleType: "super-admin", userDocumentId: "u3" });
     expect(editor.body).toBe("Ion (Editor FDSC) și-a activat contul și a intrat în platformă.");
-    expect(admin.body).toBe("Dan (Admin FDSC) și-a activat contul și a intrat în platformă.");
-    expect(editor.link).toBe("/dashboard/utilizatori");
-    expect(admin.link).toBe("/dashboard/utilizatori");
+    expect(admin.body).toBe("Dan Pop & Co (Admin FDSC) și-a activat contul și a intrat în platformă.");
+    expect(editor.link).toBe("/dashboard/utilizatori?search=Ion&role=editor-fdsc");
+    expect(admin.link).toBe("/dashboard/utilizatori?search=Dan+Pop+%26+Co&role=super-admin");
   });
 
   it("member-joined", () => {
