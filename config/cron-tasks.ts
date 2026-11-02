@@ -2,6 +2,8 @@ import { computeProgramStatus } from '../src/api/program/utils/status';
 import { allPhasesEnded } from '../src/api/report/utils/association';
 import { toDateString, todayInBucharest } from '../src/utils/date';
 
+import { notifyEndedPhases } from '../src/api/notification/utils/phase-ended';
+
 const REPORT_UID = 'api::report.report' as const;
 const PROGRAM_UID = 'api::program.program' as const;
 
@@ -49,6 +51,19 @@ export default {
       if (closed) {
         strapi.log.info(`[cron] Finished ${closed} expired program reports.`);
       }
+    },
+    options: {
+      rule: '0 0 * * *',
+      tz: 'Europe/Bucharest',
+    },
+  },
+  /**
+   * In-app "phase ended" notification, once per phase, for phases whose end
+   * date has passed. Runs every day at midnight, Romanian time.
+   */
+  notifyEndedPhases: {
+    task: async ({ strapi }: { strapi: any }) => {
+      await notifyEndedPhases(strapi);
     },
     options: {
       rule: '0 0 * * *',

@@ -1262,6 +1262,60 @@ export interface ApiNgoMentorNgoMentor extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiNotificationNotification
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'notifications';
+  info: {
+    description: 'Notific\u0103ri \u00EEn aplica\u021Bie, c\u00E2te un r\u00E2nd pe destinatar';
+    displayName: 'Notification';
+    pluralName: 'notifications';
+    singularName: 'notification';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.Text & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    link: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    readAt: Schema.Attribute.DateTime;
+    recipient: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    > &
+      Schema.Attribute.Required;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    type: Schema.Attribute.Enumeration<
+      [
+        'account-activated',
+        'member-joined',
+        'admin-transfer',
+        'evaluation-completed',
+        'meeting-created',
+        'meeting-updated',
+        'meeting-cancelled',
+        'phase-ended',
+        'mentor-assigned',
+        'ong-added-to-program',
+        'ong-registered',
+      ]
+    > &
+      Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiOngJoinRequestOngJoinRequest
   extends Struct.CollectionTypeSchema {
   collectionName: 'ong_join_requests';
@@ -1420,6 +1474,7 @@ export interface ApiPhasePhase extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     endDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    endNotifiedAt: Schema.Attribute.DateTime;
     hasEvaluation: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<true>;
@@ -2155,6 +2210,7 @@ declare module '@strapi/strapi' {
       'api::message.message': ApiMessageMessage;
       'api::ngo-member-role.ngo-member-role': ApiNgoMemberRoleNgoMemberRole;
       'api::ngo-mentor.ngo-mentor': ApiNgoMentorNgoMentor;
+      'api::notification.notification': ApiNotificationNotification;
       'api::ong-join-request.ong-join-request': ApiOngJoinRequestOngJoinRequest;
       'api::ong.ong': ApiOngOng;
       'api::page.page': ApiPagePage;

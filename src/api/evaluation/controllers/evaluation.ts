@@ -17,6 +17,7 @@ import {
 import { computeEvaluationScores } from "../../report/utils/scores";
 import { buildProgramRounds } from "../../report/utils/rounds";
 import { ngoMentorsFor } from "../../../utils/ngo-mentors";
+import { notifyEvaluationCompleted } from "../../notification/utils/events";
 
 const reportPhaseView = (phase: any) => ({
   documentId: phase.documentId,
@@ -412,9 +413,17 @@ export default factories.createCoreController(
           populate: {
             dimensions: { populate: { quiz: true } },
             user: true,
-            report: { populate: { phases: { populate: { program: true } } } },
+            report: {
+              populate: { phases: { populate: { program: true } }, ong: true },
+            },
           },
         });
+      // Never throws: a failed notification must not fail the finish.
+      await notifyEvaluationCompleted(strapi, {
+        evaluatorId: ctx.state.user.id,
+        evaluatorName: ctx.state.user.nume,
+        report: updated.report,
+      });
       return { data: evaluationView(updated, today) };
     },
   }),

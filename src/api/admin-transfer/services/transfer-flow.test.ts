@@ -14,6 +14,7 @@ import {
   type Deps,
   type OngRecord,
   type TransferMailer,
+  type TransferNotifier,
   type TransferRecord,
   type TransferRepo,
   type UserRecord,
@@ -186,7 +187,9 @@ function world() {
     autoCancelled: vi.fn(async () => {}),
   } satisfies TransferMailer;
 
-  const deps: Deps = { repo, mailer, now: () => clock.now, log: () => {} };
+  const notifier = { initiatedByFdsc: vi.fn(async () => {}) } satisfies TransferNotifier;
+
+  const deps: Deps = { repo, mailer, notifier, now: () => clock.now, log: () => {} };
 
   // A standard ONG: admin + one active and one pending member.
   const ong: OngRecord = { documentId: "ong-1", name: "Asociația Test", ngoStatus: "active" };
@@ -206,7 +209,7 @@ function world() {
   };
 
   return {
-    deps, users, ongs, transfers, memberRoleRows, passwords, clock, mailer,
+    deps, users, ongs, transfers, memberRoleRows, passwords, clock, mailer, notifier,
     ong, admin, member, fdsc, addUser, lastToken,
     breakSwap: () => { failInsideSwap = true; },
   };
@@ -328,6 +331,26 @@ describe("createTransfer", () => {
     expect(w.mailer.fdscNotice).toHaveBeenCalledWith(
       expect.objectContaining({ to: "admin-1@example.ro" }),
     );
+  });
+
+  it("notifies the current admin in-app only when FDSC initiates", async () => {
+    await byFdsc(w, toMember);
+    expect(w.notifier.initiatedByFdsc).toHaveBeenCalledTimes(1);
+    expect(w.notifier.initiatedByFdsc).toHaveBeenCalledWith({
+      previousAdminId: w.admin.id,
+      recipientEmail: w.member.email,
+    });
+  });
+
+  it("does not notify in-app for a transfer the ONG admin started", async () => {
+    await byAdmin(w, toMember);
+    expect(w.notifier.initiatedByFdsc).not.toHaveBeenCalled();
+  });
+
+  it("a failing notifier never fails the transfer", async () => {
+    w.notifier.initiatedByFdsc.mockRejectedValueOnce(new Error("db down"));
+    const result = await byFdsc(w, toMember);
+    expect("data" in result).toBe(true);
   });
 
   it("FDSC cannot propose the current admin", async () => {

@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { docRef } from "../../../utils/relations";
 import { deleteNgoMemberRole, removeOngMembership } from "../../../utils/membership";
 import { createTransferMailer } from "./mailer";
+import { createTransferNotifier } from "./notifier";
 import type {
   Deps,
   OngRecord,
@@ -236,6 +237,7 @@ export function createTransferDeps(strapi: any): Deps {
   return {
     repo: createTransferRepo(strapi),
     mailer: createTransferMailer(strapi),
+    notifier: createTransferNotifier(strapi),
     now: () => new Date(),
     log: (message, error) => strapi.log.error(`${message}: ${String(error)}`),
   };

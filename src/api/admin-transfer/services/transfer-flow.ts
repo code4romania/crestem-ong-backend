@@ -128,9 +128,16 @@ export interface TransferMailer {
   autoCancelled(args: TransferEmail): Promise<void>;
 }
 
+/** In-app notifications; the Strapi implementation is `./notifier.ts`. */
+export interface TransferNotifier {
+  /** An FDSC-initiated transfer was created: tells the ONG's current admin. */
+  initiatedByFdsc(args: { previousAdminId: number; recipientEmail: string }): Promise<void>;
+}
+
 export type Deps = {
   repo: TransferRepo;
   mailer: TransferMailer;
+  notifier: TransferNotifier;
   now: () => Date;
   log?: (message: string, error: unknown) => void;
 };
@@ -340,6 +347,15 @@ export async function createTransfer(
         otherName: recipientLabel(transfer),
       }),
     );
+    // Like the emails, a failed notification never fails the transfer.
+    try {
+      await deps.notifier.initiatedByFdsc({
+        previousAdminId: previousAdmin.id,
+        recipientEmail: transfer.recipientEmail,
+      });
+    } catch (error) {
+      (deps.log ?? console.error)("admin transfer notification failed", error);
+    }
   }
 
   return { data: { transfer, emailSent } };
