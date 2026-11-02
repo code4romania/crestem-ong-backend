@@ -29,6 +29,9 @@
       "required": true,
       "default": true
     },
+    "endNotifiedAt": {
+      "type": "datetime"
+    },
     "program": {
       "type": "relation",
       "relation": "manyToOne",

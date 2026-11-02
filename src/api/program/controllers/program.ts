@@ -18,6 +18,10 @@ import {
   targetEntryPhase,
 } from "../../report/utils/association";
 import { isClosed } from "../../report/utils/lifecycle";
+import {
+  endNotifiedOnCreate,
+  endNotifiedReset,
+} from "../../notification/utils/phase-ended";
 import { docRef, docRefs } from "../../../utils/relations";
 import {
   createProgramSchema,
@@ -34,6 +38,7 @@ import { toDateString, todayInBucharest } from "../../../utils/date";
 import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
+import { newlyAssignedMentors, notifyMentorAssigned, notifyOngAddedToProgram } from "../../notification/utils/events";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
 import {
@@ -237,7 +242,11 @@ export default factories.createCoreController(
         for (const phase of phases) {
           createdPhases.push(
             await strapi.documents("api::phase.phase").create({
-              data: { ...phase, program: docRef(created.documentId) },
+              data: {
+                ...phase,
+                ...endNotifiedOnCreate(phase.endDate),
+                program: docRef(created.documentId),
+              },
             }),
           );
         }
@@ -416,11 +425,16 @@ export default factories.createCoreController(
                   startDate: phase.startDate,
                   endDate: phase.endDate,
                   hasEvaluation: phase.hasEvaluation,
+                  ...endNotifiedReset(phase.endDate),
                 },
               });
             } else {
               await strapi.documents("api::phase.phase").create({
-                data: { ...phase, program: docRef(existing.documentId) },
+                data: {
+                  ...phase,
+                  ...endNotifiedOnCreate(phase.endDate),
+                  program: docRef(existing.documentId),
+                },
               });
             }
           }
@@ -826,10 +840,24 @@ export default factories.createCoreController(
         );
       }
       const row = await findOrCreateNgoMentorRow(strapi, programId, ongId);
+      const alreadyAssigned = (row.mentors ?? []) as any[];
       const updated = await strapi.documents("api::ngo-mentor.ngo-mentor").update({
         documentId: row.documentId,
         data: { mentors: { connect: mentorIds } },
         populate: { mentors: { populate: { avatar: true } } },
+      });
+      // Only mentors newly connected by this call; re-submitting an existing
+      // assignment stays silent. Runs after the write and never throws.
+      const ong = ((program.ongs ?? []) as any[]).find((o) => o.documentId === ongId);
+      await notifyMentorAssigned(strapi, {
+        ong: { documentId: ongId, name: ong?.name ?? "" },
+        programName: program.name,
+        mentors: newlyAssignedMentors(
+          alreadyAssigned,
+          ((updated.mentors ?? []) as any[]).filter((mentor) =>
+            mentorIds.includes(mentor.documentId),
+          ),
+        ),
       });
       return { data: { mentors: ((updated.mentors ?? []) as any[]).map(mentorView) } };
     },
@@ -1013,6 +1041,7 @@ export default factories.createCoreController(
           console.error("assignOngs admin lookup failed", error);
           emailSent = false;
         }
+        await notifyOngAddedToProgram(strapi, { ong, programName: program.name });
       }
       return { data: { ongs: (updated.ongs ?? []).map(ongView), emailSent } };
     },
