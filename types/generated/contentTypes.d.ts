@@ -1299,7 +1299,6 @@ export interface ApiNotificationNotification
         'account-activated',
         'member-joined',
         'admin-transfer',
-        'evaluation-completed',
         'meeting-created',
         'meeting-updated',
         'meeting-cancelled',

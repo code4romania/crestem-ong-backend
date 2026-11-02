@@ -7,7 +7,6 @@ import { fdscAdmins, ongAdmins } from "./recipients";
 import {
   accountActivatedMessage,
   classifyMeetingChange,
-  evaluationCompletedMessage,
   isActivationAnnounced,
   meetingChangeMessage,
   meetingCreatedMessage,
@@ -73,39 +72,6 @@ export const notifyAccountActivated = (strapi: any, user: ActivatedUser) =>
         nume: user.nume,
         roleType,
         userDocumentId: user.documentId,
-      }),
-    );
-  });
-
-/**
- * An evaluation was finished. The ONG's admin hears about it unless they are
- * the one who finished it.
- */
-export const notifyEvaluationCompleted = (
-  strapi: any,
-  args: {
-    evaluatorId: number;
-    evaluatorName: string;
-    report: {
-      documentId: string;
-      name?: string;
-      ong?: { documentId: string } | null;
-    };
-  },
-) =>
-  safely(strapi, "evaluation-completed", async () => {
-    const ong = args.report.ong;
-    if (!ong) return;
-    const admins = (await ongAdmins(strapi, [ong.documentId])).filter(
-      (id) => id !== args.evaluatorId,
-    );
-    await deliver(
-      strapi,
-      admins,
-      evaluationCompletedMessage({
-        nume: args.evaluatorName,
-        reportName: args.report.name ?? "",
-        reportDocumentId: args.report.documentId,
       }),
     );
   });

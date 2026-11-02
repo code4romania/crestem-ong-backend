@@ -9,7 +9,6 @@ import { fdscAdmins, ongAdmins } from "./recipients";
 import {
   newlyAssignedMentors,
   notifyAccountActivated,
-  notifyEvaluationCompleted,
   notifyMeetingCreated,
   notifyMeetingUpdated,
   notifyMentorAssigned,
@@ -20,7 +19,6 @@ import {
   accountActivatedMessage,
   adminTransferMessage,
   classifyMeetingChange,
-  evaluationCompletedMessage,
   meetingChangeMessage,
   meetingCreatedMessage,
   memberJoinedMessage,
@@ -81,17 +79,6 @@ describe("message builders", () => {
       title: "Schimbare administrator",
       body: "FDSC a inițiat transferul rolului de administrator către nou@ong.ro.",
       link: "/dashboard/profil",
-    });
-  });
-
-  it("evaluation-completed", () => {
-    expect(
-      evaluationCompletedMessage({ nume: "Vlad", reportName: "Runda 1", reportDocumentId: "r1" }),
-    ).toEqual({
-      type: "evaluation-completed",
-      title: "Evaluare finalizată",
-      body: "Vlad a finalizat evaluarea „Runda 1”.",
-      link: "/dashboard/evaluari/r1",
     });
   });
 
@@ -206,32 +193,6 @@ describe("notifyAccountActivated", () => {
       }),
     ).resolves.toBeUndefined();
     expect(error).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("notifyEvaluationCompleted", () => {
-  const report = { documentId: "r1", name: "Runda 1", ong: { documentId: "o1" } };
-
-  it("notifies the ONG admin when someone else finished", async () => {
-    vi.mocked(ongAdmins).mockResolvedValue([9]);
-    await notifyEvaluationCompleted(strapi, { evaluatorId: 5, evaluatorName: "Vlad", report });
-    expect(ongAdmins).toHaveBeenCalledWith(strapi, ["o1"]);
-    expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ recipients: [9], type: "evaluation-completed" }),
-    );
-  });
-
-  it("skips when the evaluator is the ONG admin", async () => {
-    vi.mocked(ongAdmins).mockResolvedValue([9]);
-    await notifyEvaluationCompleted(strapi, { evaluatorId: 9, evaluatorName: "Admin", report });
-    expect(notify).not.toHaveBeenCalled();
-  });
-
-  it("skips a report without an ONG", async () => {
-    await notifyEvaluationCompleted(strapi, {
-      evaluatorId: 5, evaluatorName: "V", report: { documentId: "r", name: "n", ong: null },
-    });
-    expect(notify).not.toHaveBeenCalled();
   });
 });
 
