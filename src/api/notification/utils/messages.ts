@@ -105,7 +105,9 @@ export function classifyMeetingChange(
   if (after.status === "anulata" && before.status !== "anulata") {
     return "cancelled";
   }
-  if (new Date(before.dataOra).getTime() !== new Date(after.dataOra).getTime()) {
+  if (
+    new Date(before.dataOra).getTime() !== new Date(after.dataOra).getTime()
+  ) {
     return "moved";
   }
   return "updated";
