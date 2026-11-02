@@ -39,6 +39,7 @@ import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
 import { newlyAssignedMentors, notifyMentorAssigned, notifyOngAddedToProgram } from "../../notification/utils/events";
+import { ACTIVE_NOT_BLOCKED } from "../../notification/utils/recipients";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
 import {
@@ -1019,7 +1020,8 @@ export default factories.createCoreController(
                 ongs: { documentId: ong.documentId },
                 role: { type: "ngo-admin" },
                 accountStatus: "active",
-                blocked: false,
+                // Legacy-imported admins have `blocked` NULL; they still get the email.
+                ...ACTIVE_NOT_BLOCKED,
               },
             });
           for (const admin of admins) {
