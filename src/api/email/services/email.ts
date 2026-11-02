@@ -1,5 +1,5 @@
 import type { Core } from "@strapi/strapi";
-import { toDateString } from "../../../utils/date";
+import { toDisplayDate } from "../../../utils/date";
 import { renderEmail, termsNote } from "../utils/template";
 
 export interface SendAccountActivationArgs {
@@ -55,6 +55,8 @@ export interface SendEvaluationInviteArgs {
   deadline?: string;
 }
 
+export type SendEvaluationReminderArgs = SendEvaluationInviteArgs;
+
 export interface SendOngDeletedArgs {
   to: string;
   nume: string;
@@ -68,6 +70,7 @@ export interface EmailService {
   sendPasswordReset(args: SendPasswordResetArgs): Promise<void>;
   sendProgramAssignment(args: SendProgramAssignmentArgs): Promise<void>;
   sendEvaluationInvite(args: SendEvaluationInviteArgs): Promise<void>;
+  sendEvaluationReminder(args: SendEvaluationReminderArgs): Promise<void>;
   sendOngDeleted(args: SendOngDeletedArgs): Promise<void>;
   sendEmailChangeConfirmation(
     args: SendEmailChangeConfirmationArgs,
@@ -242,7 +245,7 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           `Organizația ${ongName} a pornit o sesiune de evaluare pe platforma Creștem ONG și te-a invitat să o completezi.`,
           ...(deadline
             ? [
-                `Termenul limită pentru completare este ${toDateString(deadline)}.`,
+                `Termenul limită pentru completare este ${toDisplayDate(deadline)}.`,
               ]
             : []),
           "Accesează linkul de mai jos, autentifică-te și completează evaluarea:",
@@ -250,6 +253,34 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
           link,
           "",
           "Poți completa evaluarea pe dimensiuni, în mai multe reprize. O dimensiune trimisă nu mai poate fi modificată.",
+        ]),
+      });
+  },
+  async sendEvaluationReminder({
+    to,
+    nume,
+    ongName,
+    link,
+    deadline,
+  }: SendEvaluationReminderArgs) {
+    await strapi
+      .plugin("email")
+      .service("email")
+      .send({
+        to,
+        subject: `Reamintire: evaluarea pentru ${ongName} te așteaptă`,
+        ...renderEmail([
+          `Bună, ${nume},`,
+          "",
+          `Îți reamintim că organizația ${ongName} te-a invitat să completezi evaluarea de pe platforma Creștem ONG.`,
+          ...(deadline
+            ? [
+                `Termenul limită pentru completare este ${toDisplayDate(deadline)}.`,
+              ]
+            : []),
+          "Accesează linkul de mai jos, autentifică-te și completează evaluarea:",
+          "",
+          link,
         ]),
       });
   },

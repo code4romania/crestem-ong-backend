@@ -10,8 +10,10 @@ import type { CreatedEvaluation } from "../utils/members";
 import {
   createEvaluations,
   memberView,
+  reminderBlocker,
   resolveMembers,
   sendInvites,
+  sendReminder,
 } from "../utils/members";
 import {
   activePhase,
@@ -29,6 +31,13 @@ import { docRef } from "../../../utils/relations";
 import { requireOng } from "../../../utils/ong-scope";
 
 const todayIso = () => todayInBucharest();
+
+/** The latest phase end date, or `undefined` for a standalone round. */
+const reportDeadline = (report: any): string | undefined =>
+  ((report.phases ?? []) as any[])
+    .map((phase) => toDateString(phase.endDate))
+    .sort()
+    .pop();
 
 const phaseView = (phase: any) => ({
   documentId: phase.documentId,
@@ -239,10 +248,7 @@ export default factories.createCoreController(
       const skipped = resolved.members
         .filter((member: any) => existingUserIds.has(member.documentId))
         .map(memberView);
-      const deadline = ((report.phases ?? []) as any[])
-        .map((phase) => toDateString(phase.endDate))
-        .sort()
-        .pop();
+      const deadline = reportDeadline(report);
       let created: CreatedEvaluation[] = [];
       if (fresh.length > 0) {
         try {
@@ -434,6 +440,63 @@ export default factories.createCoreController(
         .documents("api::evaluation.evaluation")
         .delete({ documentId: evaluation.documentId });
       return { data: { documentId: evaluation.documentId } };
+    },
+    async remindMember(ctx: Context) {
+      if (!ctx.state.user) {
+        return ctx.unauthorized();
+      }
+      const scope = await requireOng(strapi, ctx);
+      if ("error" in scope) {
+        return ctx.badRequest(scope.error);
+      }
+      const ong = scope.ong;
+      const report = await strapi.documents("api::report.report").findOne({
+        documentId: ctx.params.documentId,
+        populate: {
+          ong: true,
+          phases: true,
+          evaluations: {
+            populate: {
+              user: { populate: { role: true, ong: true } },
+              dimensions: true,
+            },
+          },
+        },
+      });
+      if (!report || report.ong?.documentId !== ong.documentId) {
+        return ctx.badRequest("Runda nu există");
+      }
+      if (isClosed(report, todayIso())) {
+        return ctx.badRequest("Runda de evaluare este închisă");
+      }
+      const evaluation = ((report.evaluations ?? []) as any[]).find(
+        (entry) => entry.documentId === ctx.params.evaluationId && entry.user,
+      );
+      if (!evaluation) {
+        return ctx.badRequest("Membrul nu a fost găsit");
+      }
+      const blocker = reminderBlocker(
+        evaluation,
+        scope.user.documentId,
+        ong.documentId,
+        computeProgress(evaluation.dimensions, false).status === "completat",
+      );
+      if (blocker) {
+        return ctx.badRequest(blocker);
+      }
+      const result = await sendReminder(
+        strapi,
+        evaluation,
+        ong.name,
+        ong.documentId,
+        reportDeadline(report),
+      );
+      if (!result.emailSent) {
+        return ctx.badRequest(
+          "Reminderul nu a putut fi trimis. Încearcă din nou",
+        );
+      }
+      return { message: "Reminderul a fost trimis." };
     },
     async detail(ctx: Context) {
       if (!ctx.state.user) {

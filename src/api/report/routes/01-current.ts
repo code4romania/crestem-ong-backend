@@ -50,6 +50,12 @@ export default {
     },
     {
       method: "POST",
+      path: "/reports/:documentId/members/:evaluationId/remind",
+      handler: "report.remindMember",
+      config: { policies: ["global::is-ngo-admin"] },
+    },
+    {
+      method: "POST",
       path: "/reports/:documentId/finish",
       handler: "report.finishOne",
       config: { policies: ["global::is-ngo-admin"] },

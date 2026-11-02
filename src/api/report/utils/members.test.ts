@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { memberView, resolveMembers, sendInvites } from "./members";
+import { describe, expect, it, vi } from "vitest";
+import {
+  memberView,
+  reminderBlocker,
+  resolveMembers,
+  sendInvites,
+  sendReminder,
+} from "./members";
 
 describe("memberView", () => {
   it("returns the real name and email for an active account", () => {
@@ -121,5 +127,124 @@ describe("sendInvites", () => {
 
     expect(sent).toEqual([]);
     expect(result).toEqual({ emailSent: true, failed: [] });
+  });
+});
+
+const pendingEvaluation = (user: Record<string, unknown> = {}) => ({
+  documentId: "eval-1",
+  user: {
+    documentId: "u1",
+    nume: "Ana Pop",
+    email: "ana@example.com",
+    accountStatus: "active",
+    role: { type: "ngo-member" },
+    ong: [{ documentId: "ong-1" }],
+    ...user,
+  },
+});
+
+describe("reminderBlocker", () => {
+  it("lets the admin remind an ngo-member who has not finished", () => {
+    expect(
+      reminderBlocker(pendingEvaluation(), "admin-1", "ong-1", false),
+    ).toBeNull();
+  });
+
+  it("refuses the admin's own evaluation", () => {
+    expect(
+      reminderBlocker(
+        pendingEvaluation({ documentId: "admin-1", role: { type: "ngo-admin" } }),
+        "admin-1",
+        "ong-1",
+        false,
+      ),
+    ).toBe("Nu îți poți trimite reminder ție");
+  });
+
+  it("refuses a completed evaluation", () => {
+    expect(
+      reminderBlocker(pendingEvaluation(), "admin-1", "ong-1", true),
+    ).toBe("Membrul a completat deja evaluarea");
+  });
+
+  it("refuses a deleted account", () => {
+    expect(
+      reminderBlocker(
+        pendingEvaluation({ accountStatus: "deleted", ong: [] }),
+        "admin-1",
+        "ong-1",
+        false,
+      ),
+    ).toBe("Utilizatorul Ana Pop și-a șters contul");
+  });
+
+  it("refuses a member who has since left the organization", () => {
+    expect(
+      reminderBlocker(pendingEvaluation({ ong: [] }), "admin-1", "ong-1", false),
+    ).toBe("Utilizatorul Ana Pop nu mai este membru al organizației");
+  });
+});
+
+describe("sendReminder", () => {
+  it("mails the wizard link and stamps notificationSentAt", async () => {
+    process.env.FRONTEND_URL = "https://crestem.ong";
+    const sent: any[] = [];
+    const updates: any[] = [];
+    const strapi = {
+      service: () => ({
+        sendEvaluationReminder: async (args: any) => {
+          sent.push(args);
+        },
+      }),
+      documents: () => ({
+        update: async (args: any) => {
+          updates.push(args);
+        },
+      }),
+    };
+
+    const result = await sendReminder(
+      strapi,
+      pendingEvaluation(),
+      "Asociația Test",
+      "ong-1",
+      "2026-11-15",
+    );
+
+    expect(result).toEqual({ emailSent: true });
+    expect(sent).toEqual([
+      {
+        to: "ana@example.com",
+        nume: "Ana Pop",
+        ongName: "Asociația Test",
+        link: "https://crestem.ong/dashboard/ong-1/evaluari/eval-1",
+        deadline: "2026-11-15",
+      },
+    ]);
+    expect(updates[0].documentId).toBe("eval-1");
+    expect(updates[0].data.notificationSentAt).toEqual(expect.any(String));
+  });
+
+  it("reports a failed delivery without stamping the evaluation", async () => {
+    const updates: any[] = [];
+    const strapi = {
+      service: () => ({
+        sendEvaluationReminder: async () => {
+          throw new Error("smtp down");
+        },
+      }),
+      documents: () => ({
+        update: async (args: any) => {
+          updates.push(args);
+        },
+      }),
+    };
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await sendReminder(strapi, pendingEvaluation(), "Asociația Test", "ong-1");
+
+    expect(result).toEqual({ emailSent: false });
+    expect(updates).toEqual([]);
+    spy.mockRestore();
   });
 });

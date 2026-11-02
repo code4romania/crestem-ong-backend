@@ -246,6 +246,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "api::report.report.addMembers",
     "api::report.report.members",
     "api::report.report.removeMember",
+    "api::report.report.remindMember",
     "api::report.report.detail",
     "api::report.report.finishOne",
     "api::report.report.deleteOne",

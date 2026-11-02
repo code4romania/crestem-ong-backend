@@ -100,3 +100,49 @@ describe("sendAdminEmailChangeConfirmation", () => {
     expect(h.send.mock.calls[0][0].text).not.toContain("Ai cerut");
   });
 });
+
+describe("sendEvaluationReminder", () => {
+  const args = {
+    to: "ana@example.ro",
+    nume: "Ana",
+    ongName: "Asociația Exemplu",
+    link: "https://app.crestem-ong.ro/dashboard/ong-1/evaluari/eval-1",
+  };
+
+  it("reminds the member which organization is waiting and links to the evaluation", async () => {
+    const h = harness();
+    await h.service.sendEvaluationReminder(args);
+    const payload = h.send.mock.calls[0][0];
+    expect(payload.to).toBe("ana@example.ro");
+    expect(payload.subject).toBe(
+      "Reamintire: evaluarea pentru Asociația Exemplu te așteaptă",
+    );
+    expect(payload.text).toContain("Îți reamintim");
+    expect(payload.text).toContain(args.link);
+    expect(payload.text).not.toContain("Termenul limită");
+  });
+
+  it("states the deadline when the round has one", async () => {
+    const h = harness();
+    await h.service.sendEvaluationReminder({ ...args, deadline: "2026-11-15" });
+    expect(h.send.mock.calls[0][0].text).toContain(
+      "Termenul limită pentru completare este 15.11.2026.",
+    );
+  });
+});
+
+describe("sendEvaluationInvite", () => {
+  it("states the deadline in Romanian display format", async () => {
+    const h = harness();
+    await h.service.sendEvaluationInvite({
+      to: "ana@example.ro",
+      nume: "Ana",
+      ongName: "Asociația Exemplu",
+      link: "https://app.crestem-ong.ro/dashboard/ong-1/evaluari/eval-1",
+      deadline: "2026-11-15",
+    });
+    expect(h.send.mock.calls[0][0].text).toContain(
+      "Termenul limită pentru completare este 15.11.2026.",
+    );
+  });
+});
