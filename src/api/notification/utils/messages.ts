@@ -62,21 +62,6 @@ export const adminTransferMessage = (args: {
   link: "/dashboard/profil",
 });
 
-/**
- * The ONG route of that round's detail page, which lists each member's
- * evaluation (`app/dashboard/ong/evaluari/[documentId]`).
- */
-export const evaluationCompletedMessage = (args: {
-  nume: string;
-  reportName: string;
-  reportDocumentId: string;
-}): NotificationMessage => ({
-  type: "evaluation-completed",
-  title: "Evaluare finalizată",
-  body: `${args.nume} a finalizat evaluarea „${args.reportName}”.`,
-  link: `/dashboard/evaluari/${args.reportDocumentId}`,
-});
-
 const MEETINGS_LINK = "/dashboard/persoane-resursa/intalniri";
 
 export const meetingCreatedMessage = (args: {
