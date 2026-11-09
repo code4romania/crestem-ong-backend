@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { addOngMembership, cancelPendingInvite } from "./membership";
+import {
+  addOngMembership,
+  canJoinOngAsMember,
+  cancelPendingInvite,
+} from "./membership";
 
 const USER_UID = "plugin::users-permissions.user";
 const NGO_MEMBER_ROLE_UID = "api::ngo-member-role.ngo-member-role";
@@ -64,6 +68,61 @@ describe("addOngMembership", () => {
     await addOngMembership(h.strapi, "user-1", "ong-1", undefined);
     expect(h.roleWrites).toEqual([]);
     expect(h.userUpdates).toHaveLength(1);
+  });
+
+  it("reports a new attachment as added", async () => {
+    const h = harness(member);
+    const result = await addOngMembership(h.strapi, "user-1", "ong-1");
+    expect(result).toBe("added");
+  });
+
+  it("reports a user already in the ong as already-member", async () => {
+    const h = harness({ ...member, ong: [{ documentId: "ong-1" }] });
+    const result = await addOngMembership(h.strapi, "user-1", "ong-1");
+    expect(result).toBe("already-member");
+    expect(h.userUpdates).toEqual([]);
+  });
+
+  it("reports a missing user as not-found", async () => {
+    const h = harness(null);
+    const result = await addOngMembership(h.strapi, "user-1", "ong-1");
+    expect(result).toBe("not-found");
+  });
+
+  it.each(["ngo-admin", "mentor", "super-admin", "editor-fdsc"])(
+    "refuses a %s account without writing anything",
+    async (roleType) => {
+      const h = harness({
+        documentId: "user-1",
+        role: { type: roleType },
+        ong: [{ documentId: "ong-other" }],
+      });
+      const result = await addOngMembership(h.strapi, "user-1", "ong-1", "Coordonator");
+      expect(result).toBe("ineligible");
+      expect(h.userUpdates).toEqual([]);
+      expect(h.roleWrites).toEqual([]);
+    },
+  );
+
+  it("refuses an account with no role", async () => {
+    const h = harness({ documentId: "user-1", role: null, ong: [] });
+    const result = await addOngMembership(h.strapi, "user-1", "ong-1");
+    expect(result).toBe("ineligible");
+    expect(h.userUpdates).toEqual([]);
+  });
+});
+
+describe("canJoinOngAsMember", () => {
+  it.each([
+    ["individual", true],
+    ["ngo-member", true],
+    ["ngo-admin", false],
+    ["mentor", false],
+    ["super-admin", false],
+    ["editor-fdsc", false],
+    [undefined, false],
+  ])("%s → %s", (roleType, expected) => {
+    expect(canJoinOngAsMember(roleType)).toBe(expected);
   });
 });
 

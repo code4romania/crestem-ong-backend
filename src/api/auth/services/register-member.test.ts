@@ -2,7 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { registerOrAttachMember } from "./register-member";
 
 const membership = vi.hoisted(() => ({
-  addOngMembership: vi.fn(async (): Promise<boolean> => true),
+  addOngMembership: vi.fn(
+    async (): Promise<"added" | "already-member" | "not-found" | "ineligible"> =>
+      "added",
+  ),
+  MEMBER_NOT_ELIGIBLE: "not-eligible-message",
 }));
 vi.mock("../../../utils/membership", () => membership);
 
@@ -63,7 +67,7 @@ const activeUser = {
 
 beforeEach(() => {
   membership.addOngMembership.mockReset();
-  membership.addOngMembership.mockResolvedValue(true);
+  membership.addOngMembership.mockResolvedValue("added");
 });
 
 describe("registerOrAttachMember", () => {
@@ -120,7 +124,7 @@ describe("registerOrAttachMember", () => {
   });
 
   it("does not email a user who is already a member of the ong", async () => {
-    membership.addOngMembership.mockResolvedValue(false);
+    membership.addOngMembership.mockResolvedValue("already-member");
     const h = harness(activeUser);
 
     const result = await registerOrAttachMember(h.strapi, data, ong, vi.fn());
@@ -132,6 +136,20 @@ describe("registerOrAttachMember", () => {
       alreadyMember: true,
       emailSent: false,
     });
+  });
+
+  it("refuses an existing account that cannot be an ong member, without emailing it", async () => {
+    membership.addOngMembership.mockResolvedValue("ineligible");
+    const h = harness(activeUser);
+    const createMember = vi.fn();
+
+    const result = await registerOrAttachMember(h.strapi, data, ong, createMember);
+
+    expect(result).toEqual({ error: "not-eligible-message" });
+    expect(createMember).not.toHaveBeenCalled();
+    expect(h.emailService.sendMemberAdded).not.toHaveBeenCalled();
+    expect(h.emailService.sendMemberActivation).not.toHaveBeenCalled();
+    expect(h.userEdits).toEqual([]);
   });
 
   it("still attaches the user when the notification email fails", async () => {

@@ -113,24 +113,46 @@ export async function getNgoMemberRolesForUser(
 }
 
 /**
- * Returns `true` only when the user was newly attached to the organization —
- * `false` when the user is missing or already a member (the role is still
- * updated in that case).
+ * Only an `individual` (who becomes `ngo-member`) or an existing `ngo-member`
+ * may be attached to an organization. Anything else — an `ngo-admin` of
+ * another organization, a mentor, FDSC staff, or a role added later — would
+ * keep its role and silently gain the organization: an ngo-admin attached this
+ * way ends up administering two organizations.
+ */
+const MEMBER_ELIGIBLE_ROLES = new Set(["individual", "ngo-member"]);
+
+export const canJoinOngAsMember = (roleType: string | null | undefined) =>
+  Boolean(roleType && MEMBER_ELIGIBLE_ROLES.has(roleType));
+
+/** Deliberately does not name the role, so it reveals nothing about the account. */
+export const MEMBER_NOT_ELIGIBLE =
+  "Acest email aparține unui cont care nu poate fi adăugat ca membru al organizației.";
+
+export type AddOngMembershipResult =
+  | "added"
+  | "already-member"
+  | "not-found"
+  | "ineligible";
+
+/**
+ * `added` only when the user was newly attached. For `already-member` the
+ * role is still updated. `ineligible` (see `canJoinOngAsMember`) writes nothing.
  */
 export async function addOngMembership(
   strapi: any,
   userDocumentId: string,
   ongDocumentId: string,
   role?: string,
-): Promise<boolean> {
+): Promise<AddOngMembershipResult> {
   const user = await loadUserWithMemberships(strapi, userDocumentId);
-  if (!user) return false;
+  if (!user) return "not-found";
+  if (!canJoinOngAsMember(user.role?.type)) return "ineligible";
   if (role) {
     await setNgoMemberRole(strapi, user.documentId, ongDocumentId, role);
   }
   const ongs = (user.ong ?? []) as any[];
   if (ongs.some((entry) => entry.documentId === ongDocumentId)) {
-    return false;
+    return "already-member";
   }
   const updateData: Record<string, unknown> = {
     ong: [
@@ -150,7 +172,7 @@ export async function addOngMembership(
     documentId: user.documentId,
     data: updateData,
   });
-  return true;
+  return "added";
 }
 
 export async function removeOngMembership(
