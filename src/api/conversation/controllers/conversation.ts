@@ -2,6 +2,10 @@ import { Context } from "koa";
 import { isAnonymized } from "../../../utils/anonymize";
 import { getOngAdminNames, requireOng } from "../../../utils/ong-scope";
 import {
+  markConversationNotificationsRead,
+  notifyMessageReceived,
+} from "../../notification/utils/events";
+import {
   pairKey,
   syncConversationsForMentor,
   syncConversationsForOng,
@@ -80,7 +84,7 @@ const findMentorConversation = async (
 ) => {
   const conversation = await strapi
     .documents("api::conversation.conversation")
-    .findOne({ documentId, populate: { mentor: true } });
+    .findOne({ documentId, populate: { mentor: true, ong: true } });
   if (!conversation || conversation.mentor?.documentId !== mentorDocumentId) {
     return null;
   }
@@ -184,6 +188,11 @@ export default {
       documentId: conversation.documentId,
       data: { ongLastReadAt: new Date().toISOString() },
     });
+    await markConversationNotificationsRead(strapi, {
+      userId: ctx.state.user.id,
+      side: "ong",
+      conversationDocumentId: conversation.documentId,
+    });
 
     return {
       data: (messages as any[]).map((message) =>
@@ -233,6 +242,13 @@ export default {
     await strapi.documents("api::conversation.conversation").update({
       documentId: conversation.documentId,
       data: { lastMessageAt: now, ongLastReadAt: now },
+    });
+    // `conversation` still holds the pre-message timestamps the rule reads.
+    await notifyMessageReceived(strapi, {
+      conversation,
+      recipientSide: "mentor",
+      senderName: scope.ong.name,
+      content: parsed.data.content,
     });
 
     return { data: messageView(message, ctx.state.user.documentId) };
@@ -336,6 +352,11 @@ export default {
       documentId: conversation.documentId,
       data: { mentorLastReadAt: new Date().toISOString() },
     });
+    await markConversationNotificationsRead(strapi, {
+      userId: ctx.state.user.id,
+      side: "mentor",
+      conversationDocumentId: conversation.documentId,
+    });
 
     return {
       data: (messages as any[]).map((message) =>
@@ -373,6 +394,13 @@ export default {
     await strapi.documents("api::conversation.conversation").update({
       documentId: conversation.documentId,
       data: { lastMessageAt: now, mentorLastReadAt: now },
+    });
+    // `conversation` still holds the pre-message timestamps the rule reads.
+    await notifyMessageReceived(strapi, {
+      conversation,
+      recipientSide: "ong",
+      senderName: ctx.state.user.nume,
+      content: parsed.data.content,
     });
 
     return { data: messageView(message, ctx.state.user.documentId) };

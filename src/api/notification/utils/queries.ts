@@ -1,4 +1,4 @@
-import { NOTIFICATION_UID, type NotificationView } from "./types";
+import { NOTIFICATION_UID, type NotificationType, type NotificationView } from "./types";
 
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 50;
@@ -79,6 +79,30 @@ export async function markAllRead(
   const unread: Array<{ id: number }> = await query.findMany({
     select: ["id"],
     where: { recipient: { id: userId }, readAt: null },
+  });
+  if (unread.length === 0) return 0;
+  const result = await query.updateMany({
+    where: { id: { $in: unread.map((row) => row.id) } },
+    data: { readAt: new Date() },
+  });
+  return result?.count ?? unread.length;
+}
+
+/**
+ * Marks read the caller's unread notifications of one `type` and `link` —
+ * e.g. the `message-received` rows of a conversation once it is opened.
+ * Returns how many changed.
+ */
+export async function markReadByLink(
+  strapi: any,
+  userId: number,
+  type: NotificationType,
+  link: string,
+): Promise<number> {
+  const query = strapi.db.query(NOTIFICATION_UID);
+  const unread: Array<{ id: number }> = await query.findMany({
+    select: ["id"],
+    where: { recipient: { id: userId }, type, link, readAt: null },
   });
   if (unread.length === 0) return 0;
   const result = await query.updateMany({

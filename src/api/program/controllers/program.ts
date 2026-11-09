@@ -38,7 +38,13 @@ import { toDateString, todayInBucharest } from "../../../utils/date";
 import { isFdscStaff } from "../../../utils/fdsc-staff";
 import { computeProgramStatus } from "../utils/status";
 import { EmailService } from "../../email/services/email";
-import { newlyAssignedMentors, notifyMentorAssigned, notifyOngAddedToProgram } from "../../notification/utils/events";
+import {
+  newlyAssignedMentors,
+  notifyMentorAssigned,
+  notifyOngAddedToProgram,
+  notifyPhaseDatesChanged,
+  phasesWithChangedDates,
+} from "../../notification/utils/events";
 import { ongAdminContacts } from "../../notification/utils/recipients";
 import { requireOng } from "../../../utils/ong-scope";
 import { mentorView, ngoMentorsFor } from "../../../utils/ngo-mentors";
@@ -446,6 +452,14 @@ export default factories.createCoreController(
             documentId: existing.documentId,
             populate: { phases: true },
           });
+        // The route admits FDSC staff only (`is-fdsc-staff`), so every date
+        // change reaching this point is an Admin or Editor FDSC edit.
+        if (phases) {
+          await notifyPhaseDatesChanged(strapi, {
+            programDocumentId: existing.documentId,
+            phases: phasesWithChangedDates(existingPhases, phases, today),
+          });
+        }
         return {
           data: {
             ...programView(refreshed),
