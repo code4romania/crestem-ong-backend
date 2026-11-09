@@ -1,6 +1,7 @@
 /**
- * Phase-ending-soon reminders: the nightly run reminds the ONG admins of a
- * program whose phase ends exactly `REMINDER_DAYS_BEFORE` days from today.
+ * Phase-ending-soon reminders: the nightly run reminds the ONG admins and the
+ * active mentors of a program whose phase ends exactly `REMINDER_DAYS_BEFORE`
+ * days from today.
  * There is no catch-up — a phase moved closer than that is covered by the
  * phase-dates-changed notice FDSC's edit sends instead.
  *
@@ -10,7 +11,7 @@
  */
 import { addDays, todayInBucharest } from "../../../utils/date";
 import { phaseEndingSoonMessage } from "./messages";
-import { ongAdmins } from "./recipients";
+import { activeAmong, ongAdmins } from "./recipients";
 
 const PHASE_UID = "api::phase.phase";
 const NOTIFICATION_SERVICE = "api::notification.notification";
@@ -32,7 +33,10 @@ export async function notifyPhasesEndingSoon(strapi: any): Promise<void> {
       ],
     },
     populate: {
-      program: { fields: ["name"], populate: { ongs: { fields: ["id"] } } },
+      program: {
+        fields: ["name"],
+        populate: { ongs: { fields: ["id"] }, mentors: { fields: ["id"] } },
+      },
     },
     limit: -1,
   });
@@ -41,17 +45,23 @@ export async function notifyPhasesEndingSoon(strapi: any): Promise<void> {
   for (const phase of phases) {
     try {
       const program = phase.program;
-      const admins = program
-        ? await ongAdmins(
-            strapi,
-            (program.ongs ?? []).map((ong: { id: number }) => ong.id),
-          )
+      const recipients = program
+        ? [
+            ...(await ongAdmins(
+              strapi,
+              (program.ongs ?? []).map((ong: { id: number }) => ong.id),
+            )),
+            ...(await activeAmong(
+              strapi,
+              (program.mentors ?? []).map((mentor: { id: number }) => mentor.id),
+            )),
+          ]
         : [];
       // Notify + marker commit together: a failure leaves both undone.
       await strapi.db.transaction(async () => {
-        if (admins.length > 0) {
+        if (recipients.length > 0) {
           await strapi.service(NOTIFICATION_SERVICE).notify({
-            recipients: admins,
+            recipients,
             ...phaseEndingSoonMessage({
               phaseTitle: phase.title,
               programName: program.name,
