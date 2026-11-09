@@ -71,3 +71,11 @@ export const nextDay = (day: string): string => {
     .toISOString()
     .slice(0, 10);
 };
+
+/** The calendar day `days` after `day` (negative goes back), both `YYYY-MM-DD`. */
+export const addDays = (day: string, days: number): string => {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date + days))
+    .toISOString()
+    .slice(0, 10);
+};

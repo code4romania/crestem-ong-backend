@@ -30,7 +30,10 @@
         "phase-ended",
         "mentor-assigned",
         "ong-added-to-program",
-        "ong-registered"
+        "ong-registered",
+        "message-received",
+        "phase-ending-soon",
+        "phase-dates-changed"
       ],
       "required": true
     },

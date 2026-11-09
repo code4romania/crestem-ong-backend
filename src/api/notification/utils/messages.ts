@@ -3,6 +3,7 @@
  * `notify` needs apart from the recipients. Copy is Romanian and exact; dates
  * come from `./format` (Europe/Bucharest).
  */
+import { toDisplayDate } from "../../../utils/date";
 import { formatRoDate, formatRoTime } from "./format";
 import type { NotificationType } from "./types";
 
@@ -182,4 +183,79 @@ export const phaseEndedMessage = (args: {
     args.staffIds.has(recipientId)
       ? `/dashboard/programe/${args.programDocumentId}`
       : "/dashboard/programe",
+});
+
+/** Longest message excerpt a notification body carries, ellipsis excluded. */
+export const MESSAGE_PREVIEW_LENGTH = 100;
+
+/**
+ * A chat message shrunk for the notification list: whitespace runs (new lines
+ * included) collapse to one space, and a longer text is cut at the last word
+ * boundary within the limit, with an ellipsis. A single word longer than the
+ * limit is cut mid-word rather than dropped.
+ */
+export function messagePreview(
+  content: string,
+  maxLength: number = MESSAGE_PREVIEW_LENGTH,
+): string {
+  const text = content.replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  const cut = text.slice(0, maxLength + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  const head = lastSpace > 0 ? cut.slice(0, lastSpace) : text.slice(0, maxLength);
+  return `${head.trimEnd()}…`;
+}
+
+/**
+ * Where a message notification lands: the recipient's own messages page with
+ * the conversation preselected. ONG admins read messages under Persoane
+ * resursă, mentors under Mesaje.
+ */
+export const conversationLink = (
+  recipientSide: "ong" | "mentor",
+  conversationDocumentId: string,
+): string =>
+  `${recipientSide === "ong" ? "/dashboard/persoane-resursa" : "/dashboard/mesaje"}?${new URLSearchParams(
+    { conversatie: conversationDocumentId },
+  )}`;
+
+/** A new message in a conversation the recipient had fully read. */
+export const messageReceivedMessage = (args: {
+  senderName: string;
+  content: string;
+  recipientSide: "ong" | "mentor";
+  conversationDocumentId: string;
+}): NotificationMessage => ({
+  type: "message-received",
+  title: `Mesaj nou de la ${args.senderName}`,
+  body: messagePreview(args.content),
+  link: conversationLink(args.recipientSide, args.conversationDocumentId),
+});
+
+/** ONG admins land on their programs list, like the phase-ended notice. */
+const ONG_PROGRAMS_LINK = "/dashboard/programe";
+
+/** The phase ends in three days; its ONGs' admins are reminded. */
+export const phaseEndingSoonMessage = (args: {
+  phaseTitle: string;
+  programName: string;
+  endDate: string;
+}): NotificationMessage => ({
+  type: "phase-ending-soon",
+  title: "Faza se încheie în curând",
+  body: `Faza „${args.phaseTitle}” din programul ${args.programName} se încheie pe ${toDisplayDate(args.endDate)}.`,
+  link: ONG_PROGRAMS_LINK,
+});
+
+/** FDSC changed a phase's start or end date; its ONGs' admins hear the new period. */
+export const phaseDatesChangedMessage = (args: {
+  phaseTitle: string;
+  programName: string;
+  startDate: string;
+  endDate: string;
+}): NotificationMessage => ({
+  type: "phase-dates-changed",
+  title: "Perioada fazei a fost modificată",
+  body: `Faza „${args.phaseTitle}” din programul ${args.programName} se desfășoară acum între ${toDisplayDate(args.startDate)} și ${toDisplayDate(args.endDate)}.`,
+  link: ONG_PROGRAMS_LINK,
 });
