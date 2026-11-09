@@ -232,10 +232,10 @@ export const messageReceivedMessage = (args: {
   link: conversationLink(args.recipientSide, args.conversationDocumentId),
 });
 
-/** ONG admins land on their programs list, like the phase-ended notice. */
+/** ONG admins and mentors land on their programs list, like the phase-ended notice. */
 const ONG_PROGRAMS_LINK = "/dashboard/programe";
 
-/** The phase ends in three days; its ONGs' admins are reminded. */
+/** The phase ends in three days; its ONGs' admins and mentors are reminded. */
 export const phaseEndingSoonMessage = (args: {
   phaseTitle: string;
   programName: string;
@@ -247,7 +247,7 @@ export const phaseEndingSoonMessage = (args: {
   link: ONG_PROGRAMS_LINK,
 });
 
-/** FDSC changed a phase's start or end date; its ONGs' admins hear the new period. */
+/** FDSC changed a phase's start or end date; its ONGs' admins and mentors hear the new period. */
 export const phaseDatesChangedMessage = (args: {
   phaseTitle: string;
   programName: string;
