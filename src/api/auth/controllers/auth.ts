@@ -183,6 +183,10 @@ export default {
         (data, ong) => authService.createMember(data, ong),
       );
 
+      if ("error" in result) {
+        return ctx.badRequest(result.error);
+      }
+
       if (result.attached === true) {
         return {
           message: result.alreadyMember
