@@ -23,6 +23,8 @@ import {
 } from "../../../utils/ong-scope";
 import {
   addOngMembership,
+  canJoinOngAsMember,
+  MEMBER_NOT_ELIGIBLE,
   cancelPendingInvite,
   getNgoMemberRoles,
   removeOngMembership,
@@ -599,6 +601,12 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     if (belongsToOng(user, ong.documentId)) {
       return ctx.badRequest("Faci deja parte din această organizație");
     }
+    // Refuse up front: acceptJoinRequest would refuse it anyway.
+    if (!canJoinOngAsMember(ctx.state.user.role?.type)) {
+      return ctx.badRequest(
+        "Contul tău nu poate fi adăugat ca membru al unei organizații.",
+      );
+    }
     const existing = await strapi
       .documents("api::ong-join-request.ong-join-request")
       .findMany({
@@ -688,12 +696,16 @@ export default factories.createCoreController("api::ong.ong", ({ strapi }) => ({
     ) {
       return ctx.badRequest("Cererea nu a fost găsită");
     }
-    await addOngMembership(
+    const added = await addOngMembership(
       strapi,
       request.user.documentId,
       scope.ong.documentId,
       parsed.data.rol,
     );
+    // Left pending so the admin can still reject it.
+    if (added === "ineligible") {
+      return ctx.badRequest(MEMBER_NOT_ELIGIBLE);
+    }
     await strapi.documents("api::ong-join-request.ong-join-request").update({
       documentId: request.documentId,
       data: { status: "accepted" },

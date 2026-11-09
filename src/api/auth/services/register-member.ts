@@ -1,4 +1,4 @@
-import { addOngMembership } from "../../../utils/membership";
+import { addOngMembership, MEMBER_NOT_ELIGIBLE } from "../../../utils/membership";
 import type { EmailService } from "../../email/services/email";
 import {
   ACTIVATION_PATH,
@@ -32,7 +32,9 @@ export type MemberRegistrationResult =
       attached: false;
       id: number;
       emailSent: boolean;
-    };
+    }
+  /** The existing account's role cannot be an ong member (see `canJoinOngAsMember`). */
+  | { error: string };
 
 /**
  * An NGO admin adding a member by email may be naming someone who already
@@ -61,7 +63,10 @@ export async function registerOrAttachMember(
       ong.documentId,
       data.rol,
     );
-    if (!added) {
+    if (added === "ineligible") {
+      return { error: MEMBER_NOT_ELIGIBLE };
+    }
+    if (added !== "added") {
       return { attached: true, id: existing.id, alreadyMember: true, emailSent: false };
     }
 
