@@ -314,7 +314,7 @@ export const phasesWithChangedDates = (
 
 /**
  * FDSC staff changed the dates of `phases` in a program: the admins of the
- * program's ONGs get one notification per phase.
+ * program's ONGs and its active mentors get one notification per phase.
  */
 export const notifyPhaseDatesChanged = (
   strapi: any,
@@ -325,17 +325,23 @@ export const notifyPhaseDatesChanged = (
     const program = await strapi.documents("api::program.program").findOne({
       documentId: args.programDocumentId,
       fields: ["name"],
-      populate: { ongs: { fields: ["id"] } },
+      populate: { ongs: { fields: ["id"] }, mentors: { fields: ["id"] } },
     });
     if (!program) return;
-    const admins = await ongAdmins(
-      strapi,
-      (program.ongs ?? []).map((ong: { id: number }) => ong.id),
-    );
+    const recipients = [
+      ...(await ongAdmins(
+        strapi,
+        (program.ongs ?? []).map((ong: { id: number }) => ong.id),
+      )),
+      ...(await activeAmong(
+        strapi,
+        (program.mentors ?? []).map((mentor: { id: number }) => mentor.id),
+      )),
+    ];
     for (const phase of args.phases) {
       await deliver(
         strapi,
-        admins,
+        recipients,
         phaseDatesChangedMessage({
           phaseTitle: phase.title,
           programName: program.name,

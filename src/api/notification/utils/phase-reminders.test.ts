@@ -7,7 +7,7 @@ vi.mock("./recipients", () => ({
   ongAdmins: vi.fn(),
 }));
 
-import { ongAdmins } from "./recipients";
+import { activeAmong, ongAdmins } from "./recipients";
 import { notifyPhasesEndingSoon, reminderTargetDay } from "./phase-ending-soon";
 import { notifyPhaseDatesChanged, phasesWithChangedDates } from "./events";
 import { phaseDatesChangedMessage, phaseEndingSoonMessage } from "./messages";
@@ -30,6 +30,7 @@ beforeEach(() => {
   notify.mockResolvedValue(1);
   update.mockResolvedValue({});
   vi.mocked(ongAdmins).mockResolvedValue([20, 21]);
+  vi.mocked(activeAmong).mockResolvedValue([30]);
 });
 
 describe("date helpers", () => {
@@ -75,7 +76,10 @@ describe("message builders", () => {
 
 describe("notifyPhasesEndingSoon", () => {
   const target = reminderTargetDay(todayInBucharest());
-  const phase = (documentId: string, program: any = { name: "SCA", ongs: [{ id: 5 }, { id: 6 }] }) => ({
+  const phase = (
+    documentId: string,
+    program: any = { name: "SCA", ongs: [{ id: 5 }, { id: 6 }], mentors: [{ id: 30 }, { id: 31 }] },
+  ) => ({
     documentId,
     title: `Faza ${documentId}`,
     program,
@@ -93,13 +97,14 @@ describe("notifyPhasesEndingSoon", () => {
     });
   });
 
-  it("reminds the program's ONG admins, then records the end date", async () => {
+  it("reminds the program's ONG admins and active mentors, then records the end date", async () => {
     findMany.mockResolvedValue([phase("a")]);
     await notifyPhasesEndingSoon(strapi);
     expect(ongAdmins).toHaveBeenCalledWith(strapi, [5, 6]);
+    expect(activeAmong).toHaveBeenCalledWith(strapi, [30, 31]);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0]).toMatchObject({
-      recipients: [20, 21],
+      recipients: [20, 21, 30],
       type: "phase-ending-soon",
       body: expect.stringContaining("Faza „Faza a” din programul SCA"),
     });
@@ -115,9 +120,17 @@ describe("notifyPhasesEndingSoon", () => {
     expect(notify).toHaveBeenCalledTimes(2);
   });
 
-  it("a phase without ONG admins is marked without notifying", async () => {
+  it("mentors are reminded even when the program has no ONG admins", async () => {
     vi.mocked(ongAdmins).mockResolvedValue([]);
-    findMany.mockResolvedValue([phase("a", { name: "SCA", ongs: [] })]);
+    findMany.mockResolvedValue([phase("a", { name: "SCA", ongs: [], mentors: [{ id: 30 }] })]);
+    await notifyPhasesEndingSoon(strapi);
+    expect(notify.mock.calls[0][0].recipients).toEqual([30]);
+  });
+
+  it("a phase without ONG admins or mentors is marked without notifying", async () => {
+    vi.mocked(ongAdmins).mockResolvedValue([]);
+    vi.mocked(activeAmong).mockResolvedValue([]);
+    findMany.mockResolvedValue([phase("a", { name: "SCA", ongs: [], mentors: [] })]);
     await notifyPhasesEndingSoon(strapi);
     expect(notify).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledTimes(1);
@@ -220,13 +233,14 @@ describe("notifyPhaseDatesChanged", () => {
     { title: "B", startDate: "2026-11-26", endDate: "2026-12-10" },
   ];
 
-  it("one notification per phase to the program's ONG admins", async () => {
-    findOne.mockResolvedValue({ name: "SCA", ongs: [{ id: 5 }] });
+  it("one notification per phase to the program's ONG admins and active mentors", async () => {
+    findOne.mockResolvedValue({ name: "SCA", ongs: [{ id: 5 }], mentors: [{ id: 30 }, { id: 31 }] });
     await notifyPhaseDatesChanged(strapi, { programDocumentId: "p1", phases: changed });
     expect(ongAdmins).toHaveBeenCalledWith(strapi, [5]);
+    expect(activeAmong).toHaveBeenCalledWith(strapi, [30, 31]);
     expect(notify).toHaveBeenCalledTimes(2);
     expect(notify.mock.calls[0][0]).toMatchObject({
-      recipients: [20, 21],
+      recipients: [20, 21, 30],
       type: "phase-dates-changed",
       body: "Faza „A” din programul SCA se desfășoară acum între 01.11.2026 și 25.11.2026.",
     });

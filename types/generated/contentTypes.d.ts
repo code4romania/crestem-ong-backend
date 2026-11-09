@@ -1306,6 +1306,9 @@ export interface ApiNotificationNotification
         'mentor-assigned',
         'ong-added-to-program',
         'ong-registered',
+        'message-received',
+        'phase-ending-soon',
+        'phase-dates-changed',
       ]
     > &
       Schema.Attribute.Required;
@@ -1474,6 +1477,7 @@ export interface ApiPhasePhase extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     endDate: Schema.Attribute.Date & Schema.Attribute.Required;
     endNotifiedAt: Schema.Attribute.DateTime;
+    endReminderSentFor: Schema.Attribute.Date;
     hasEvaluation: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<true>;
