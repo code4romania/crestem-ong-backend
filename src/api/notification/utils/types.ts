@@ -9,6 +9,9 @@ export const NOTIFICATION_TYPES = [
   "mentor-assigned",
   "ong-added-to-program",
   "ong-registered",
+  "message-received",
+  "phase-ending-soon",
+  "phase-dates-changed",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

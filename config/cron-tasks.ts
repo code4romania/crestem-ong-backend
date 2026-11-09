@@ -3,6 +3,7 @@ import { allPhasesEnded } from '../src/api/report/utils/association';
 import { toDateString, todayInBucharest } from '../src/utils/date';
 
 import { notifyEndedPhases } from '../src/api/notification/utils/phase-ended';
+import { notifyPhasesEndingSoon } from '../src/api/notification/utils/phase-ending-soon';
 
 const REPORT_UID = 'api::report.report' as const;
 const PROGRAM_UID = 'api::program.program' as const;
@@ -64,6 +65,19 @@ export default {
   notifyEndedPhases: {
     task: async ({ strapi }: { strapi: any }) => {
       await notifyEndedPhases(strapi);
+    },
+    options: {
+      rule: '0 0 * * *',
+      tz: 'Europe/Bucharest',
+    },
+  },
+  /**
+   * In-app reminder to the ONG admins of a program whose phase ends in exactly
+   * three days. Runs every day at midnight, Romanian time.
+   */
+  notifyPhasesEndingSoon: {
+    task: async ({ strapi }: { strapi: any }) => {
+      await notifyPhasesEndingSoon(strapi);
     },
     options: {
       rule: '0 0 * * *',
