@@ -1,5 +1,5 @@
 /**
- * A set of functions called "actions" for `auth`
+ * A set of functions called "actions" for auth
  */
 import { Context } from "koa";
 import {
